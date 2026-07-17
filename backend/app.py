@@ -21,6 +21,7 @@ from conga_core import map as cmap
 from conga_core.config import load_env
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
+from backend.schedules import ScheduleStore
 
 STATIC = Path(__file__).parent / "static"
 
@@ -36,10 +37,18 @@ else:
 
 clients: set[WebSocket] = set()
 zones = ZoneStore()               # zonas de Clean Assistant (persiste en zones.json)
+schedules = ScheduleStore()       # horarios (persiste en schedules.json)
 
 
 def _map_head_id() -> int:
     return getattr(robot.state, "map_head_id", None) or 1700000000
+
+
+def _rooms_meta() -> dict:
+    m = getattr(robot, "map", None)
+    if m and m.get("rooms"):
+        return {r["id"]: {"name": r["name"]} for r in m["rooms"]}
+    return {}
 
 
 def _send_zone_group(group: str):
@@ -93,6 +102,15 @@ async def broadcast_map():
 
 async def broadcast_zones():
     msg = json.dumps({"type": "zones", "zones": zones.zones})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
+async def broadcast_schedules():
+    msg = json.dumps({"type": "schedules", "schedules": schedules.plans})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -175,6 +193,38 @@ async def zone_delete(payload: dict):
     return {"ok": True, "zones": zones.zones}
 
 
+@app.get("/api/schedules")
+def get_schedules():
+    return {"schedules": schedules.plans}
+
+
+@app.post("/api/schedules/save")
+async def schedule_save(payload: dict):
+    plan = payload.get("plan") or payload
+    p = schedules.upsert(plan)
+    robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
+    await broadcast_schedules()
+    return {"ok": True, "plan": p, "schedules": schedules.plans}
+
+
+@app.post("/api/schedules/toggle")
+async def schedule_toggle(payload: dict):
+    p = schedules.toggle(payload["id"], payload.get("enable", True))
+    if p:
+        robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
+    await broadcast_schedules()
+    return {"ok": True, "schedules": schedules.plans}
+
+
+@app.post("/api/schedules/delete")
+async def schedule_delete(payload: dict):
+    p = schedules.delete(payload["id"])
+    if p:
+        robot.command(schedules.delete_command(p))
+    await broadcast_schedules()
+    return {"ok": True, "schedules": schedules.plans}
+
+
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     await ws.accept()
@@ -184,6 +234,8 @@ async def websocket(ws: WebSocket):
         await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
     if zones.zones:
         await ws.send_text(json.dumps({"type": "zones", "zones": zones.zones}))
+    if schedules.plans:
+        await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.plans}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto

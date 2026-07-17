@@ -150,6 +150,11 @@
   .days{display:flex;gap:4px;margin:11px 0 10px}
   .day{width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:11px;font-weight:560;background:var(--inset);color:var(--faint)}
   .day.on{background:var(--accent);color:#fff}
+  .days.edit .day{cursor:pointer}
+  .tinput{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}
+  .tinput:focus{outline:none;border-color:var(--accent)}
+  .sched .actions{display:flex;gap:8px;margin-top:11px}
+  .sched .actions .btn{padding:9px;font-size:12.5px}
   .perroom{display:flex;flex-wrap:wrap;gap:5px}
   .pr{font-size:11.5px;color:var(--muted);background:var(--inset);padding:4px 9px;border-radius:7px}
   .pr b{color:var(--ink);font-weight:600}
@@ -265,18 +270,28 @@
       </div>
 
       <div class="tabpane" data-pane="horarios">
-        <p class="hint">El robot limpia solo, con el modo de cada habitación.</p>
-        <div class="sched">
-          <div class="top"><span class="nm">Noche entre semana</span><span class="tm">22:30</span><button class="toggle" aria-pressed="true" style="margin-left:auto"></button></div>
-          <div class="days"><span class="day on">L</span><span class="day on">M</span><span class="day on">X</span><span class="day on">J</span><span class="day on">V</span><span class="day">S</span><span class="day">D</span></div>
-          <div class="perroom"><span class="pr"><b>Cocina</b> · Turbo · Alto · x2</span><span class="pr"><b>Salón</b> · Normal · Bajo</span></div>
+        <p class="hint">El robot limpia solo a la hora y días elegidos, con el modo de cada habitación.</p>
+        <div id="schedList"></div>
+        <div class="btnrow" id="schedListBtns"><button class="btn ghost" id="newSched">+ Nuevo horario</button></div>
+
+        <div id="schedEditor" style="display:none">
+          <div class="phead" id="schedEditTitle">Nuevo horario</div>
+          <div class="field"><label>Nombre</label><input type="text" id="sName" class="tinput" placeholder="Noche entre semana"/></div>
+          <div class="field"><label>Hora</label><input type="time" id="sTime" class="tinput" value="22:30"/></div>
+          <div class="field"><label>Días</label><div class="days edit" id="sDays"></div></div>
+          <div class="field"><label>Habitaciones</label><div class="rooms" id="sRooms"></div></div>
+          <div class="phead">Succión (todas)</div>
+          <div class="seg" id="sFan"><button data-v="Eco">Eco</button><button data-v="Normal" aria-pressed="true">Normal</button><button data-v="Turbo">Turbo</button></div>
+          <div class="phead">Agua</div>
+          <div class="seg" id="sWater"><button data-v="Off">Off</button><button data-v="Bajo">Bajo</button><button data-v="Medio" aria-pressed="true">Medio</button><button data-v="Alto">Alto</button></div>
+          <div class="phead">Mopa</div>
+          <div class="seg" id="sMop"><button data-v="Off">Off</button><button data-v="Estándar" aria-pressed="true">Estándar</button><button data-v="Fuerte">Fuerte</button><button data-v="Potente">Potente</button></div>
+          <div class="row"><div class="rt"><div class="t">Doble pasada (x2)</div></div><button class="toggle" id="sTwice"></button></div>
+          <div class="btnrow">
+            <button class="btn" id="saveSched">Guardar horario</button>
+            <button class="btn ghost" id="cancelSched">Cancelar</button>
+          </div>
         </div>
-        <div class="sched">
-          <div class="top"><span class="nm">Repaso fin de semana</span><span class="tm">10:00</span><button class="toggle" style="margin-left:auto"></button></div>
-          <div class="days"><span class="day">L</span><span class="day">M</span><span class="day">X</span><span class="day">J</span><span class="day">V</span><span class="day on">S</span><span class="day on">D</span></div>
-          <div class="perroom"><span class="pr"><b>Toda la casa</b> · Auto</span><span class="pr"><b>Baños</b> · Fregado</span></div>
-        </div>
-        <div class="btnrow"><button class="btn ghost">+ Nuevo horario</button></div>
       </div>
 
       <div class="tabpane" data-pane="ajustes">
@@ -455,6 +470,7 @@
       svg.classList.add('hidden'); cv.classList.add('show'); renderRealMap();
     }
     syncSel();
+    if(typeof renderSchedules==='function') renderSchedules();
   }
   function _hex(c){ c=(c||'').trim();
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
@@ -574,16 +590,94 @@
     }
   });
 
+  // ---- horarios (setOrder6090) ----
+  var SCHEDULES=[], editingId=null;
+  var DAY_KEYS=[['lun','L'],['mar','M'],['mie','X'],['jue','J'],['vie','V'],['sab','S'],['dom','D']];
+  function roomName(id){ var r=(ROOMS||[]).filter(function(x){return x.id===id;})[0]; return r?r.name:('Hab '+id); }
+  function segVal(id){ var b=document.querySelector('#'+id+' [aria-pressed="true"]'); return b?(b.dataset.v||b.textContent.trim()):null; }
+  function segSet(id,val){ document.querySelectorAll('#'+id+' button').forEach(function(b){ b.setAttribute('aria-pressed',(b.dataset.v||b.textContent.trim())===val); }); }
+
+  function renderSchedules(){
+    var el=document.getElementById('schedList'); if(!el)return; el.innerHTML='';
+    if(!SCHEDULES.length){ el.innerHTML='<p class="hint" style="opacity:.65">Aún no hay horarios.</p>'; return; }
+    SCHEDULES.forEach(function(p){
+      var days=DAY_KEYS.map(function(d){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+d[1]+'</span>';}).join('');
+      var rooms=(p.rooms||[]).map(function(r){return '<span class="pr"><b>'+roomName(r.room)+'</b> · '+(r.fan||'')+(r.twice?' · x2':'')+'</span>';}).join('');
+      var card=document.createElement('div'); card.className='sched';
+      card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+(p.time||'')+'</span><button class="toggle sEn" style="margin-left:auto" aria-pressed="'+(p.enable?'true':'false')+'"></button></div>'+
+        '<div class="days">'+days+'</div><div class="perroom">'+rooms+'</div>'+
+        '<div class="actions"><button class="btn ghost sEd">Editar</button><button class="btn ghost sDel">Borrar</button></div>';
+      card.querySelector('.nm').textContent=p.name||p.id;
+      card.querySelector('.sEn').addEventListener('click',function(){ var on=this.getAttribute('aria-pressed')!=='true'; this.setAttribute('aria-pressed',on); toggleSched(p.id,on); });
+      card.querySelector('.sEd').addEventListener('click',function(){ openEditor(p); });
+      card.querySelector('.sDel').addEventListener('click',function(){ if(confirm('¿Borrar el horario "'+(p.name||p.id)+'"?')) delSched(p.id); });
+      el.appendChild(card);
+    });
+  }
+  function buildEditorDays(sel){
+    var el=document.getElementById('sDays'); el.innerHTML='';
+    DAY_KEYS.forEach(function(d){ var s=document.createElement('span'); s.className='day'+(sel.indexOf(d[0])>=0?' on':''); s.textContent=d[1]; s.dataset.day=d[0];
+      s.addEventListener('click',function(){ s.classList.toggle('on'); }); el.appendChild(s); });
+  }
+  function buildEditorRooms(sel){
+    var el=document.getElementById('sRooms'); el.innerHTML='';
+    (ROOMS||[]).forEach(function(r,i){ var b=document.createElement('button'); b.className='rchip'+(sel.indexOf(r.id)>=0?' sel':''); b.dataset.id=r.id;
+      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,i)+')"></span>'+r.name+'<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4 10-11"/></svg>';
+      b.addEventListener('click',function(){ b.classList.toggle('sel'); }); el.appendChild(b); });
+  }
+  function openEditor(plan){
+    editingId=plan?plan.id:null;
+    document.getElementById('schedEditTitle').textContent=plan?'Editar horario':'Nuevo horario';
+    document.getElementById('sName').value=plan?(plan.name||''):'';
+    document.getElementById('sTime').value=plan?(plan.time||'22:30'):'22:30';
+    buildEditorDays(plan?(plan.days||[]):['lun','mar','mie','jue','vie']);
+    buildEditorRooms(plan?(plan.rooms||[]).map(function(r){return r.room;}):[]);
+    var m=(plan&&plan.rooms&&plan.rooms[0])||{};
+    segSet('sFan',m.fan||'Normal'); segSet('sWater',m.water||'Medio'); segSet('sMop',m.mop||'Estándar');
+    document.getElementById('sTwice').setAttribute('aria-pressed',m.twice?'true':'false');
+    document.getElementById('schedList').style.display='none';
+    document.getElementById('schedListBtns').style.display='none';
+    document.getElementById('schedEditor').style.display='block';
+  }
+  function closeEditor(){
+    document.getElementById('schedEditor').style.display='none';
+    document.getElementById('schedList').style.display='';
+    document.getElementById('schedListBtns').style.display='';
+    editingId=null;
+  }
+  function collectPlan(){
+    var days=Array.prototype.map.call(document.querySelectorAll('#sDays .day.on'),function(s){return s.dataset.day;});
+    var ids=Array.prototype.map.call(document.querySelectorAll('#sRooms .rchip.sel'),function(b){return +b.dataset.id;});
+    var fan=segVal('sFan'),water=segVal('sWater'),mop=segVal('sMop'),twice=document.getElementById('sTwice').getAttribute('aria-pressed')==='true';
+    var p={name:document.getElementById('sName').value.trim()||'Horario',time:document.getElementById('sTime').value||'22:30',
+           days:days,rooms:ids.map(function(id){return {room:id,fan:fan,water:water,mop:mop,twice:twice};}),enable:true};
+    if(editingId)p.id=editingId;
+    return p;
+  }
+  document.getElementById('newSched').addEventListener('click',function(){ openEditor(null); });
+  document.getElementById('cancelSched').addEventListener('click',closeEditor);
+  document.getElementById('saveSched').addEventListener('click',function(){
+    var p=collectPlan();
+    if(!p.days.length){ alert('Elige al menos un día.'); return; }
+    if(!p.rooms.length){ alert('Elige al menos una habitación.'); return; }
+    fetch('/api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:p})})
+      .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); closeEditor(); });
+  });
+  function toggleSched(id,on){ fetch('/api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
+  function delSched(id){ fetch('/api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
+
   // ---- carga inicial + WebSocket ----
   fetch('/api/map').then(function(r){return r.json();}).then(applyMap);
   fetch('/api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
+  fetch('/api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+'/ws');
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
       if(m.type==='state'){st=m.state;render();}
       else if(m.type==='map'){applyMap(m.map);}
-      else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}};
+      else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
+      else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }

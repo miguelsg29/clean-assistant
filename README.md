@@ -31,7 +31,10 @@ desarrollar la interfaz sin un Conga real:
 - ✅ **Zonas** (prohibida / sin fregona / limpieza): se dibujan como rectángulos sobre
   el mapa, se convierten a metros y se envían con `set_virwall`/`set_area`; persistentes
   (`zones.json`), con lista y borrado. Flujo completo verificado por la API.
-- ⬜ Editor visual de **horarios**; puente **MQTT** opcional para Home Assistant.
+- ✅ **Horarios** (`setOrder6090`): editor visual (nombre, hora, días, habitaciones y
+  modo), con lista, activar/desactivar y borrar; persistentes (`schedules.json`).
+- ⬜ Puente **MQTT** opcional para Home Assistant; posición del robot en vivo durante
+  la limpieza; modo por habitación en el editor de horarios.
 - ⬜ Puente **MQTT** opcional para Home Assistant.
 
 ## Arquitectura
