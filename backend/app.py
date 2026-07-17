@@ -9,6 +9,7 @@ Arrancar:  uvicorn backend.app:app --reload
 from __future__ import annotations
 import asyncio
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -17,10 +18,21 @@ from fastapi.staticfiles import StaticFiles
 
 from conga_core import commands as cmd
 from conga_core import map as cmap
+from conga_core.config import load_env
 from backend.mock import MockRobot
 
 STATIC = Path(__file__).parent / "static"
-robot = MockRobot()
+
+# CONGA_MODE=real -> servidor TLS+WS que habla con tu Conga (necesita datos en .env
+# y certificados). Por defecto 'mock': robot simulado, para desarrollar sin robot.
+MODE = (load_env()("CONGA_MODE", "mock") or "mock").lower()
+if MODE == "real":
+    from conga_core.robot import RealRobot
+    from conga_core.config import RobotConfig
+    robot = RealRobot(RobotConfig.from_env())
+else:
+    robot = MockRobot()
+
 clients: set[WebSocket] = set()
 
 
@@ -66,6 +78,14 @@ async def _loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    loop = asyncio.get_running_loop()
+    # push inmediato: cuando el robot real cambia de estado, retransmitimos ya.
+    robot.on_update = lambda: asyncio.run_coroutine_threadsafe(broadcast(), loop)
+    try:
+        robot.start()
+    except Exception as e:
+        print(f"[robot] no se pudo arrancar el servidor ({MODE}): {e}")
+    print(f"[Clean Assistant] modo={MODE}")
     task = asyncio.create_task(_loop())
     yield
     task.cancel()

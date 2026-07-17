@@ -1,0 +1,81 @@
+"""Configuración e identidad del robot para el servidor local (RealRobot)."""
+from __future__ import annotations
+import base64
+import json
+import os
+from dataclasses import dataclass
+
+# GUID mágico del handshake WebSocket (RFC 6455) que usa el firmware del robot.
+WS_MAGIC = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+
+
+def load_env(path: str = ".env"):
+    """Lector simple de .env; prioridad: variable de entorno > .env > default."""
+    env = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip().strip('"').strip("'")
+
+    def get(key, default=None):
+        return os.environ.get(key, env.get(key, default))
+    return get
+
+
+def make_synthetic_jwt(did, factory_id) -> str:
+    """JWT con estructura válida, firma FALSA y SIN caducidad. El robot no valida
+    la firma (solo necesita code:0 y respuesta bien formada)."""
+    def b64url(d):
+        return base64.urlsafe_b64encode(d).decode().rstrip("=")
+    header = {"typ": "JWT", "alg": "HS256"}
+    payload = {"value": json.dumps({"data": {"FACTORY_ID": str(factory_id)},
+               "clientType": "ROBOT", "id": str(did), "resetCode": 0}),
+               "version": None, "scope": None, "timestamp": None}
+    h = b64url(json.dumps(header, separators=(",", ":")).encode())
+    p = b64url(json.dumps(payload, separators=(",", ":")).encode())
+    return f"{h}.{p}.SYNTHETIC0SIGNATURE0NO0VALIDATION0NEEDED000000000000000000000"
+
+
+@dataclass
+class RobotConfig:
+    """Identificadores de TU Conga (salen del login capturado con el MITM) y
+    parámetros del servidor. Los valores por defecto son de EJEMPLO."""
+    did: int = 123456
+    userid: int = 654321
+    sn: str = "500400000000"
+    mac: str = "12:34:56:78:9A:BC"
+    factory_id: str = "1003"
+    project_type: str = "CECOTECCRL350-1001"
+    listen_port: int = 9090
+    cert_path: str = "cert.pem"
+    key_path: str = "key.pem"
+    auth_jwt: str = ""     # vacío -> se genera un JWT sintético
+
+    @property
+    def jwt(self) -> str:
+        return self.auth_jwt or make_synthetic_jwt(self.did, self.factory_id)
+
+    @property
+    def configured(self) -> bool:
+        """True si parece configurado con datos reales (no los de ejemplo)."""
+        return self.did != 123456 and self.sn != "500400000000"
+
+    @classmethod
+    def from_env(cls, path: str = ".env") -> "RobotConfig":
+        e = load_env(path)
+        return cls(
+            did=int(e("ROBOT_DID", "123456")),
+            userid=int(e("ROBOT_USERID", "654321")),
+            sn=e("ROBOT_SN", "500400000000"),
+            mac=e("ROBOT_MAC", "12:34:56:78:9A:BC"),
+            factory_id=e("FACTORY_ID", "1003"),
+            project_type=e("PROJECT_TYPE", "CECOTECCRL350-1001"),
+            listen_port=int(e("LISTEN_PORT", "9090")),
+            cert_path=e("CERT_PATH", "cert.pem"),
+            key_path=e("KEY_PATH", "key.pem"),
+            auth_jwt=(e("AUTH_JWT", "") or "").strip(),
+        )

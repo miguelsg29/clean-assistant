@@ -20,7 +20,9 @@ desarrollar la interfaz sin un Conga real:
 - ✅ Frontend cableado en vivo: mapa, selección de habitaciones, dock de control
   (iniciar/pausar/base/localizar), modos, succión/agua/mopa, y ajustes (voz, no
   molestar, OTA, vaciar base…).
-- ⬜ **Robot real** (servidor TLS+WS que suplanta la nube) — misma interfaz que el mock.
+- ✅ **Robot real** (`RealRobot`): servidor TLS+WS que suplanta la nube, login con
+  JWT sintético, report_data → estado, envío de comandos. Misma interfaz que el mock;
+  verificado de punta a punta con un robot simulado.
 - ⬜ **Mapa real** (decodificador zlib+Protobuf del robot).
 - ⬜ Edición de **zonas** dibujando en el mapa; editor visual de **horarios**.
 - ⬜ Puente **MQTT** opcional para Home Assistant.
@@ -53,6 +55,18 @@ uvicorn backend.app:app --reload --port 8000
 
 Abre **http://localhost:8000**. Verás la interfaz con el robot simulado: pulsa
 *Iniciar* y observa cómo cambia el estado en vivo (por WebSocket).
+
+### Modo real (contra tu Conga)
+
+1. Copia `.env.example` a `.env`, pon `CONGA_MODE=real` y rellena los IDs de tu robot
+   (`ROBOT_DID`, `ROBOT_USERID`, `ROBOT_SN`, `ROBOT_MAC`) — salen del login capturado.
+2. Redirige el DNS de `tcp-cecotec.3irobotix.net` a la IP de esta máquina y abre el
+   puerto 9090. Los certificados se generan solos (openssl) si no existen.
+3. Arranca igual (`uvicorn backend.app:app`) y reinicia el robot (corte de luz). En
+   el log verás `[robot] conectado` y el estado real en la interfaz.
+
+> ⚠️ El puente MQTT y Clean Assistant usan el mismo puerto 9090: no los ejecutes a la
+> vez apuntando ambos al robot.
 
 ## Estructura
 

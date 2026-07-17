@@ -17,6 +17,10 @@ class MockRobot:
             consumables={"main_brush": 74, "side_brush": 68, "filter": 22, "dishcloth": 81},
             auto_upgrade=0,
         )
+        self.on_update = None      # interfaz común con RealRobot (sin uso en el mock)
+
+    def start(self):
+        pass                       # el mock no arranca ningún servidor
 
     # --- recibe el objeto `control` ya construido y simula su efecto ---
     def command(self, control: dict) -> dict:
