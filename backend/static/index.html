@@ -124,6 +124,10 @@
   .rchip.sel .check{color:var(--accent)}
   .check{display:none;width:14px;height:14px}
   .rchip.sel .check{display:block}
+  .rmode{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0}
+  .rmhead{font-weight:600;font-size:13.5px}
+  .rmlbl{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:9px 0 4px}
+  .rmx2{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:13px;font-weight:500}
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
@@ -267,6 +271,7 @@
         <div class="seg" data-cmd="water"><button>Off</button><button>Bajo</button><button aria-pressed="true">Medio</button><button>Alto</button></div>
         <div class="phead">Mopa</div>
         <div class="seg" data-cmd="mop"><button>Off</button><button aria-pressed="true">Estándar</button><button>Fuerte</button><button>Potente</button></div>
+        <div class="row" style="margin-top:8px"><div class="rt"><div class="t">Doble pasada (x2)</div><div class="d">Pasa dos veces por cada zona</div></div><button class="toggle" id="twiceTog"></button></div>
         <div class="btnrow">
           <button class="btn" id="cleanSel" disabled>Limpiar selección</button>
           <button class="btn ghost" id="cleanAll">Limpieza completa de la casa</button>
@@ -294,13 +299,8 @@
           <div class="field"><label>Hora</label><input type="time" id="sTime" class="tinput" value="22:30"/></div>
           <div class="field"><label>Días</label><div class="days edit" id="sDays"></div></div>
           <div class="field"><label>Habitaciones</label><div class="rooms" id="sRooms"></div></div>
-          <div class="phead">Succión (todas)</div>
-          <div class="seg" id="sFan"><button data-v="Eco">Eco</button><button data-v="Normal" aria-pressed="true">Normal</button><button data-v="Turbo">Turbo</button></div>
-          <div class="phead">Agua</div>
-          <div class="seg" id="sWater"><button data-v="Off">Off</button><button data-v="Bajo">Bajo</button><button data-v="Medio" aria-pressed="true">Medio</button><button data-v="Alto">Alto</button></div>
-          <div class="phead">Mopa</div>
-          <div class="seg" id="sMop"><button data-v="Off">Off</button><button data-v="Estándar" aria-pressed="true">Estándar</button><button data-v="Fuerte">Fuerte</button><button data-v="Potente">Potente</button></div>
-          <div class="row"><div class="rt"><div class="t">Doble pasada (x2)</div></div><button class="toggle" id="sTwice"></button></div>
+          <div class="phead">Modo por habitación</div>
+          <div id="roomModes"></div>
           <div class="btnrow">
             <button class="btn" id="saveSched">Guardar horario</button>
             <button class="btn ghost" id="cancelSched">Cancelar</button>
@@ -441,7 +441,7 @@
   document.getElementById('homeBtn').addEventListener('click',function(){api('home');});
   document.getElementById('locBtn').addEventListener('click',function(){api('locate');});
   document.getElementById('cleanSel').addEventListener('click',function(){
-    if(selected.size)api('clean_rooms',{rooms:Array.from(selected)});
+    if(selected.size)api('clean_rooms',{rooms:Array.from(selected),twice:twiceOn});
   });
   document.getElementById('cleanAll').addEventListener('click',function(){api('clean_all');});
   document.getElementById('dustBtn').addEventListener('click',function(){api('dust');});
@@ -460,6 +460,8 @@
   wireToggle('voiceTog',function(on){api('voice',{on:on,volume:+document.getElementById('vol').value});});
   wireToggle('otaTog',function(on){api('ota',{value:on});});
   wireToggle('carpetTog',function(on){api('carpet_turbo',{value:on});});
+  var twiceOn=false;   // doble pasada para "Limpiar selección" (modo x2)
+  wireToggle('twiceTog',function(on){twiceOn=on;api('twice',{value:on});});
   function hm2min(s){var p=String(s||'0:0').split(':');return (+p[0])*60+(+p[1]);}
   function sendQuiet(){
     var on=document.getElementById('quietTog').getAttribute('aria-pressed')==='true';
@@ -470,7 +472,7 @@
   document.getElementById('quietBegin').addEventListener('change',sendQuiet);
   document.getElementById('quietEnd').addEventListener('change',sendQuiet);
   // toggles solo-visuales (se leen al guardar): doble pasada del editor de horarios, etc.
-  document.querySelectorAll('.zrow .toggle,.sched .toggle,#sTwice').forEach(function(t){
+  document.querySelectorAll('.zrow .toggle,.sched .toggle').forEach(function(t){
     t.addEventListener('click',function(){t.setAttribute('aria-pressed',t.getAttribute('aria-pressed')!=='true');});
   });
   var vol=document.getElementById('vol');
@@ -700,11 +702,12 @@
   });
 
   // ---- horarios (setOrder6090) ----
-  var SCHEDULES=[], editingId=null;
+  var SCHEDULES=[], editingId=null, editorModes={};   // editorModes: modo por habitación {id:{fan,water,mop,twice}}
+  var MODE_OPTS={fan:['Eco','Normal','Turbo'],water:['Off','Bajo','Medio','Alto'],mop:['Off','Estándar','Fuerte','Potente']};
+  var MODE_LBL={fan:'Succión',water:'Agua',mop:'Mopa'};
+  var MODE_DEF={fan:'Normal',water:'Medio',mop:'Estándar',twice:false};
   var DAY_KEYS=[['lun','L'],['mar','M'],['mie','X'],['jue','J'],['vie','V'],['sab','S'],['dom','D']];
   function roomName(id){ var r=(ROOMS||[]).filter(function(x){return x.id===id;})[0]; return r?r.name:('Hab '+id); }
-  function segVal(id){ var b=document.querySelector('#'+id+' [aria-pressed="true"]'); return b?(b.dataset.v||b.textContent.trim()):null; }
-  function segSet(id,val){ document.querySelectorAll('#'+id+' button').forEach(function(b){ b.setAttribute('aria-pressed',(b.dataset.v||b.textContent.trim())===val); }); }
 
   function renderSchedules(){
     var el=document.getElementById('schedList'); if(!el)return; el.innerHTML='';
@@ -730,9 +733,40 @@
   }
   function buildEditorRooms(sel){
     var el=document.getElementById('sRooms'); el.innerHTML='';
-    (ROOMS||[]).forEach(function(r,i){ var b=document.createElement('button'); b.className='rchip'+(sel.indexOf(r.id)>=0?' sel':''); b.dataset.id=r.id;
-      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,i)+')"></span>'+r.name+'<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4 10-11"/></svg>';
-      b.addEventListener('click',function(){ b.classList.toggle('sel'); }); el.appendChild(b); });
+    (ROOMS||[]).forEach(function(r){
+      if(r.named===false)return;                       // no ofrecer segmentos temporales
+      var b=document.createElement('button'); b.className='rchip'+(sel.indexOf(r.id)>=0?' sel':''); b.dataset.id=r.id;
+      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,(IDX[r.id]!=null?IDX[r.id]:0))+')"></span>'+r.name+'<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4 10-11"/></svg>';
+      b.addEventListener('click',function(){ b.classList.toggle('sel'); renderRoomModes(); }); el.appendChild(b); });
+  }
+  function buildModeSeg(field,current,onChange){
+    var seg=document.createElement('div'); seg.className='seg';
+    MODE_OPTS[field].forEach(function(opt){
+      var b=document.createElement('button'); b.textContent=opt; b.dataset.v=opt;
+      if(opt===current)b.setAttribute('aria-pressed','true');
+      b.addEventListener('click',function(){ seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);}); onChange(opt); });
+      seg.appendChild(b);
+    });
+    return seg;
+  }
+  function renderRoomModes(){
+    var host=document.getElementById('roomModes'); host.innerHTML='';
+    var sel=Array.prototype.map.call(document.querySelectorAll('#sRooms .rchip.sel'),function(b){return +b.dataset.id;});
+    if(!sel.length){ host.innerHTML='<p class="hint" style="opacity:.65">Elige habitaciones para configurar su modo.</p>'; return; }
+    sel.forEach(function(id){
+      var mode=editorModes[id]||(editorModes[id]=Object.assign({},MODE_DEF));
+      var card=document.createElement('div'); card.className='rmode';
+      var head=document.createElement('div'); head.className='rmhead'; head.textContent=roomName(id); card.appendChild(head);
+      ['fan','water','mop'].forEach(function(field){
+        var lab=document.createElement('div'); lab.className='rmlbl'; lab.textContent=MODE_LBL[field]; card.appendChild(lab);
+        card.appendChild(buildModeSeg(field,mode[field],function(v){mode[field]=v;}));
+      });
+      var row=document.createElement('div'); row.className='rmx2'; row.innerHTML='<span>Doble pasada (x2)</span>';
+      var tog=document.createElement('button'); tog.className='toggle'; tog.setAttribute('aria-pressed',mode.twice?'true':'false');
+      tog.addEventListener('click',function(){ var on=tog.getAttribute('aria-pressed')!=='true'; tog.setAttribute('aria-pressed',on); mode.twice=on; });
+      row.appendChild(tog); card.appendChild(row);
+      host.appendChild(card);
+    });
   }
   function openEditor(plan){
     editingId=plan?plan.id:null;
@@ -740,10 +774,10 @@
     document.getElementById('sName').value=plan?(plan.name||''):'';
     document.getElementById('sTime').value=plan?(plan.time||'22:30'):'22:30';
     buildEditorDays(plan?(plan.days||[]):['lun','mar','mie','jue','vie']);
+    editorModes={};
+    if(plan){ (plan.rooms||[]).forEach(function(r){ editorModes[r.room]={fan:r.fan||'Normal',water:r.water||'Medio',mop:r.mop||'Estándar',twice:!!r.twice}; }); }
     buildEditorRooms(plan?(plan.rooms||[]).map(function(r){return r.room;}):[]);
-    var m=(plan&&plan.rooms&&plan.rooms[0])||{};
-    segSet('sFan',m.fan||'Normal'); segSet('sWater',m.water||'Medio'); segSet('sMop',m.mop||'Estándar');
-    document.getElementById('sTwice').setAttribute('aria-pressed',m.twice?'true':'false');
+    renderRoomModes();
     document.getElementById('schedList').style.display='none';
     document.getElementById('schedListBtns').style.display='none';
     document.getElementById('schedEditor').style.display='block';
@@ -757,9 +791,8 @@
   function collectPlan(){
     var days=Array.prototype.map.call(document.querySelectorAll('#sDays .day.on'),function(s){return s.dataset.day;});
     var ids=Array.prototype.map.call(document.querySelectorAll('#sRooms .rchip.sel'),function(b){return +b.dataset.id;});
-    var fan=segVal('sFan'),water=segVal('sWater'),mop=segVal('sMop'),twice=document.getElementById('sTwice').getAttribute('aria-pressed')==='true';
     var p={name:document.getElementById('sName').value.trim()||'Horario',time:document.getElementById('sTime').value||'22:30',
-           days:days,rooms:ids.map(function(id){return {room:id,fan:fan,water:water,mop:mop,twice:twice};}),enable:true};
+           days:days,rooms:ids.map(function(id){ var m=editorModes[id]||MODE_DEF; return {room:id,fan:m.fan,water:m.water,mop:m.mop,twice:!!m.twice}; }),enable:true};
     if(editingId)p.id=editingId;
     return p;
   }
