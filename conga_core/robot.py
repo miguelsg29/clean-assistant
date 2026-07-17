@@ -33,12 +33,15 @@ class RealRobot:
         self.cfg = cfg
         self.state = RobotState()
         self.map = None                # último mapa decodificado (dict del frontend)
+        self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
         self.on_update = None          # callback opcional (estado -> push)
         self.on_map = None             # callback opcional (mapa -> push)
+        self.on_pose = None            # callback opcional (solo pose -> push ligero)
         self.log = logger
         self._sock = None
         self._lock = threading.Lock()
         self._diag = {"quiet": 0, "info": 0}
+        self._last_cells = None        # rejilla del último mapa emitido (para detectar cambios)
 
     # ---------------- interfaz común (como MockRobot) ----------------
     def start(self):
@@ -159,6 +162,13 @@ class RealRobot:
             except Exception:
                 pass
 
+    def _notify_pose(self):
+        if self.on_pose:
+            try:
+                self.on_pose()
+            except Exception:
+                pass
+
     def _query_startup(self):
         """Pide no molestar / consumibles / OTA / voz (con reintentos)."""
         uid = self.cfg.userid
@@ -180,11 +190,19 @@ class RealRobot:
         if b"\x78\x9c" in payload and (b"syn_no_cache" in payload
                                        or b"sweeper-map" in payload):
             try:
-                self.map = cmap.decode_map(payload)
-                m = self.map
-                self.log(f"  [robot] mapa: {m['name']} "
-                         f"{m['bbox'][2]}x{m['bbox'][3]} ({len(m['rooms'])} hab.)")
-                self._notify_map()
+                m = cmap.decode_map(payload)
+                self.map = m
+                self.pose = m.get("robot")
+                cells = m.get("cells_b64")
+                if cells != self._last_cells:
+                    # la rejilla cambió (mapa nuevo o zona nueva): mapa completo
+                    self._last_cells = cells
+                    self.log(f"  [robot] mapa: {m['name']} "
+                             f"{m['bbox'][2]}x{m['bbox'][3]} ({len(m['rooms'])} hab.)")
+                    self._notify_map()
+                elif self.pose:
+                    # misma rejilla, solo se movió el robot: push ligero de pose
+                    self._notify_pose()
             except Exception as e:
                 self.log(f"  [!] mapa no decodificado: {e}")
             return

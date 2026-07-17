@@ -33,9 +33,12 @@ desarrollar la interfaz sin un Conga real:
   (`zones.json`), con lista y borrado. Flujo completo verificado por la API.
 - ✅ **Horarios** (`setOrder6090`): editor visual (nombre, hora, días, habitaciones y
   modo), con lista, activar/desactivar y borrar; persistentes (`schedules.json`).
-- ⬜ Puente **MQTT** opcional para Home Assistant; posición del robot en vivo durante
-  la limpieza; modo por habitación en el editor de horarios.
-- ⬜ Puente **MQTT** opcional para Home Assistant.
+- ✅ **Posición del robot en vivo**: la pose se separa de la rejilla (solo se reenvía el
+  mapa completo cuando la rejilla cambia; si solo se mueve el robot va un push ligero de
+  `pose`) y se dibuja en una **capa superpuesta** con desplazamiento animado y anillo
+  pulsante mientras limpia.
+- ⬜ Puente **MQTT** opcional para Home Assistant; modo por habitación en el editor de
+  horarios.
 
 ## Arquitectura
 

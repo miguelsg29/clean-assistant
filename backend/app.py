@@ -100,6 +100,18 @@ async def broadcast_map():
             clients.discard(ws)
 
 
+async def broadcast_pose():
+    pose = getattr(robot, "pose", None)
+    if not pose:
+        return
+    msg = json.dumps({"type": "pose", "pose": pose})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def broadcast_zones():
     msg = json.dumps({"type": "zones", "zones": zones.zones})
     for ws in list(clients):
@@ -131,6 +143,7 @@ async def lifespan(app: FastAPI):
     # push inmediato: cuando el robot real cambia de estado, retransmitimos ya.
     robot.on_update = lambda: asyncio.run_coroutine_threadsafe(broadcast(), loop)
     robot.on_map = lambda: asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
+    robot.on_pose = lambda: asyncio.run_coroutine_threadsafe(broadcast_pose(), loop)
     try:
         robot.start()
     except Exception as e:

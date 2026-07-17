@@ -70,8 +70,10 @@
   .mapwrap{padding:10px}
   svg.map{width:100%;height:auto;display:block;border-radius:12px}
   svg.map.hidden{display:none}
-  canvas.realmap{display:none;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
-  canvas.realmap.show{display:block}
+  canvas.realmap{display:block;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
+  .canvaswrap{display:none;position:relative}
+  .canvaswrap.show{display:block}
+  canvas.realmap.overlay{position:absolute;inset:0;width:100%;height:100%;image-rendering:auto;cursor:default;pointer-events:none;border-radius:12px}
   .room{cursor:pointer}
   .room .rfill{transition:fill .2s,opacity .2s}
   .room:hover .rfill{opacity:.72}
@@ -225,7 +227,10 @@
           <rect class="dock" x="80" y="279" width="24" height="7" rx="2"/>
           <g class="robot" id="robot" transform="translate(92,258)"><circle class="ping" cx="0" cy="0" r="9"/><circle class="halo" cx="0" cy="0" r="13"/><circle class="body" cx="0" cy="0" r="8"/></g>
         </svg>
-        <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
+        <div class="canvaswrap" id="canvasWrap">
+          <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
+          <canvas class="realmap overlay" id="robotCanvas" aria-hidden="true"></canvas>
+        </div>
       </div>
       <div class="dockbar" role="group" aria-label="Controles del robot">
         <button class="dbtn primary" id="playBtn"><svg viewBox="0 0 24 24" fill="currentColor" id="playIco"><path d="M8 5v14l11-7z"/></svg><span id="playLbl">Iniciar</span></button>
@@ -371,6 +376,7 @@
     document.getElementById('battTxt').textContent=b;
     if(st.battery!=null)document.getElementById('battBar').style.width=Math.max(6,st.battery)+'%';
     document.body.classList.toggle('cleaning',s==='cleaning'||s==='paused');
+    if(typeof startRbt==='function') startRbt();   // mantiene vivo el anillo pulsante del robot
     var p=POS[s]||POS.docked;
     document.getElementById('robot').setAttribute('transform','translate('+p[0]+','+p[1]+')');
     var note=document.getElementById('mapNote');
@@ -461,13 +467,14 @@
   function applyMap(m){
     MAP=m; ROOMS=m.rooms||[]; buildChips();
     document.getElementById('modeTag').textContent=m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot';
-    var svg=document.querySelector('svg.map'), cv=document.getElementById('mapCanvas');
-    if(m.sample){ svg.classList.remove('hidden'); cv.classList.remove('show'); }
+    var svg=document.querySelector('svg.map'), wrap=document.getElementById('canvasWrap');
+    if(m.sample){ svg.classList.remove('hidden'); wrap.classList.remove('show'); }
     else{
       IDX={}; (m.rooms||[]).forEach(function(r,i){IDX[r.id]=i;});
       var bin=atob(m.cells_b64); CELLS=new Uint8Array(bin.length);
       for(var i=0;i<bin.length;i++)CELLS[i]=bin.charCodeAt(i);
-      svg.classList.add('hidden'); cv.classList.add('show'); renderRealMap();
+      svg.classList.add('hidden'); wrap.classList.add('show'); renderRealMap();
+      setRobotTarget(m.robot, true);   // salto directo: el mapa (y su caja) pueden haber cambiado
     }
     syncSel();
     if(typeof renderSchedules==='function') renderSchedules();
@@ -479,6 +486,7 @@
   function renderRealMap(){
     if(!MAP||MAP.sample||!CELLS)return;
     var w=MAP.bbox[2], h=MAP.bbox[3], scale=Math.max(2,Math.ceil(560/w));
+    SCALE=scale;
     var cv=document.getElementById('mapCanvas'); cv.width=w*scale; cv.height=h*scale;
     var ctx=cv.getContext('2d');
     var wall=_hex(cssVar('--ink')), thin=_hex(cssVar('--line')),
@@ -512,20 +520,58 @@
     (MAP.rooms||[]).forEach(function(r){
       ctx.fillStyle=selected.has(r.id)?cssVar('--accent-ink'):cssVar('--ink');
       ctx.fillText(r.name, r.center[0]*scale, r.center[1]*scale); });
-    // robot (desde la pose del mapa)
-    if(MAP.robot){
-      var rx=MAP.robot.x*scale, ry=MAP.robot.y*scale, rr=Math.max(7,scale*3.2), acc=cssVar('--accent');
-      ctx.globalAlpha=0.16; ctx.fillStyle=acc;
-      ctx.beginPath(); ctx.arc(rx,ry,rr*1.9,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
-      ctx.beginPath(); ctx.arc(rx,ry,rr,0,6.2832); ctx.fillStyle=acc; ctx.fill();
-      ctx.lineWidth=Math.max(2,scale); ctx.strokeStyle=cssVar('--surface'); ctx.stroke();
-    }
     // rectángulo en curso de dibujo
     if(drawRect&&drawKind){ var a=drawRect[0],b=drawRect[1], dcol=cssVar(ZK[drawKind].c),
         X=Math.min(a[0],b[0])*scale,Y=Math.min(a[1],b[1])*scale,
         W2=Math.abs(b[0]-a[0])*scale,H2=Math.abs(b[1]-a[1])*scale;
       ctx.fillStyle=dcol; ctx.globalAlpha=0.18; ctx.fillRect(X,Y,W2,H2); ctx.globalAlpha=1;
       ctx.strokeStyle=dcol; ctx.lineWidth=Math.max(2,scale); ctx.setLineDash([scale*2,scale*1.5]); ctx.strokeRect(X,Y,W2,H2); ctx.setLineDash([]); }
+    sizeOverlay(); drawRobot();
+  }
+
+  // ---- robot en vivo: capa superpuesta con posición animada ----
+  var SCALE=1, RBT=null, RBT_T=null, rbtRAF=0;
+  function sizeOverlay(){
+    var b=document.getElementById('mapCanvas'), o=document.getElementById('robotCanvas');
+    if(o.width!==b.width||o.height!==b.height){ o.width=b.width; o.height=b.height; }
+  }
+  function setRobotTarget(pose, snap){
+    if(!pose||pose.x==null){ RBT_T=null; return; }
+    RBT_T={x:pose.x,y:pose.y};
+    if(snap||!RBT) RBT={x:pose.x,y:pose.y};
+    startRbt();
+  }
+  function startRbt(){ if(rbtRAF||!MAP||MAP.sample) return; rbtRAF=requestAnimationFrame(tickRbt); }
+  function tickRbt(){
+    rbtRAF=0;
+    var moving=false;
+    if(RBT&&RBT_T){
+      RBT.x+=(RBT_T.x-RBT.x)*0.18; RBT.y+=(RBT_T.y-RBT.y)*0.18;
+      if(Math.abs(RBT_T.x-RBT.x)+Math.abs(RBT_T.y-RBT.y)>0.06) moving=true;
+      else { RBT.x=RBT_T.x; RBT.y=RBT_T.y; }
+    }
+    drawRobot();
+    if(moving||document.body.classList.contains('cleaning')) startRbt();
+  }
+  function drawRobot(){
+    var o=document.getElementById('robotCanvas'); if(!o)return;
+    var ctx=o.getContext('2d'); ctx.clearRect(0,0,o.width,o.height);
+    if(!MAP||MAP.sample||!RBT)return;
+    var x=RBT.x*SCALE, y=RBT.y*SCALE, r=Math.max(7,SCALE*3.2),
+        acc=cssVar('--accent'), surf=cssVar('--surface'),
+        cleaning=document.body.classList.contains('cleaning');
+    if(cleaning){ var t=(performance.now()%2600)/2600;   // anillo pulsante al limpiar
+      ctx.globalAlpha=0.3*(1-t); ctx.fillStyle=acc;
+      ctx.beginPath(); ctx.arc(x,y,r+r*2.2*t,0,6.2832); ctx.fill(); ctx.globalAlpha=1; }
+    ctx.globalAlpha=0.16; ctx.fillStyle=acc;               // halo
+    ctx.beginPath(); ctx.arc(x,y,r*1.9,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
+    if(MAP.robot&&MAP.robot.angle!=null){                  // orientación (verificar signo con robot real)
+      var a=MAP.robot.angle;
+      ctx.strokeStyle=acc; ctx.lineCap='round'; ctx.lineWidth=Math.max(2,SCALE*0.9);
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*r*1.75, y+Math.sin(a)*r*1.75); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(x,y,r,0,6.2832); ctx.fillStyle=acc; ctx.fill();   // cuerpo
+    ctx.lineWidth=Math.max(2,SCALE); ctx.strokeStyle=surf; ctx.stroke();
   }
   // ---- zonas: coordenadas, lista, dibujo ----
   function evtCell(e){ var cv=document.getElementById('mapCanvas'), r=cv.getBoundingClientRect();
@@ -676,6 +722,7 @@
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
       if(m.type==='state'){st=m.state;render();}
       else if(m.type==='map'){applyMap(m.map);}
+      else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
       else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
       else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
