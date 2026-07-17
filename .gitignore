@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Frontend (cuando haya build)
+node_modules/
+frontend/dist/
+
+# Privado / runtime
+.env
+cert.pem
+key.pem
+*.pem
+*.log
+plans.json
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
