@@ -65,6 +65,30 @@ def _save_view():
         pass
 
 
+# caché del último mapa: se muestra al arrancar (aunque el robot esté en la base) y se
+# refresca cuando el robot envía uno nuevo (al empezar a limpiar y durante la limpieza).
+MAP_CACHE = "map_cache.json"
+
+
+def _save_map():
+    m = getattr(robot, "map", None)
+    if not m:
+        return
+    try:
+        with open(MAP_CACHE, "w", encoding="utf-8") as f:
+            json.dump(m, f)
+    except Exception:
+        pass
+
+
+def _load_map():
+    try:
+        with open(MAP_CACHE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
 def _map_head_id() -> int:
     return getattr(robot.state, "map_head_id", None) or 1700000000
 
@@ -109,6 +133,21 @@ def build(action: str, p: dict):
     if action == "ota":          return cmd.set_upgrade(p["value"])
     if action == "quiet":        return cmd.set_quiet(p["is_open"], p["begin"], p["end"])
     raise ValueError(f"acción desconocida: {action}")
+
+
+def _optimistic_state(action: str, p: dict):
+    """Refleja en el estado local los ajustes que el robot NO reenvía en report_data,
+    para que la interfaz no revierta el control al valor anterior (voz/OTA/no molestar)."""
+    s = robot.state
+    if action == "voice":
+        vol = p.get("volume")
+        s.voice = {"voiceMode": 1 if p.get("on") else 0,
+                   "volume": int(vol if vol is not None else (s.voice or {}).get("volume", 10))}
+    elif action == "ota":
+        s.auto_upgrade = 1 if p.get("value") else 0
+    elif action == "quiet":
+        s.quiet = {"is_open": 1 if p.get("is_open") else 0,
+                   "begin_time": int(p.get("begin", 1320)), "end_time": int(p.get("end", 420))}
 
 
 async def broadcast():
@@ -188,8 +227,15 @@ async def lifespan(app: FastAPI):
         mqtt.publish_state()
 
     def on_map():
+        _save_map()                # persiste el último mapa para verlo tras reiniciar
         asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
+
+    # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
+    if MODE == "real" and getattr(robot, "map", None) is None:
+        cached = _load_map()
+        if cached:
+            robot.map = cached
 
     robot.on_update = on_update
     robot.on_map = on_map
@@ -227,6 +273,7 @@ async def post_command(payload: dict):
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
     result = robot.command(control)
+    _optimistic_state(action, payload)
     mqtt.note_web_command(action, payload)
     await broadcast()
     return {"ok": True, "sent": control, "result": result}
