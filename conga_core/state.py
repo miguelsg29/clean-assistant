@@ -23,6 +23,7 @@ class RobotState:
     area: float | None = None       # m² limpiados
     clean_time: int | None = None   # minutos
     cleaning_room: int | None = None
+    repeat_clean: int | None = None   # repeatClean del report_data: 1 = segunda pasada
     map_head_id: int | None = None
     map_name: str | None = None
     # ajustes reflejados (lo que sabemos del robot)
@@ -60,6 +61,7 @@ class RobotState:
         self.area = data.get("cleanSize", self.area)
         self.clean_time = data.get("cleanTime", self.clean_time)
         self.cleaning_room = data.get("cleaning_roomId", self.cleaning_room)
+        self.repeat_clean = data.get("repeatClean", self.repeat_clean)
         if data.get("map_head_id"):
             self.map_head_id = data["map_head_id"]
         if data.get("current_map_name"):
