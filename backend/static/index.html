@@ -484,6 +484,14 @@
     (MAP.rooms||[]).forEach(function(r){
       ctx.fillStyle=selected.has(r.id)?cssVar('--accent-ink'):cssVar('--ink');
       ctx.fillText(r.name, r.center[0]*scale, r.center[1]*scale); });
+    // robot (desde la pose del mapa)
+    if(MAP.robot){
+      var rx=MAP.robot.x*scale, ry=MAP.robot.y*scale, rr=Math.max(7,scale*3.2), acc=cssVar('--accent');
+      ctx.globalAlpha=0.16; ctx.fillStyle=acc;
+      ctx.beginPath(); ctx.arc(rx,ry,rr*1.9,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
+      ctx.beginPath(); ctx.arc(rx,ry,rr,0,6.2832); ctx.fillStyle=acc; ctx.fill();
+      ctx.lineWidth=Math.max(2,scale); ctx.strokeStyle=cssVar('--surface'); ctx.stroke();
+    }
   }
   document.getElementById('mapCanvas').addEventListener('click',function(e){
     if(!MAP||MAP.sample||!CELLS)return;

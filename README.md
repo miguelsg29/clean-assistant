@@ -26,7 +26,9 @@ desarrollar la interfaz sin un Conga real:
 - ✅ **Mapa real**: decodificador zlib+Protobuf (`decode_map`), recepción en `RealRobot`
   (frame `syn_no_cache`) y **render en canvas** con las habitaciones y selección tocando
   el mapa. Verificado con un frame de mapa real capturado (8 habitaciones, 13 ms).
-- ⬜ Posición del robot y **zonas** sobre el mapa real (transformación rejilla↔metros);
+- ✅ **Transformación rejilla↔metros** (origen −20/−20 m, 0.05 m/celda) validada contra
+  zonas reales capturadas, y **posición del robot** dibujada sobre el mapa real.
+- ⬜ Dibujar **zonas** sobre el mapa (usa la transformación ya expuesta en `world`);
   editor visual de **horarios**.
 - ⬜ Puente **MQTT** opcional para Home Assistant.
 

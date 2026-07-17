@@ -11,6 +11,7 @@ decodificador probado del repo de documentación (decodificar_mapa.py).
 """
 from __future__ import annotations
 import base64
+import struct
 import zlib
 
 GRID_W = 800
@@ -36,12 +37,63 @@ def _extract_zlib(frame: bytes) -> bytes:
     return zlib.decompress(frame[pos:])
 
 
+def _f32(chunk, p):
+    return struct.unpack("<f", chunk[p:p + 4])[0]
+
+
+def _parse_params(chunk) -> dict:
+    """Campo 3: w(f2), h(f3), min_x(f4), min_y(f5), max_x(f6), max_y(f7), res(f8)."""
+    keymap = {2: "w", 3: "h", 4: "min_x", 5: "min_y", 6: "max_x", 7: "max_y", 8: "res"}
+    out = {}
+    p = 0
+    while p < len(chunk):
+        st, p = _read_varint(chunk, p)
+        sf, sw = st >> 3, st & 7
+        if sw == 0:
+            v, p = _read_varint(chunk, p)
+            if sf in keymap:
+                out[keymap[sf]] = v
+        elif sw == 5:
+            if sf in keymap:
+                out[keymap[sf]] = round(_f32(chunk, p), 4)
+            p += 4
+        elif sw == 1:
+            p += 8
+        elif sw == 2:
+            sl, p = _read_varint(chunk, p); p += sl
+        else:
+            break
+    return out
+
+
+def _parse_pose(chunk) -> dict:
+    """Campo 7: pose x(f1), y(f2), angle(f3) en metros/radianes."""
+    vals = {}
+    p = 0
+    while p < len(chunk):
+        st, p = _read_varint(chunk, p)
+        sf, sw = st >> 3, st & 7
+        if sw == 5:
+            vals[sf] = round(_f32(chunk, p), 4); p += 4
+        elif sw == 0:
+            _, p = _read_varint(chunk, p)
+        elif sw == 1:
+            p += 8
+        elif sw == 2:
+            sl, p = _read_varint(chunk, p); p += sl
+        else:
+            break
+    return {"x": vals.get(1), "y": vals.get(2), "angle": vals.get(3)}
+
+
 def _parse_protobuf(pb: bytes) -> dict:
-    """Extrae la rejilla (campo 4), habitaciones (campo 12) y nombre (campo 5)."""
+    """Extrae rejilla (4), habitaciones (12), nombre (5), params (3) y pose (7)."""
     pos = 0
     grid = None
     rooms = []
     map_name = None
+    params = None
+    pose = None
     while pos < len(pb):
         try:
             tag, pos = _read_varint(pb, pos)
@@ -85,6 +137,10 @@ def _parse_protobuf(pb: bytes) -> dict:
                     else:
                         break
                 rooms.append((rid, name))
+            elif fn == 3:                                 # params (origen, resolución)
+                params = _parse_params(chunk)
+            elif fn == 7:                                 # pose del robot
+                pose = _parse_pose(chunk)
             elif fn == 5 and map_name is None:            # nombre del mapa
                 p = 0
                 while p < len(chunk):
@@ -103,7 +159,8 @@ def _parse_protobuf(pb: bytes) -> dict:
                         break
         else:
             break
-    return {"grid": grid, "rooms": rooms, "map_name": map_name}
+    return {"grid": grid, "rooms": rooms, "map_name": map_name,
+            "params": params, "pose": pose}
 
 
 def decode_map(frame: bytes) -> dict:
@@ -159,12 +216,27 @@ def decode_map(frame: bytes) -> dict:
             "center": [round(r[5] / cnt - minx, 1), round(r[6] / cnt - miny, 1)],
             "bbox": [r[0] - minx, r[1] - miny, r[2] - r[0] + 1, r[3] - r[1] + 1],
         })
+    # transformación mundo(metros) <-> rejilla:  celda = (mundo - min) / res
+    prm = info.get("params") or {}
+    mnx = prm.get("min_x", -20.0)
+    mny = prm.get("min_y", -20.0)
+    res = prm.get("res") or 0.05
+    robot = None
+    pose = info.get("pose")
+    if pose and pose.get("x") is not None:
+        robot = {"x": round((pose["x"] - mnx) / res - minx, 1),
+                 "y": round((pose["y"] - mny) / res - miny, 1),
+                 "angle": pose.get("angle")}
     return {
         "name": info["map_name"] or "Interior",
         "grid_size": [GRID_W, GRID_H],
         "bbox": [minx, miny, w, h],
         "cells_b64": base64.b64encode(bytes(cropped)).decode(),
         "rooms": rooms,
+        "robot": robot,
+        # origen del mundo para convertir celda(recortada)<->metros en el frontend:
+        # metros = (celda_recortada + bbox_min) * res + min
+        "world": {"min_x": mnx, "min_y": mny, "res": res},
         "sample": False,
     }
 
