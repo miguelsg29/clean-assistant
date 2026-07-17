@@ -159,6 +159,8 @@
   .zt{flex:1}.zt .n{font-size:14px;font-weight:540}.zt .k{font-size:11.5px;color:var(--muted)}
   .zbtns{display:flex;gap:8px;margin-top:14px}
   .zbtns .btn{padding:10px;font-size:12.5px}
+  .zrow .iconbtn{width:28px;height:28px;font-size:13px}
+  .btn.zadd.arming{outline:2px solid var(--ink);outline-offset:2px}
   .cons{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
   .cons:first-of-type{border-top:none}
   .cons .cn{flex:1;font-size:13.5px;font-weight:520}
@@ -253,14 +255,12 @@
       </div>
 
       <div class="tabpane" data-pane="zonas">
-        <p class="hint">Dibuja rectángulos sobre el mapa para crear zonas. <b>Edición de zonas: próxima versión.</b></p>
-        <div class="zrow"><span class="zdot" style="background:var(--critical)"></span><div class="zt"><div class="n">Entrada</div><div class="k">Zona prohibida · no entra</div></div><button class="toggle" aria-pressed="true"></button></div>
-        <div class="zrow"><span class="zdot" style="background:var(--water)"></span><div class="zt"><div class="n">Alfombra del salón</div><div class="k">Zona sin fregona · no moja</div></div><button class="toggle" aria-pressed="true"></button></div>
-        <div class="zrow"><span class="zdot" style="background:var(--accent)"></span><div class="zt"><div class="n">Bajo la mesa</div><div class="k">Zona de limpieza · doble pasada</div></div><button class="toggle" aria-pressed="false"></button></div>
+        <p class="hint" id="zoneHint">Elige un tipo y dibuja un rectángulo sobre el mapa.</p>
+        <div id="zoneList"></div>
         <div class="zbtns">
-          <button class="btn" style="background:var(--critical);box-shadow:none">+ Prohibida</button>
-          <button class="btn" style="background:var(--water);box-shadow:none">+ Sin fregona</button>
-          <button class="btn">+ Limpieza</button>
+          <button class="btn zadd" data-kind="nogo" style="background:var(--critical);box-shadow:none">+ Prohibida</button>
+          <button class="btn zadd" data-kind="nomop" style="background:var(--water);box-shadow:none">+ Sin fregona</button>
+          <button class="btn zadd" data-kind="clean">+ Limpieza</button>
         </div>
       </div>
 
@@ -304,6 +304,9 @@
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
   var MAP=null, CELLS=null, IDX={}; // mapa actual + rejilla real + id->indice
+  var ZONES=[], drawKind=null, drawStart=null, drawRect=null;
+  var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
+          clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
   function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
   var ROOM_TOKENS=['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8'];
 
@@ -479,6 +482,15 @@
     for(var j=0;j<CELLS.length;j++){ var vv=CELLS[j];
       if(vv>1&&vv!==255&&selected.has(vv)) ctx.fillRect((j%w)*scale,((j/w)|0)*scale,scale,scale); }
     ctx.globalAlpha=1;
+    // zonas guardadas
+    ZONES.forEach(function(z){
+      var col=cssVar((ZK[z.kind]||{}).c||'--faint');
+      ctx.beginPath();
+      z.points.forEach(function(p,i){ var c=worldToCell(p[0],p[1]),X=c[0]*scale,Y=c[1]*scale; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+      ctx.closePath();
+      ctx.fillStyle=col; ctx.globalAlpha=0.16; ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.7); ctx.setLineDash([scale*2,scale*1.5]); ctx.stroke(); ctx.setLineDash([]);
+    });
     ctx.font='600 '+Math.max(11,Math.round(scale*5))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     (MAP.rooms||[]).forEach(function(r){
@@ -492,24 +504,86 @@
       ctx.beginPath(); ctx.arc(rx,ry,rr,0,6.2832); ctx.fillStyle=acc; ctx.fill();
       ctx.lineWidth=Math.max(2,scale); ctx.strokeStyle=cssVar('--surface'); ctx.stroke();
     }
+    // rectángulo en curso de dibujo
+    if(drawRect&&drawKind){ var a=drawRect[0],b=drawRect[1], dcol=cssVar(ZK[drawKind].c),
+        X=Math.min(a[0],b[0])*scale,Y=Math.min(a[1],b[1])*scale,
+        W2=Math.abs(b[0]-a[0])*scale,H2=Math.abs(b[1]-a[1])*scale;
+      ctx.fillStyle=dcol; ctx.globalAlpha=0.18; ctx.fillRect(X,Y,W2,H2); ctx.globalAlpha=1;
+      ctx.strokeStyle=dcol; ctx.lineWidth=Math.max(2,scale); ctx.setLineDash([scale*2,scale*1.5]); ctx.strokeRect(X,Y,W2,H2); ctx.setLineDash([]); }
   }
-  document.getElementById('mapCanvas').addEventListener('click',function(e){
+  // ---- zonas: coordenadas, lista, dibujo ----
+  function evtCell(e){ var cv=document.getElementById('mapCanvas'), r=cv.getBoundingClientRect();
+    return [(e.clientX-r.left)/r.width*MAP.bbox[2], (e.clientY-r.top)/r.height*MAP.bbox[3]]; }
+  function cellToWorld(cx,cy){ var w=MAP.world,b=MAP.bbox; return [(cx+b[0])*w.res+w.min_x, (cy+b[1])*w.res+w.min_y]; }
+  function worldToCell(wx,wy){ var w=MAP.world,b=MAP.bbox; return [(wx-w.min_x)/w.res-b[0], (wy-w.min_y)/w.res-b[1]]; }
+
+  function renderZones(){
+    var el=document.getElementById('zoneList'); if(!el)return; el.innerHTML='';
+    if(!ZONES.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Aún no hay zonas.</p>'; return; }
+    ZONES.forEach(function(z){
+      var k=ZK[z.kind]||{c:'--faint',l:z.kind};
+      var d=document.createElement('div'); d.className='zrow';
+      d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
+        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
+        '<button class="iconbtn zdel" title="Borrar zona" aria-label="Borrar">✕</button>';
+      d.querySelector('.n').textContent=z.name;
+      d.querySelector('.zdel').addEventListener('click',function(){ delZone(z.id); });
+      el.appendChild(d);
+    });
+  }
+  function delZone(id){
+    fetch('/api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+      .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
+  }
+  function enterDraw(kind,btn){
+    if(!MAP||MAP.sample){ alert('El dibujo de zonas necesita el mapa real del robot (modo real).'); return; }
+    drawKind=kind;
+    document.querySelectorAll('.zadd').forEach(function(b){b.classList.toggle('arming',b===btn);});
+    var h=document.getElementById('zoneHint'); if(h)h.textContent='Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa otra vez para cancelar).';
+  }
+  function exitDraw(){ drawKind=null; drawStart=null; drawRect=null;
+    document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
+    var h=document.getElementById('zoneHint'); if(h)h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; }
+  document.querySelectorAll('.zadd').forEach(function(b){
+    b.addEventListener('click',function(){ drawKind===b.dataset.kind ? exitDraw() : enterDraw(b.dataset.kind,b); });
+  });
+
+  var cvEl=document.getElementById('mapCanvas');
+  cvEl.addEventListener('pointerdown',function(e){
+    if(!MAP||MAP.sample||!CELLS||!drawKind)return;
+    cvEl.setPointerCapture(e.pointerId); drawStart=evtCell(e); drawRect=[drawStart,drawStart]; e.preventDefault();
+  });
+  cvEl.addEventListener('pointermove',function(e){
+    if(drawKind&&drawStart){ drawRect=[drawStart,evtCell(e)]; renderRealMap(); }
+  });
+  cvEl.addEventListener('pointerup',function(e){
     if(!MAP||MAP.sample||!CELLS)return;
-    var rect=this.getBoundingClientRect(), w=MAP.bbox[2], h=MAP.bbox[3];
-    var x=Math.floor((e.clientX-rect.left)/rect.width*w),
-        y=Math.floor((e.clientY-rect.top)/rect.height*h);
-    if(x<0||y<0||x>=w||y>=h)return;
-    var v=CELLS[y*w+x]; if(v>1&&v!==255)toggleRoom(v);
+    if(drawKind&&drawStart){
+      var end=evtCell(e), x0=Math.min(drawStart[0],end[0]),y0=Math.min(drawStart[1],end[1]),
+          x1=Math.max(drawStart[0],end[0]),y1=Math.max(drawStart[1],end[1]), kind=drawKind;
+      if((x1-x0)>3&&(y1-y0)>3){
+        var pts=[cellToWorld(x0,y0),cellToWorld(x1,y0),cellToWorld(x1,y1),cellToWorld(x0,y1)];
+        exitDraw();
+        var name=prompt('Nombre de la zona:', ZK[kind].l); if(name===null){renderRealMap();return;}
+        fetch('/api/zones/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,points:pts,name:name||ZK[kind].l})})
+          .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
+      } else { exitDraw(); renderRealMap(); }
+    } else {
+      var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];
+      if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x]; if(v>1&&v!==255)toggleRoom(v); }
+    }
   });
 
   // ---- carga inicial + WebSocket ----
   fetch('/api/map').then(function(r){return r.json();}).then(applyMap);
+  fetch('/api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+'/ws');
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
       if(m.type==='state'){st=m.state;render();}
-      else if(m.type==='map'){applyMap(m.map);}};
+      else if(m.type==='map'){applyMap(m.map);}
+      else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }

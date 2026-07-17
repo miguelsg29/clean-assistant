@@ -107,12 +107,15 @@ def set_virwall(zones, map_head_id: int):
             "virwallList": vw, "map_head_id": int(map_head_id), "area_type": 2}
 
 
-def set_area(zones, map_head_id: int):
-    """zones de limpieza: type 200 (1 pasada) o 201 (x2)."""
+def set_area(zones, map_head_id: int, top_area_type: int = 2):
+    """Zonas de limpieza: type 200 (1 pasada) o 201 (x2). `top_area_type` 2=guardadas
+    (persistentes), 3=limpiar ahora (la zona lleva area_type 2 y 1 respectivamente)."""
+    za = 1 if top_area_type == 3 else 2
     vw = [_zone(z["points"], z.get("type", AREA_ONE), z.get("name", ""),
-               z.get("id", 0), area_type=1) for z in zones]
+               z.get("id", 0), area_type=za) for z in zones]
     return {"control": "set_area", "VirwallCount": len(vw), "clean_plan_id": 0,
-            "virwallList": vw, "map_head_id": int(map_head_id), "area_type": 3}
+            "virwallList": vw, "map_head_id": int(map_head_id),
+            "area_type": top_area_type}
 
 
 # ---------------- horarios (setOrder6090) ----------------

@@ -16,6 +16,7 @@ key.pem
 *.pem
 *.log
 plans.json
+zones.json
 
 # Sistema / editores
 .DS_Store

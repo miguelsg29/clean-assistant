@@ -20,6 +20,7 @@ from conga_core import commands as cmd
 from conga_core import map as cmap
 from conga_core.config import load_env
 from backend.mock import MockRobot
+from backend.zones import ZoneStore
 
 STATIC = Path(__file__).parent / "static"
 
@@ -34,6 +35,16 @@ else:
     robot = MockRobot()
 
 clients: set[WebSocket] = set()
+zones = ZoneStore()               # zonas de Clean Assistant (persiste en zones.json)
+
+
+def _map_head_id() -> int:
+    return getattr(robot.state, "map_head_id", None) or 1700000000
+
+
+def _send_zone_group(group: str):
+    """Reenvía al robot la lista COMPLETA del grupo (set_virwall o set_area)."""
+    return robot.command(zones.build_command(group, _map_head_id()))
 
 
 # ------- acción de la interfaz -> objeto `control` del robot -------
@@ -73,6 +84,15 @@ async def broadcast_map():
     if not robot.map:
         return
     msg = json.dumps({"type": "map", "map": robot.map})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
+async def broadcast_zones():
+    msg = json.dumps({"type": "zones", "zones": zones.zones})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -128,6 +148,33 @@ async def post_command(payload: dict):
     return {"ok": True, "sent": control, "result": result}
 
 
+@app.get("/api/zones")
+def get_zones():
+    return {"zones": zones.zones}
+
+
+@app.post("/api/zones/add")
+async def zone_add(payload: dict):
+    try:
+        z = zones.add(payload["kind"], payload["points"], payload.get("name", ""))
+    except (KeyError, ValueError) as e:
+        return {"ok": False, "error": str(e)}
+    _send_zone_group(zones.group_of(z["kind"]))
+    await broadcast_zones()
+    return {"ok": True, "zone": z, "zones": zones.zones}
+
+
+@app.post("/api/zones/delete")
+async def zone_delete(payload: dict):
+    zid = payload.get("id")
+    z = next((x for x in zones.zones if x["id"] == int(zid)), None)
+    zones.delete(zid)
+    if z:
+        _send_zone_group(zones.group_of(z["kind"]))
+    await broadcast_zones()
+    return {"ok": True, "zones": zones.zones}
+
+
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     await ws.accept()
@@ -135,6 +182,8 @@ async def websocket(ws: WebSocket):
     await ws.send_text(json.dumps({"type": "state", "state": robot.state.to_dict()}))
     if robot.map:
         await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
+    if zones.zones:
+        await ws.send_text(json.dumps({"type": "zones", "zones": zones.zones}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto

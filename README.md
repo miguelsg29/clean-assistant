@@ -28,8 +28,10 @@ desarrollar la interfaz sin un Conga real:
   el mapa. Verificado con un frame de mapa real capturado (8 habitaciones, 13 ms).
 - ✅ **Transformación rejilla↔metros** (origen −20/−20 m, 0.05 m/celda) validada contra
   zonas reales capturadas, y **posición del robot** dibujada sobre el mapa real.
-- ⬜ Dibujar **zonas** sobre el mapa (usa la transformación ya expuesta en `world`);
-  editor visual de **horarios**.
+- ✅ **Zonas** (prohibida / sin fregona / limpieza): se dibujan como rectángulos sobre
+  el mapa, se convierten a metros y se envían con `set_virwall`/`set_area`; persistentes
+  (`zones.json`), con lista y borrado. Flujo completo verificado por la API.
+- ⬜ Editor visual de **horarios**; puente **MQTT** opcional para Home Assistant.
 - ⬜ Puente **MQTT** opcional para Home Assistant.
 
 ## Arquitectura
