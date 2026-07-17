@@ -1,2 +1,3 @@
 fastapi>=0.115
 uvicorn[standard]>=0.30
+paho-mqtt>=2.0        # opcional: puente MQTT para Home Assistant (solo si MQTT_HOST)

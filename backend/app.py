@@ -22,12 +22,14 @@ from conga_core.config import load_env
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore
+from backend.mqtt_bridge import MqttBridge
 
 STATIC = Path(__file__).parent / "static"
+env = load_env()
 
 # CONGA_MODE=real -> servidor TLS+WS que habla con tu Conga (necesita datos en .env
 # y certificados). Por defecto 'mock': robot simulado, para desarrollar sin robot.
-MODE = (load_env()("CONGA_MODE", "mock") or "mock").lower()
+MODE = (env("CONGA_MODE", "mock") or "mock").lower()
 if MODE == "real":
     from conga_core.robot import RealRobot
     from conga_core.config import RobotConfig
@@ -49,6 +51,11 @@ def _rooms_meta() -> dict:
     if m and m.get("rooms"):
         return {r["id"]: {"name": r["name"]} for r in m["rooms"]}
     return {}
+
+
+# Puente MQTT opcional para Home Assistant (montado sobre el mismo robot). Solo se
+# activa si MQTT_HOST está definido; si no, todos sus métodos son no-ops.
+mqtt = MqttBridge(robot, schedules, env, _map_head_id, _rooms_meta)
 
 
 def _send_zone_group(group: str):
@@ -135,23 +142,35 @@ async def _loop():
         await asyncio.sleep(2)
         robot.tick()
         await broadcast()
+        mqtt.publish_state()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
-    # push inmediato: cuando el robot real cambia de estado, retransmitimos ya.
-    robot.on_update = lambda: asyncio.run_coroutine_threadsafe(broadcast(), loop)
-    robot.on_map = lambda: asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
+
+    # push inmediato: cuando el robot cambia, retransmitimos a la web Y a Home Assistant.
+    def on_update():
+        asyncio.run_coroutine_threadsafe(broadcast(), loop)
+        mqtt.publish_state()
+
+    def on_map():
+        asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
+        mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
+
+    robot.on_update = on_update
+    robot.on_map = on_map
     robot.on_pose = lambda: asyncio.run_coroutine_threadsafe(broadcast_pose(), loop)
     try:
         robot.start()
     except Exception as e:
         print(f"[robot] no se pudo arrancar el servidor ({MODE}): {e}")
+    mqtt.start()
     print(f"[Clean Assistant] modo={MODE}")
     task = asyncio.create_task(_loop())
     yield
     task.cancel()
+    mqtt.stop()
 
 
 app = FastAPI(title="Clean Assistant", version="0.1.0", lifespan=lifespan)
@@ -175,6 +194,7 @@ async def post_command(payload: dict):
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
     result = robot.command(control)
+    mqtt.note_web_command(action, payload)
     await broadcast()
     return {"ok": True, "sent": control, "result": result}
 
@@ -217,6 +237,7 @@ async def schedule_save(payload: dict):
     p = schedules.upsert(plan)
     robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
     await broadcast_schedules()
+    mqtt.publish_discovery()          # añade/refresca el switch del horario en HA
     return {"ok": True, "plan": p, "schedules": schedules.plans}
 
 
@@ -225,6 +246,7 @@ async def schedule_toggle(payload: dict):
     p = schedules.toggle(payload["id"], payload.get("enable", True))
     if p:
         robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
+        mqtt.reflect_schedule(p)
     await broadcast_schedules()
     return {"ok": True, "schedules": schedules.plans}
 
@@ -234,6 +256,7 @@ async def schedule_delete(payload: dict):
     p = schedules.delete(payload["id"])
     if p:
         robot.command(schedules.delete_command(p))
+        mqtt.forget_schedule(p["id"])   # retira el switch del horario en HA
     await broadcast_schedules()
     return {"ok": True, "schedules": schedules.plans}
 

@@ -37,8 +37,13 @@ desarrollar la interfaz sin un Conga real:
   mapa completo cuando la rejilla cambia; si solo se mueve el robot va un push ligero de
   `pose`) y se dibuja en una **capa superpuesta** con desplazamiento animado y anillo
   pulsante mientras limpia.
-- ⬜ Puente **MQTT** opcional para Home Assistant; modo por habitación en el editor de
-  horarios.
+- ✅ **Puente MQTT** para Home Assistant (`backend/mqtt_bridge.py`): montado **encima**
+  del mismo `RealRobot` (sin un segundo servidor 9090), publica autodiscovery (vacuum,
+  batería/área/tiempo, consumibles, botones por habitación, selectores potencia/agua/mopa/
+  modo/base, switches no molestar/voz/OTA/turbo/x2, volumen y horarios) y traduce los
+  comandos de HA a `robot.command(...)`. Se activa solo con `MQTT_HOST`. Verificado con un
+  cliente MQTT simulado (discovery + estado + comandos).
+- ⬜ Modo por habitación en el editor de horarios.
 
 ## Arquitectura
 
@@ -78,8 +83,25 @@ Abre **http://localhost:8000**. Verás la interfaz con el robot simulado: pulsa
 3. Arranca igual (`uvicorn backend.app:app`) y reinicia el robot (corte de luz). En
    el log verás `[robot] conectado` y el estado real en la interfaz.
 
-> ⚠️ El puente MQTT y Clean Assistant usan el mismo puerto 9090: no los ejecutes a la
-> vez apuntando ambos al robot.
+### Home Assistant (puente MQTT, opcional)
+
+Clean Assistant puede publicarse en HA **además** de la web, con una sola conexión al
+robot. Solo tienes que definir el broker en `.env`:
+
+```
+MQTT_HOST=192.168.1.10
+MQTT_PORT=1883
+MQTT_USER=usuario
+MQTT_PASS=clave
+```
+
+Al arrancar aparecerá el dispositivo **Conga 8090** en HA (autodiscovery): aspiradora,
+batería/área/tiempo, consumibles, un botón por habitación, selectores de potencia/agua/
+mopa/modo/base, switches de no molestar/voz/OTA/turbo/doble pasada, volumen y un switch
+por horario. La disponibilidad sigue a la conexión del robot.
+
+> ⚠️ Esto **sustituye** al puente clásico `conga_mqtt_bridge.py`: ambos escuchan en el
+> 9090, así que no ejecutes los dos apuntando al mismo robot a la vez.
 
 ## Estructura
 
@@ -92,16 +114,18 @@ clean-assistant/
 ├── backend/
 │   ├── app.py           # FastAPI: REST + WebSocket + estáticos
 │   ├── mock.py          # robot simulado
+│   ├── zones.py         # zonas (virwall/area) persistentes
+│   ├── schedules.py     # horarios (setOrder6090) persistentes
+│   ├── mqtt_bridge.py   # puente Home Assistant (autodiscovery), opcional
 │   └── static/          # frontend (index.html)
 └── requirements.txt
 ```
 
 ## Hoja de ruta
 
-1. **Robot real**: portar el servidor TLS+WebSocket (del puente) como `RealRobot`.
-2. **Mapa real**: portar el decodificador (`decodificar_mapa.py`) → datos en vivo.
-3. **Zonas**: dibujar prohibidas / sin fregona / de limpieza sobre el mapa
-   (transformación rejilla↔metros, con los datos ya capturados para calibrar).
-4. **Horarios** visuales (`setOrder6090`).
-5. **MQTT** opcional para Home Assistant.
-6. Empaquetado (Docker / add-on de HA con ingress).
+1. ✅ **Robot real**: servidor TLS+WebSocket (del puente) como `RealRobot`.
+2. ✅ **Mapa real**: decodificador zlib+Protobuf → datos en vivo (+ posición del robot).
+3. ✅ **Zonas**: prohibidas / sin fregona / de limpieza sobre el mapa.
+4. ✅ **Horarios** visuales (`setOrder6090`).
+5. ✅ **MQTT** opcional para Home Assistant.
+6. ⬜ Empaquetado (Docker / add-on de HA con ingress).
