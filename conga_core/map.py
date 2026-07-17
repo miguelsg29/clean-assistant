@@ -66,8 +66,8 @@ def _parse_params(chunk) -> dict:
     return out
 
 
-def _parse_pose(chunk) -> dict:
-    """Campo 7: pose x(f1), y(f2), angle(f3) en metros/radianes."""
+def _floats_by_subfield(chunk) -> dict:
+    """Devuelve {subcampo: float} de los subcampos wire-type 5 de un sub-mensaje."""
     vals = {}
     p = 0
     while p < len(chunk):
@@ -83,7 +83,19 @@ def _parse_pose(chunk) -> dict:
             sl, p = _read_varint(chunk, p); p += sl
         else:
             break
-    return {"x": vals.get(1), "y": vals.get(2), "angle": vals.get(3)}
+    return vals
+
+
+def _parse_pose(chunk) -> dict:
+    """Campo 7 = base de carga: x(f1), y(f2), angle(f3) en metros/radianes."""
+    v = _floats_by_subfield(chunk)
+    return {"x": v.get(1), "y": v.get(2), "angle": v.get(3)}
+
+
+def _parse_robot(chunk) -> dict:
+    """Campo 8 = robot vivo: contador(i1), i2, x(f3), y(f4), angle(f5)."""
+    v = _floats_by_subfield(chunk)
+    return {"x": v.get(3), "y": v.get(4), "angle": v.get(5)}
 
 
 def _parse_protobuf(pb: bytes) -> dict:
@@ -94,6 +106,7 @@ def _parse_protobuf(pb: bytes) -> dict:
     map_name = None
     params = None
     pose = None
+    robot = None
     while pos < len(pb):
         try:
             tag, pos = _read_varint(pb, pos)
@@ -139,8 +152,10 @@ def _parse_protobuf(pb: bytes) -> dict:
                 rooms.append((rid, name))
             elif fn == 3:                                 # params (origen, resolución)
                 params = _parse_params(chunk)
-            elif fn == 7:                                 # pose del robot
+            elif fn == 7:                                 # base de carga (estática)
                 pose = _parse_pose(chunk)
+            elif fn == 8:                                 # robot vivo (se mueve al limpiar)
+                robot = _parse_robot(chunk)
             elif fn == 5 and map_name is None:            # nombre del mapa
                 p = 0
                 while p < len(chunk):
@@ -160,7 +175,7 @@ def _parse_protobuf(pb: bytes) -> dict:
         else:
             break
     return {"grid": grid, "rooms": rooms, "map_name": map_name,
-            "params": params, "pose": pose}
+            "params": params, "pose": pose, "robot": robot}
 
 
 def decode_map(frame: bytes) -> dict:
@@ -213,6 +228,9 @@ def decode_map(frame: bytes) -> dict:
         rooms.append({
             "id": rid,
             "name": names.get(rid) or f"Habitación {rid}",
+            # named=False -> segmento temporal que el firmware crea al limpiar (sin
+            # nombre en el mapa): se pinta el suelo pero NO se lista como habitación.
+            "named": bool(names.get(rid)),
             "center": [round(r[5] / cnt - minx, 1), round(r[6] / cnt - miny, 1)],
             "bbox": [r[0] - minx, r[1] - miny, r[2] - r[0] + 1, r[3] - r[1] + 1],
         })
@@ -221,12 +239,17 @@ def decode_map(frame: bytes) -> dict:
     mnx = prm.get("min_x", -20.0)
     mny = prm.get("min_y", -20.0)
     res = prm.get("res") or 0.05
-    robot = None
-    pose = info.get("pose")
-    if pose and pose.get("x") is not None:
-        robot = {"x": round((pose["x"] - mnx) / res - minx, 1),
-                 "y": round((pose["y"] - mny) / res - miny, 1),
-                 "angle": pose.get("angle")}
+
+    def _to_cell(pose):
+        if pose and pose.get("x") is not None:
+            return {"x": round((pose["x"] - mnx) / res - minx, 1),
+                    "y": round((pose["y"] - mny) / res - miny, 1),
+                    "angle": pose.get("angle")}
+        return None
+
+    # campo 8 = robot vivo; campo 7 = base de carga. Si no llega el 8, caemos al 7.
+    charger = _to_cell(info.get("pose"))
+    robot = _to_cell(info.get("robot")) or charger
     return {
         "name": info["map_name"] or "Interior",
         "grid_size": [GRID_W, GRID_H],
@@ -234,6 +257,7 @@ def decode_map(frame: bytes) -> dict:
         "cells_b64": base64.b64encode(bytes(cropped)).decode(),
         "rooms": rooms,
         "robot": robot,
+        "charger": charger,
         # origen del mundo para convertir celda(recortada)<->metros en el frontend:
         # metros = (celda_recortada + bbox_min) * res + min
         "world": {"min_x": mnx, "min_y": mny, "res": res},

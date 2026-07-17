@@ -18,6 +18,7 @@ key.pem
 plans.json
 zones.json
 schedules.json
+view.json
 
 # Sistema / editores
 .DS_Store

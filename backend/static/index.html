@@ -67,6 +67,9 @@
   .mapcard{position:relative;overflow:hidden;padding:0}
   .maphead{position:absolute;top:14px;left:16px;z-index:3;display:flex;gap:8px;align-items:center;pointer-events:none}
   .chiplbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
+  .mapctl{position:absolute;top:12px;right:12px;z-index:4;display:none;gap:6px}
+  body.has-realmap .mapctl{display:flex}
+  .mapctl .iconbtn{width:34px;height:34px;font-size:16px;line-height:1}
   .mapwrap{padding:10px}
   svg.map{width:100%;height:auto;display:block;border-radius:12px}
   svg.map.hidden{display:none}
@@ -199,6 +202,11 @@
   <div class="stage">
     <section class="card mapcard">
       <div class="maphead"><span class="chiplbl">Interior</span><span class="chiplbl" id="mapNote"></span></div>
+      <div class="mapctl">
+        <button class="iconbtn" id="rotL" title="Girar 90° a la izquierda" aria-label="Girar izquierda">↺</button>
+        <button class="iconbtn" id="rotR" title="Girar 90° a la derecha" aria-label="Girar derecha">↻</button>
+        <button class="iconbtn" id="flipB" title="Voltear en espejo" aria-label="Espejo">⇌</button>
+      </div>
       <div class="mapwrap">
         <svg class="map" viewBox="0 0 400 300" role="img" aria-label="Mapa de la vivienda">
           <g>
@@ -330,6 +338,18 @@
   var ZONES=[], drawKind=null, drawStart=null, drawRect=null;
   var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
+  // orientación de la VISTA del mapa (no afecta a las coords que van al robot)
+  var VIEW={rot:0,flip:0}, LAST_BBOX=null;
+  function vdims(){ var W=MAP.bbox[2],H=MAP.bbox[3]; return (VIEW.rot%2)?{w:H,h:W}:{w:W,h:H}; }
+  function s2v(cx,cy){ var W=MAP.bbox[2],H=MAP.bbox[3],x=VIEW.flip?(W-cx):cx,y=cy;
+    switch(VIEW.rot){case 1:return[H-y,x];case 2:return[W-x,H-y];case 3:return[y,W-x];default:return[x,y];} }
+  function v2s(vx,vy){ var W=MAP.bbox[2],H=MAP.bbox[3],x,y;
+    switch(VIEW.rot){case 1:x=vy;y=H-vx;break;case 2:x=W-vx;y=H-vy;break;case 3:x=W-vy;y=vx;break;default:x=vx;y=vy;}
+    return [VIEW.flip?(W-x):x,y]; }
+  function applyViewBtns(){ var f=document.getElementById('flipB'); if(f)f.setAttribute('aria-pressed',VIEW.flip?'true':'false'); }
+  function setView(patch){ Object.assign(VIEW,patch); applyViewBtns();
+    fetch('/api/view/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(VIEW)});
+    if(MAP&&!MAP.sample)renderRealMap(); }
   function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
   var ROOM_TOKENS=['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8'];
 
@@ -341,21 +361,23 @@
   function hhmm(min){return pad(Math.floor(min/60)%24)+':'+pad(min%60);}
 
   // ---- room chips (construidos desde /api/map) ----
-  var ROOMS=[];
+  var ROOMS=[], NAMED=new Set();   // NAMED: ids de habitaciones reales (con nombre)
   function roomToken(r,i){ return r.color ? ('--'+r.color) : ROOM_TOKENS[i%ROOM_TOKENS.length]; }
   function buildChips(){
     var wrap=document.getElementById('roomChips');
     wrap.innerHTML='';
-    ROOMS.forEach(function(r,i){
+    ROOMS.forEach(function(r){
+      if(r.named===false)return;                       // no listar segmentos temporales
       var b=document.createElement('button');
       b.className='rchip';b.dataset.id=r.id;
-      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,i)+')"></span>'+r.name+
+      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,(IDX[r.id]!=null?IDX[r.id]:0))+')"></span>'+r.name+
         '<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4 10-11"/></svg>';
       b.addEventListener('click',function(){toggleRoom(r.id);});
       wrap.appendChild(b);
     });
   }
-  function toggleRoom(id){ selected.has(id)?selected.delete(id):selected.add(id); syncSel(); }
+  function toggleRoom(id){ if(NAMED.size&&!NAMED.has(id))return;   // no seleccionar segmentos temporales
+    selected.has(id)?selected.delete(id):selected.add(id); syncSel(); }
   function syncSel(){
     document.querySelectorAll('.rchip').forEach(function(c){c.classList.toggle('sel',selected.has(+c.dataset.id));});
     document.querySelectorAll('.map .room').forEach(function(r){r.classList.toggle('sel',selected.has(KEY2ID[r.dataset.room]));});
@@ -480,16 +502,20 @@
 
   // ---- mapa: aplicar (ejemplo -> SVG de ejemplo; real -> canvas) ----
   function applyMap(m){
-    MAP=m; ROOMS=m.rooms||[]; buildChips();
+    MAP=m; ROOMS=m.rooms||[];
+    IDX={}; NAMED=new Set();
+    ROOMS.forEach(function(r,i){ IDX[r.id]=i; if(r.named!==false)NAMED.add(r.id); });
+    buildChips();
     document.getElementById('modeTag').textContent=m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot';
     var svg=document.querySelector('svg.map'), wrap=document.getElementById('canvasWrap');
-    if(m.sample){ svg.classList.remove('hidden'); wrap.classList.remove('show'); }
+    if(m.sample){ svg.classList.remove('hidden'); wrap.classList.remove('show'); document.body.classList.remove('has-realmap'); }
     else{
-      IDX={}; (m.rooms||[]).forEach(function(r,i){IDX[r.id]=i;});
       var bin=atob(m.cells_b64); CELLS=new Uint8Array(bin.length);
       for(var i=0;i<bin.length;i++)CELLS[i]=bin.charCodeAt(i);
-      svg.classList.add('hidden'); wrap.classList.add('show'); renderRealMap();
-      setRobotTarget(m.robot, true);   // salto directo: el mapa (y su caja) pueden haber cambiado
+      svg.classList.add('hidden'); wrap.classList.add('show'); document.body.classList.add('has-realmap');
+      renderRealMap();
+      var bb=(m.bbox||[]).join(',');       // salto solo si cambia la caja; si no, desliza
+      setRobotTarget(m.robot, bb!==LAST_BBOX); LAST_BBOX=bb;
     }
     syncSel();
     if(typeof renderSchedules==='function') renderSchedules();
@@ -498,14 +524,24 @@
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
       return [parseInt(c.substr(1,2),16),parseInt(c.substr(3,2),16),parseInt(c.substr(5,2),16)]; }
     var mm=c.match(/\d+/g); return mm?[+mm[0],+mm[1],+mm[2]]:[150,150,150]; }
+  function gridTransform(ctx,scale){
+    var w=MAP.bbox[2],h=MAP.bbox[3],Wp=w*scale,Hp=h*scale,sx=VIEW.flip?-1:1,ex=VIEW.flip?Wp:0;
+    switch(VIEW.rot){
+      case 1: ctx.setTransform(0,sx,-1,0,Hp,ex); break;
+      case 2: ctx.setTransform(-sx,0,0,-1,Wp-ex,Hp); break;
+      case 3: ctx.setTransform(0,-sx,1,0,0,Wp-ex); break;
+      default: ctx.setTransform(sx,0,0,1,ex,0);
+    }
+  }
   function renderRealMap(){
     if(!MAP||MAP.sample||!CELLS)return;
-    var w=MAP.bbox[2], h=MAP.bbox[3], scale=Math.max(2,Math.ceil(560/w));
+    var w=MAP.bbox[2], h=MAP.bbox[3], vd=vdims(), scale=Math.max(2,Math.ceil(560/vd.w));
     SCALE=scale;
-    var cv=document.getElementById('mapCanvas'); cv.width=w*scale; cv.height=h*scale;
+    var cv=document.getElementById('mapCanvas'); cv.width=vd.w*scale; cv.height=vd.h*scale;
     var ctx=cv.getContext('2d');
     var wall=_hex(cssVar('--ink')), thin=_hex(cssVar('--line')),
         pal=ROOM_TOKENS.map(function(t){return _hex(cssVar(t));});
+    // rejilla + selección en un offscreen en espacio ORIGEN (w×h), para girarlo entero
     var off=document.createElement('canvas'); off.width=w; off.height=h;
     var octx=off.getContext('2d'), img=octx.createImageData(w,h), D=img.data;
     for(var i=0;i<CELLS.length;i++){ var v=CELLS[i], o=i*4, col;
@@ -515,17 +551,18 @@
       D[o]=col[0]; D[o+1]=col[1]; D[o+2]=col[2]; D[o+3]=255;
     }
     octx.putImageData(img,0,0);
-    ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,cv.width,cv.height);
-    ctx.drawImage(off,0,0,cv.width,cv.height);
-    ctx.fillStyle=cssVar('--accent'); ctx.globalAlpha=0.22;
+    octx.fillStyle=cssVar('--accent'); octx.globalAlpha=0.33;
     for(var j=0;j<CELLS.length;j++){ var vv=CELLS[j];
-      if(vv>1&&vv!==255&&selected.has(vv)) ctx.fillRect((j%w)*scale,((j/w)|0)*scale,scale,scale); }
-    ctx.globalAlpha=1;
-    // zonas guardadas
+      if(vv>1&&vv!==255&&selected.has(vv)) octx.fillRect(j%w,(j/w)|0,1,1); }
+    octx.globalAlpha=1;
+    ctx.clearRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false;
+    gridTransform(ctx,scale); ctx.drawImage(off,0,0,w*scale,h*scale);
+    ctx.setTransform(1,0,0,1,0,0);
+    // zonas guardadas (transformadas punto a punto, rectas)
     ZONES.forEach(function(z){
       var col=cssVar((ZK[z.kind]||{}).c||'--faint');
       ctx.beginPath();
-      z.points.forEach(function(p,i){ var c=worldToCell(p[0],p[1]),X=c[0]*scale,Y=c[1]*scale; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+      z.points.forEach(function(p,i){ var c=worldToCell(p[0],p[1]),vp=s2v(c[0],c[1]),X=vp[0]*scale,Y=vp[1]*scale; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
       ctx.closePath();
       ctx.fillStyle=col; ctx.globalAlpha=0.16; ctx.fill(); ctx.globalAlpha=1;
       ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.7); ctx.setLineDash([scale*2,scale*1.5]); ctx.stroke(); ctx.setLineDash([]);
@@ -533,12 +570,15 @@
     ctx.font='600 '+Math.max(11,Math.round(scale*5))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
     ctx.textAlign='center'; ctx.textBaseline='middle';
     (MAP.rooms||[]).forEach(function(r){
+      if(r.named===false)return;                      // no etiquetar segmentos temporales
+      var vp=s2v(r.center[0],r.center[1]);
       ctx.fillStyle=selected.has(r.id)?cssVar('--accent-ink'):cssVar('--ink');
-      ctx.fillText(r.name, r.center[0]*scale, r.center[1]*scale); });
-    // rectángulo en curso de dibujo
+      ctx.fillText(r.name, vp[0]*scale, vp[1]*scale); });
+    // rectángulo en curso de dibujo (4 esquinas transformadas -> bounding box en vista)
     if(drawRect&&drawKind){ var a=drawRect[0],b=drawRect[1], dcol=cssVar(ZK[drawKind].c),
-        X=Math.min(a[0],b[0])*scale,Y=Math.min(a[1],b[1])*scale,
-        W2=Math.abs(b[0]-a[0])*scale,H2=Math.abs(b[1]-a[1])*scale;
+        corners=[[a[0],a[1]],[b[0],a[1]],[b[0],b[1]],[a[0],b[1]]], xs=[], ys=[];
+      corners.forEach(function(c){ var vp=s2v(c[0],c[1]); xs.push(vp[0]*scale); ys.push(vp[1]*scale); });
+      var X=Math.min.apply(null,xs),Y=Math.min.apply(null,ys),W2=Math.max.apply(null,xs)-X,H2=Math.max.apply(null,ys)-Y;
       ctx.fillStyle=dcol; ctx.globalAlpha=0.18; ctx.fillRect(X,Y,W2,H2); ctx.globalAlpha=1;
       ctx.strokeStyle=dcol; ctx.lineWidth=Math.max(2,scale); ctx.setLineDash([scale*2,scale*1.5]); ctx.strokeRect(X,Y,W2,H2); ctx.setLineDash([]); }
     sizeOverlay(); drawRobot();
@@ -571,26 +611,33 @@
   function drawRobot(){
     var o=document.getElementById('robotCanvas'); if(!o)return;
     var ctx=o.getContext('2d'); ctx.clearRect(0,0,o.width,o.height);
-    if(!MAP||MAP.sample||!RBT)return;
-    var x=RBT.x*SCALE, y=RBT.y*SCALE, r=Math.max(7,SCALE*3.2),
-        acc=cssVar('--accent'), surf=cssVar('--surface'),
+    if(!MAP||MAP.sample)return;
+    var acc=cssVar('--accent'), surf=cssVar('--surface');
+    // base de carga (campo 7): pequeña diana
+    if(MAP.charger){ var vc=s2v(MAP.charger.x,MAP.charger.y),bx=vc[0]*SCALE,by=vc[1]*SCALE,br=Math.max(4,SCALE*2);
+      ctx.strokeStyle=cssVar('--muted'); ctx.lineWidth=Math.max(1.5,SCALE*0.6);
+      ctx.beginPath(); ctx.arc(bx,by,br,0,6.2832); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(bx-br,by); ctx.lineTo(bx+br,by); ctx.moveTo(bx,by-br); ctx.lineTo(bx,by+br); ctx.stroke(); }
+    if(!RBT)return;
+    var vp=s2v(RBT.x,RBT.y), x=vp[0]*SCALE, y=vp[1]*SCALE, r=Math.max(7,SCALE*3.2),
         cleaning=document.body.classList.contains('cleaning');
     if(cleaning){ var t=(performance.now()%2600)/2600;   // anillo pulsante al limpiar
       ctx.globalAlpha=0.3*(1-t); ctx.fillStyle=acc;
       ctx.beginPath(); ctx.arc(x,y,r+r*2.2*t,0,6.2832); ctx.fill(); ctx.globalAlpha=1; }
     ctx.globalAlpha=0.16; ctx.fillStyle=acc;               // halo
     ctx.beginPath(); ctx.arc(x,y,r*1.9,0,6.2832); ctx.fill(); ctx.globalAlpha=1;
-    if(MAP.robot&&MAP.robot.angle!=null){                  // orientación (verificar signo con robot real)
-      var a=MAP.robot.angle;
+    if(MAP.robot&&MAP.robot.angle!=null){                  // orientación (respeta giro/espejo transformando un punto por delante)
+      var a=MAP.robot.angle, ah=s2v(RBT.x+Math.cos(a)*2, RBT.y+Math.sin(a)*2),
+          dx=ah[0]*SCALE-x, dy=ah[1]*SCALE-y, dl=Math.hypot(dx,dy)||1;
       ctx.strokeStyle=acc; ctx.lineCap='round'; ctx.lineWidth=Math.max(2,SCALE*0.9);
-      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*r*1.75, y+Math.sin(a)*r*1.75); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+dx/dl*r*1.75, y+dy/dl*r*1.75); ctx.stroke();
     }
     ctx.beginPath(); ctx.arc(x,y,r,0,6.2832); ctx.fillStyle=acc; ctx.fill();   // cuerpo
     ctx.lineWidth=Math.max(2,SCALE); ctx.strokeStyle=surf; ctx.stroke();
   }
   // ---- zonas: coordenadas, lista, dibujo ----
-  function evtCell(e){ var cv=document.getElementById('mapCanvas'), r=cv.getBoundingClientRect();
-    return [(e.clientX-r.left)/r.width*MAP.bbox[2], (e.clientY-r.top)/r.height*MAP.bbox[3]]; }
+  function evtCell(e){ var cv=document.getElementById('mapCanvas'), r=cv.getBoundingClientRect(), vd=vdims();
+    return v2s((e.clientX-r.left)/r.width*vd.w, (e.clientY-r.top)/r.height*vd.h); }
   function cellToWorld(cx,cy){ var w=MAP.world,b=MAP.bbox; return [(cx+b[0])*w.res+w.min_x, (cy+b[1])*w.res+w.min_y]; }
   function worldToCell(wx,wy){ var w=MAP.world,b=MAP.bbox; return [(wx-w.min_x)/w.res-b[0], (wy-w.min_y)/w.res-b[1]]; }
 
@@ -728,7 +775,13 @@
   function toggleSched(id,on){ fetch('/api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
   function delSched(id){ fetch('/api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
 
+  // ---- botones de orientación del mapa (girar / espejo) ----
+  document.getElementById('rotL').addEventListener('click',function(){ setView({rot:(VIEW.rot+3)%4}); });
+  document.getElementById('rotR').addEventListener('click',function(){ setView({rot:(VIEW.rot+1)%4}); });
+  document.getElementById('flipB').addEventListener('click',function(){ setView({flip:VIEW.flip?0:1}); });
+
   // ---- carga inicial + WebSocket ----
+  fetch('/api/view').then(function(r){return r.json();}).then(function(v){VIEW=v||{rot:0,flip:0};applyViewBtns();if(MAP&&!MAP.sample)renderRealMap();});
   fetch('/api/map').then(function(r){return r.json();}).then(applyMap);
   fetch('/api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
   fetch('/api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
@@ -739,6 +792,7 @@
       if(m.type==='state'){st=m.state;render();}
       else if(m.type==='map'){applyMap(m.map);}
       else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
+      else if(m.type==='view'){ VIEW=m.view||{rot:0,flip:0}; applyViewBtns(); if(MAP&&!MAP.sample)renderRealMap(); }
       else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
       else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};

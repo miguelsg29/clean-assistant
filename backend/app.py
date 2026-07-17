@@ -41,6 +41,29 @@ clients: set[WebSocket] = set()
 zones = ZoneStore()               # zonas de Clean Assistant (persiste en zones.json)
 schedules = ScheduleStore()       # horarios (persiste en schedules.json)
 
+# orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
+VIEW_PATH = "view.json"
+
+
+def _load_view() -> dict:
+    try:
+        with open(VIEW_PATH, encoding="utf-8") as f:
+            v = json.load(f)
+        return {"rot": int(v.get("rot", 0)) % 4, "flip": 1 if v.get("flip") else 0}
+    except Exception:
+        return {"rot": 0, "flip": 0}
+
+
+view_settings = _load_view()
+
+
+def _save_view():
+    try:
+        with open(VIEW_PATH, "w", encoding="utf-8") as f:
+            json.dump(view_settings, f)
+    except Exception:
+        pass
+
 
 def _map_head_id() -> int:
     return getattr(robot.state, "map_head_id", None) or 1700000000
@@ -49,7 +72,8 @@ def _map_head_id() -> int:
 def _rooms_meta() -> dict:
     m = getattr(robot, "map", None)
     if m and m.get("rooms"):
-        return {r["id"]: {"name": r["name"]} for r in m["rooms"]}
+        # solo habitaciones reales (con nombre); descarta segmentos temporales
+        return {r["id"]: {"name": r["name"]} for r in m["rooms"] if r.get("named", True)}
     return {}
 
 
@@ -137,6 +161,15 @@ async def broadcast_schedules():
             clients.discard(ws)
 
 
+async def broadcast_view():
+    msg = json.dumps({"type": "view", "view": view_settings})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def _loop():
     while True:
         await asyncio.sleep(2)
@@ -197,6 +230,22 @@ async def post_command(payload: dict):
     mqtt.note_web_command(action, payload)
     await broadcast()
     return {"ok": True, "sent": control, "result": result}
+
+
+@app.get("/api/view")
+def get_view():
+    return view_settings
+
+
+@app.post("/api/view/set")
+async def set_view(payload: dict):
+    if "rot" in payload:
+        view_settings["rot"] = int(payload["rot"]) % 4
+    if "flip" in payload:
+        view_settings["flip"] = 1 if payload["flip"] else 0
+    _save_view()
+    await broadcast_view()
+    return {"ok": True, "view": view_settings}
 
 
 @app.get("/api/zones")
@@ -266,6 +315,7 @@ async def websocket(ws: WebSocket):
     await ws.accept()
     clients.add(ws)
     await ws.send_text(json.dumps({"type": "state", "state": robot.state.to_dict()}))
+    await ws.send_text(json.dumps({"type": "view", "view": view_settings}))
     if robot.map:
         await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
     if zones.zones:
