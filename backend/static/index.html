@@ -168,6 +168,7 @@
   .zbtns .btn{padding:10px;font-size:12.5px}
   .zrow .iconbtn{width:28px;height:28px;font-size:13px}
   .btn.zadd.arming{outline:2px solid var(--ink);outline-offset:2px}
+  .hint.armed{color:var(--accent);font-weight:600}
   .cons{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
   .cons:first-of-type{border-top:none}
   .cons .cn{flex:1;font-size:13.5px;font-weight:520}
@@ -302,7 +303,9 @@
       <div class="tabpane" data-pane="ajustes">
         <div class="phead">Robot</div>
         <div class="row"><div class="rt"><div class="t">No molestar</div><div class="d" id="quietDesc">—</div></div><button class="toggle" id="quietTog"></button></div>
-        <div class="row"><div class="rt"><div class="t">Voz</div></div><button class="toggle" id="voiceTog"></button></div>
+        <div class="field" style="margin-top:2px"><label>Franja de silencio (inicio – fin)</label>
+          <div class="slider"><input type="time" id="quietBegin" class="tinput" value="22:00"/><span style="opacity:.55">–</span><input type="time" id="quietEnd" class="tinput" value="07:00"/></div></div>
+        <div class="row"><div class="rt"><div class="t">Sonido</div></div><button class="toggle" id="voiceTog"></button></div>
         <div class="field" style="margin-top:4px"><label>Volumen</label><div class="slider"><input type="range" min="0" max="10" value="7" id="vol" aria-label="Volumen"/><span class="v" id="volv">7</span></div></div>
         <div class="row"><div class="rt"><div class="t">Turbo en alfombras</div><div class="d">Sube potencia al detectar alfombra</div></div><button class="toggle" id="carpetTog" aria-pressed="true"></button></div>
         <div class="row"><div class="rt"><div class="t">Actualizaciones automáticas</div><div class="d">Recomendado desactivar en local</div></div><button class="toggle" id="otaTog"></button></div>
@@ -389,7 +392,10 @@
     else{pi.innerHTML=PLAY;pl.textContent='Iniciar';}
     // ajustes reflejados
     if(st.quiet){var q=st.quiet;document.getElementById('quietTog').setAttribute('aria-pressed',!!q.is_open);
-      document.getElementById('quietDesc').textContent='Silencio de '+hhmm(q.begin_time)+' a '+hhmm(q.end_time);}
+      document.getElementById('quietDesc').textContent=(q.is_open?'Activo · ':'Desactivado · ')+hhmm(q.begin_time)+' a '+hhmm(q.end_time);
+      var qb=document.getElementById('quietBegin'),qe=document.getElementById('quietEnd');
+      if(document.activeElement!==qb)qb.value=hhmm(q.begin_time);
+      if(document.activeElement!==qe)qe.value=hhmm(q.end_time);}
     if(st.voice){document.getElementById('voiceTog').setAttribute('aria-pressed',!!st.voice.voiceMode);
       var vol=document.getElementById('vol');if(document.activeElement!==vol){vol.value=st.voice.volume;document.getElementById('volv').textContent=st.voice.volume;}}
     if(st.auto_upgrade!=null)document.getElementById('otaTog').setAttribute('aria-pressed',!!st.auto_upgrade);
@@ -432,9 +438,17 @@
   wireToggle('voiceTog',function(on){api('voice',{on:on,volume:+document.getElementById('vol').value});});
   wireToggle('otaTog',function(on){api('ota',{value:on});});
   wireToggle('carpetTog',function(on){api('carpet_turbo',{value:on});});
-  wireToggle('quietTog',function(on){var q=st.quiet||{begin_time:1350,end_time:420};api('quiet',{is_open:on,begin:q.begin_time,end:q.end_time});});
-  // toggles solo-visuales (zonas/horarios): sin backend aún
-  document.querySelectorAll('.zrow .toggle,.sched .toggle').forEach(function(t){
+  function hm2min(s){var p=String(s||'0:0').split(':');return (+p[0])*60+(+p[1]);}
+  function sendQuiet(){
+    var on=document.getElementById('quietTog').getAttribute('aria-pressed')==='true';
+    api('quiet',{is_open:on,begin:hm2min(document.getElementById('quietBegin').value),
+                 end:hm2min(document.getElementById('quietEnd').value)});
+  }
+  wireToggle('quietTog',function(){sendQuiet();});
+  document.getElementById('quietBegin').addEventListener('change',sendQuiet);
+  document.getElementById('quietEnd').addEventListener('change',sendQuiet);
+  // toggles solo-visuales (se leen al guardar): doble pasada del editor de horarios, etc.
+  document.querySelectorAll('.zrow .toggle,.sched .toggle,#sTwice').forEach(function(t){
     t.addEventListener('click',function(){t.setAttribute('aria-pressed',t.getAttribute('aria-pressed')!=='true');});
   });
   var vol=document.getElementById('vol');
@@ -448,6 +462,7 @@
       var p=t.dataset.pane;
       document.querySelectorAll('.tabpane').forEach(function(x){x.classList.toggle('active',x.dataset.pane===p);});
       document.body.classList.toggle('show-zones',p==='zonas');
+      if(p!=='zonas'&&typeof exitDraw==='function')exitDraw();
     });
   });
   // tema
@@ -598,14 +613,15 @@
       .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
   }
   function enterDraw(kind,btn){
-    if(!MAP||MAP.sample){ alert('El dibujo de zonas necesita el mapa real del robot (modo real).'); return; }
+    if(!MAP||MAP.sample){ alert('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).'); return; }
     drawKind=kind;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.toggle('arming',b===btn);});
-    var h=document.getElementById('zoneHint'); if(h)h.textContent='Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa otra vez para cancelar).';
+    var h=document.getElementById('zoneHint');
+    if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa el botón otra vez para cancelar).'; }
   }
   function exitDraw(){ drawKind=null; drawStart=null; drawRect=null;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
-    var h=document.getElementById('zoneHint'); if(h)h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; }
+    var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; } }
   document.querySelectorAll('.zadd').forEach(function(b){
     b.addEventListener('click',function(){ drawKind===b.dataset.kind ? exitDraw() : enterDraw(b.dataset.kind,b); });
   });
