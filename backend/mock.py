@@ -18,6 +18,8 @@ class MockRobot:
             auto_upgrade=0,
         )
         self.on_update = None      # interfaz común con RealRobot (sin uso en el mock)
+        self.on_map = None
+        self.map = None            # el mock no tiene mapa real -> se usa sample_map()
 
     def start(self):
         pass                       # el mock no arranca ningún servidor

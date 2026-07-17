@@ -19,6 +19,7 @@ import time
 
 from . import ws
 from . import commands as cmd
+from . import map as cmap
 from .config import WS_MAGIC, RobotConfig
 from .state import RobotState
 
@@ -31,7 +32,9 @@ class RealRobot:
     def __init__(self, cfg: RobotConfig, logger=print):
         self.cfg = cfg
         self.state = RobotState()
-        self.on_update = None          # callback opcional (para push inmediato)
+        self.map = None                # último mapa decodificado (dict del frontend)
+        self.on_update = None          # callback opcional (estado -> push)
+        self.on_map = None             # callback opcional (mapa -> push)
         self.log = logger
         self._sock = None
         self._lock = threading.Lock()
@@ -149,6 +152,13 @@ class RealRobot:
             except Exception:
                 pass
 
+    def _notify_map(self):
+        if self.on_map:
+            try:
+                self.on_map()
+            except Exception:
+                pass
+
     def _query_startup(self):
         """Pide no molestar / consumibles / OTA / voz (con reintentos)."""
         uid = self.cfg.userid
@@ -165,6 +175,18 @@ class RealRobot:
     def _handle_msg(self, tls, payload: bytes):
         if payload.strip() == b"libuwsc":
             ws.send(tls, b"libuwsc")
+            return
+        # Frame de mapa (binario, no JSON): syn_no_cache con zlib comprimido.
+        if b"\x78\x9c" in payload and (b"syn_no_cache" in payload
+                                       or b"sweeper-map" in payload):
+            try:
+                self.map = cmap.decode_map(payload)
+                m = self.map
+                self.log(f"  [robot] mapa: {m['name']} "
+                         f"{m['bbox'][2]}x{m['bbox'][3]} ({len(m['rooms'])} hab.)")
+                self._notify_map()
+            except Exception as e:
+                self.log(f"  [!] mapa no decodificado: {e}")
             return
         try:
             msg = json.loads(payload.decode("utf-8"))

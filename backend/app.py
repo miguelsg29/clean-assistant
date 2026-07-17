@@ -69,6 +69,17 @@ async def broadcast():
             clients.discard(ws)
 
 
+async def broadcast_map():
+    if not robot.map:
+        return
+    msg = json.dumps({"type": "map", "map": robot.map})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def _loop():
     while True:
         await asyncio.sleep(2)
@@ -81,6 +92,7 @@ async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
     # push inmediato: cuando el robot real cambia de estado, retransmitimos ya.
     robot.on_update = lambda: asyncio.run_coroutine_threadsafe(broadcast(), loop)
+    robot.on_map = lambda: asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
     try:
         robot.start()
     except Exception as e:
@@ -101,7 +113,7 @@ def get_state():
 
 @app.get("/api/map")
 def get_map():
-    return cmap.sample_map()
+    return robot.map or cmap.sample_map()
 
 
 @app.post("/api/command")
@@ -121,6 +133,8 @@ async def websocket(ws: WebSocket):
     await ws.accept()
     clients.add(ws)
     await ws.send_text(json.dumps({"type": "state", "state": robot.state.to_dict()}))
+    if robot.map:
+        await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto

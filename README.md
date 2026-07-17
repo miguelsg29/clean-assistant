@@ -23,8 +23,11 @@ desarrollar la interfaz sin un Conga real:
 - ✅ **Robot real** (`RealRobot`): servidor TLS+WS que suplanta la nube, login con
   JWT sintético, report_data → estado, envío de comandos. Misma interfaz que el mock;
   verificado de punta a punta con un robot simulado.
-- ⬜ **Mapa real** (decodificador zlib+Protobuf del robot).
-- ⬜ Edición de **zonas** dibujando en el mapa; editor visual de **horarios**.
+- ✅ **Mapa real**: decodificador zlib+Protobuf (`decode_map`), recepción en `RealRobot`
+  (frame `syn_no_cache`) y **render en canvas** con las habitaciones y selección tocando
+  el mapa. Verificado con un frame de mapa real capturado (8 habitaciones, 13 ms).
+- ⬜ Posición del robot y **zonas** sobre el mapa real (transformación rejilla↔metros);
+  editor visual de **horarios**.
 - ⬜ Puente **MQTT** opcional para Home Assistant.
 
 ## Arquitectura

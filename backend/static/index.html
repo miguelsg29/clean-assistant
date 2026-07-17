@@ -11,7 +11,7 @@
     --ink:#171c1b; --muted:#5f6b68; --faint:#93a09c; --line:#e4e9e7; --wall:#c8d2cf;
     --accent:#0e9c86; --accent-ink:#096251; --accent-soft:#e2f3ee;
     --critical:#d76a5a; --critical-soft:#f7e6e2; --water:#3d8fbf; --water-soft:#e2eef4; --amber:#c78a2b;
-    --r1:#d9efe9;--r2:#f4ecda;--r3:#e6e9f5;--r4:#e3efdd;--r5:#dcecf1;--r6:#ece5f3;--r7:#edf1ef;
+    --r1:#d9efe9;--r2:#f4ecda;--r3:#e6e9f5;--r4:#e3efdd;--r5:#dcecf1;--r6:#ece5f3;--r7:#edf1ef;--r8:#f3e1e3;
     --shadow:0 1px 2px rgba(20,40,35,.04),0 8px 24px rgba(20,45,38,.06);
     --shadow-lg:0 2px 6px rgba(20,40,35,.06),0 20px 50px rgba(20,45,38,.10);
     --radius:18px;--radius-sm:12px;
@@ -23,17 +23,17 @@
     --ink:#eaf0ee;--muted:#9aa6a2;--faint:#66736f;--line:#26302c;--wall:#39443f;
     --accent:#2cc1a7;--accent-ink:#8ee9d9;--accent-soft:#13322c;
     --critical:#e88a7b;--critical-soft:#301e1b;--water:#5aa9d6;--water-soft:#152833;--amber:#d9a441;
-    --r1:#173029;--r2:#312a1b;--r3:#20232f;--r4:#1d2b1c;--r5:#152a30;--r6:#241e2d;--r7:#1a201e;
+    --r1:#173029;--r2:#312a1b;--r3:#20232f;--r4:#1d2b1c;--r5:#152a30;--r6:#241e2d;--r7:#1a201e;--r8:#2e2023;
     --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 28px rgba(0,0,0,.35);
     --shadow-lg:0 2px 8px rgba(0,0,0,.4),0 24px 60px rgba(0,0,0,.5);color-scheme:dark;}}
   :root[data-theme="light"]{
     --bg:#f6f8f7;--surface:#ffffff;--surface-2:#eef2f1;--inset:#f2f5f4;--ink:#171c1b;--muted:#5f6b68;--faint:#93a09c;--line:#e4e9e7;--wall:#c8d2cf;
     --accent:#0e9c86;--accent-ink:#096251;--accent-soft:#e2f3ee;--critical:#d76a5a;--critical-soft:#f7e6e2;--water:#3d8fbf;--water-soft:#e2eef4;--amber:#c78a2b;
-    --r1:#d9efe9;--r2:#f4ecda;--r3:#e6e9f5;--r4:#e3efdd;--r5:#dcecf1;--r6:#ece5f3;--r7:#edf1ef;color-scheme:light;}
+    --r1:#d9efe9;--r2:#f4ecda;--r3:#e6e9f5;--r4:#e3efdd;--r5:#dcecf1;--r6:#ece5f3;--r7:#edf1ef;--r8:#f3e1e3;color-scheme:light;}
   :root[data-theme="dark"]{
     --bg:#0d1110;--surface:#161b1a;--surface-2:#1e2422;--inset:#131917;--ink:#eaf0ee;--muted:#9aa6a2;--faint:#66736f;--line:#26302c;--wall:#39443f;
     --accent:#2cc1a7;--accent-ink:#8ee9d9;--accent-soft:#13322c;--critical:#e88a7b;--critical-soft:#301e1b;--water:#5aa9d6;--water-soft:#152833;--amber:#d9a441;
-    --r1:#173029;--r2:#312a1b;--r3:#20232f;--r4:#1d2b1c;--r5:#152a30;--r6:#241e2d;--r7:#1a201e;color-scheme:dark;}
+    --r1:#173029;--r2:#312a1b;--r3:#20232f;--r4:#1d2b1c;--r5:#152a30;--r6:#241e2d;--r7:#1a201e;--r8:#2e2023;color-scheme:dark;}
 
   *{box-sizing:border-box}
   html,body{margin:0}
@@ -69,6 +69,9 @@
   .chiplbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
   .mapwrap{padding:10px}
   svg.map{width:100%;height:auto;display:block;border-radius:12px}
+  svg.map.hidden{display:none}
+  canvas.realmap{display:none;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
+  canvas.realmap.show{display:block}
   .room{cursor:pointer}
   .room .rfill{transition:fill .2s,opacity .2s}
   .room:hover .rfill{opacity:.72}
@@ -215,6 +218,7 @@
           <rect class="dock" x="80" y="279" width="24" height="7" rx="2"/>
           <g class="robot" id="robot" transform="translate(92,258)"><circle class="ping" cx="0" cy="0" r="9"/><circle class="halo" cx="0" cy="0" r="13"/><circle class="body" cx="0" cy="0" r="8"/></g>
         </svg>
+        <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
       </div>
       <div class="dockbar" role="group" aria-label="Controles del robot">
         <button class="dbtn primary" id="playBtn"><svg viewBox="0 0 24 24" fill="currentColor" id="playIco"><path d="M8 5v14l11-7z"/></svg><span id="playLbl">Iniciar</span></button>
@@ -299,6 +303,9 @@
   var KEY2ID={salon:15,cocina:13,pasillo:16,dorm_p:14,dorm:10,bano:12,bano_p:11};
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
+  var MAP=null, CELLS=null, IDX={}; // mapa actual + rejilla real + id->indice
+  function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
+  var ROOM_TOKENS=['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8'];
 
   function api(action,extra){
     return fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},
@@ -309,14 +316,14 @@
 
   // ---- room chips (construidos desde /api/map) ----
   var ROOMS=[];
+  function roomToken(r,i){ return r.color ? ('--'+r.color) : ROOM_TOKENS[i%ROOM_TOKENS.length]; }
   function buildChips(){
     var wrap=document.getElementById('roomChips');
-    var css={13:'--r2',15:'--r1',16:'--r7',14:'--r3',10:'--r4',12:'--r5',11:'--r6'};
     wrap.innerHTML='';
-    ROOMS.forEach(function(r){
+    ROOMS.forEach(function(r,i){
       var b=document.createElement('button');
       b.className='rchip';b.dataset.id=r.id;
-      b.innerHTML='<span class="sw" style="background:var('+(css[r.id]||'--r7')+')"></span>'+r.name+
+      b.innerHTML='<span class="sw" style="background:var('+roomToken(r,i)+')"></span>'+r.name+
         '<svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M5 13l4 4 10-11"/></svg>';
       b.addEventListener('click',function(){toggleRoom(r.id);});
       wrap.appendChild(b);
@@ -329,6 +336,7 @@
     var b=document.getElementById('cleanSel'),n=selected.size;
     b.disabled=n===0;
     b.textContent=n===0?'Limpiar selección':('Limpiar '+n+(n===1?' habitación':' habitaciones'));
+    if(MAP && !MAP.sample) renderRealMap();
   }
   document.querySelectorAll('.map .room').forEach(function(r){
     r.addEventListener('click',function(){var id=KEY2ID[r.dataset.room];if(id)toggleRoom(id);});
@@ -428,17 +436,72 @@
     var next=isDark?'light':'dark';
     document.documentElement.setAttribute('data-theme',next);
     document.getElementById('themeIco').innerHTML=next==='dark'?MOON:SUN;
+    if(MAP&&!MAP.sample)renderRealMap();
+  });
+
+  // ---- mapa: aplicar (ejemplo -> SVG de ejemplo; real -> canvas) ----
+  function applyMap(m){
+    MAP=m; ROOMS=m.rooms||[]; buildChips();
+    document.getElementById('modeTag').textContent=m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot';
+    var svg=document.querySelector('svg.map'), cv=document.getElementById('mapCanvas');
+    if(m.sample){ svg.classList.remove('hidden'); cv.classList.remove('show'); }
+    else{
+      IDX={}; (m.rooms||[]).forEach(function(r,i){IDX[r.id]=i;});
+      var bin=atob(m.cells_b64); CELLS=new Uint8Array(bin.length);
+      for(var i=0;i<bin.length;i++)CELLS[i]=bin.charCodeAt(i);
+      svg.classList.add('hidden'); cv.classList.add('show'); renderRealMap();
+    }
+    syncSel();
+  }
+  function _hex(c){ c=(c||'').trim();
+    if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
+      return [parseInt(c.substr(1,2),16),parseInt(c.substr(3,2),16),parseInt(c.substr(5,2),16)]; }
+    var mm=c.match(/\d+/g); return mm?[+mm[0],+mm[1],+mm[2]]:[150,150,150]; }
+  function renderRealMap(){
+    if(!MAP||MAP.sample||!CELLS)return;
+    var w=MAP.bbox[2], h=MAP.bbox[3], scale=Math.max(2,Math.ceil(560/w));
+    var cv=document.getElementById('mapCanvas'); cv.width=w*scale; cv.height=h*scale;
+    var ctx=cv.getContext('2d');
+    var wall=_hex(cssVar('--ink')), thin=_hex(cssVar('--line')),
+        pal=ROOM_TOKENS.map(function(t){return _hex(cssVar(t));});
+    var off=document.createElement('canvas'); off.width=w; off.height=h;
+    var octx=off.getContext('2d'), img=octx.createImageData(w,h), D=img.data;
+    for(var i=0;i<CELLS.length;i++){ var v=CELLS[i], o=i*4, col;
+      if(v===0){ D[o+3]=0; continue; }
+      if(v===255)col=wall; else if(v===1)col=thin;
+      else { var ix=IDX[v]; col=(ix!=null?pal[ix%pal.length]:[150,150,150]); }
+      D[o]=col[0]; D[o+1]=col[1]; D[o+2]=col[2]; D[o+3]=255;
+    }
+    octx.putImageData(img,0,0);
+    ctx.imageSmoothingEnabled=false; ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.drawImage(off,0,0,cv.width,cv.height);
+    ctx.fillStyle=cssVar('--accent'); ctx.globalAlpha=0.22;
+    for(var j=0;j<CELLS.length;j++){ var vv=CELLS[j];
+      if(vv>1&&vv!==255&&selected.has(vv)) ctx.fillRect((j%w)*scale,((j/w)|0)*scale,scale,scale); }
+    ctx.globalAlpha=1;
+    ctx.font='600 '+Math.max(11,Math.round(scale*5))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    (MAP.rooms||[]).forEach(function(r){
+      ctx.fillStyle=selected.has(r.id)?cssVar('--accent-ink'):cssVar('--ink');
+      ctx.fillText(r.name, r.center[0]*scale, r.center[1]*scale); });
+  }
+  document.getElementById('mapCanvas').addEventListener('click',function(e){
+    if(!MAP||MAP.sample||!CELLS)return;
+    var rect=this.getBoundingClientRect(), w=MAP.bbox[2], h=MAP.bbox[3];
+    var x=Math.floor((e.clientX-rect.left)/rect.width*w),
+        y=Math.floor((e.clientY-rect.top)/rect.height*h);
+    if(x<0||y<0||x>=w||y>=h)return;
+    var v=CELLS[y*w+x]; if(v>1&&v!==255)toggleRoom(v);
   });
 
   // ---- carga inicial + WebSocket ----
-  fetch('/api/map').then(function(r){return r.json();}).then(function(m){
-    ROOMS=m.rooms||[];buildChips();
-    if(m.sample)document.getElementById('modeTag').textContent='robot simulado (mapa de ejemplo)';
-  });
+  fetch('/api/map').then(function(r){return r.json();}).then(applyMap);
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+'/ws');
-    ws.onmessage=function(ev){var m=JSON.parse(ev.data);if(m.type==='state'){st=m.state;render();}};
+    ws.onmessage=function(ev){var m=JSON.parse(ev.data);
+      if(m.type==='state'){st=m.state;render();}
+      else if(m.type==='map'){applyMap(m.map);}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
