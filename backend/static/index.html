@@ -763,7 +763,7 @@
       ed.addEventListener('click',function(){
         inlineEdit(nt, r.name, function(nv){
           if(nv){ r.name=nv; fetch(BASE+'api/room/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:r.id,name:nv})}).then(function(x){return x.json();}); }
-          renderFloors();
+          renderFloors(); buildChips(); if(MAP&&!MAP.sample)renderRealMap();   // refleja el nombre en mapa y chips
         });
       });
       nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
@@ -774,6 +774,7 @@
         b.addEventListener('click',function(){
           seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
           r.material=i+1; setFloor(r.id,opt);
+          if(MAP&&!MAP.sample)renderRealMap();   // redibuja la textura del suelo al instante
         });
         seg.appendChild(b);
       });
