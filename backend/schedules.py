@@ -19,8 +19,21 @@ def _slug(name: str) -> str:
 
 # Categoría de habitación = dos últimos dígitos del roomTypeId. El robot usa varias
 # familias (2001 y 2101 = dormitorio; 2006 y 2106 = salón), por eso miramos type % 100.
-CAT_BEDROOM, CAT_BATHROOM = 1, 3   # 1=dormitorio, 3=baño, 4=pasillo, 5=cocina, 6=salón
+CAT_BEDROOM, CAT_BATHROOM, CAT_LIVING = 1, 3, 6   # 1=dorm, 3=baño, 4=pasillo, 5=cocina, 6=salón
 _ALL_DAYS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+# Config observada en la app de Cecotec para cada plan por defecto. Clave = material
+# del suelo (1 Suave, 2 Azulejos, 3 Madera, 4 Alfombra). Valor = (succión, agua, mopa).
+# "Solo baños": succión Turbo; suelos mojables a tope, madera/alfombra solo aspiran.
+_BANOS_BY_FLOOR = {2: ("Turbo", "Alto", "Potente"), 1: ("Turbo", "Alto", "Potente"),
+                   3: ("Turbo", "Off", "Off"),      4: ("Turbo", "Off", "Off")}
+# "Solo dormitorios": succión Eco; suave/madera flojo, azulejos medio, alfombra aspira.
+_DORM_BY_FLOOR = {3: ("Eco", "Bajo", "Estándar"), 1: ("Eco", "Bajo", "Estándar"),
+                  2: ("Eco", "Medio", "Fuerte"),  4: ("Eco", "Off", "Off")}
+# "Limpieza profunda": succión por CATEGORÍA de habitación; agua/mopa por suelo.
+_PROF_FAN_BY_CAT = {CAT_BEDROOM: "Eco", CAT_LIVING: "Normal"}   # resto (baño/cocina/pasillo) = Turbo
+_PROF_WET_BY_FLOOR = {3: ("Bajo", "Estándar"), 1: ("Bajo", "Estándar"),
+                      2: ("Alto", "Potente"),  4: ("Off", "Off")}
 
 
 def _category(rtype) -> int:
@@ -30,17 +43,26 @@ def _category(rtype) -> int:
         return -1
 
 
+def _floor(material) -> int:
+    return material if material in (1, 2, 3, 4) else 1   # sin definir -> Suave
+
+
 def suggested_plans(rooms) -> list[dict]:
-    """Planes sugeridos (inactivos) generados del mapa actual, tipo los que propone
-    la app de Cecotec. La config de cada habitación sale de su tipo de suelo."""
+    """Planes sugeridos (inactivos) generados del mapa actual, replicando los que
+    propone la app de Cecotec. La config de cada habitación depende del plan, de la
+    categoría de la habitación y de su tipo de suelo (agua Off/mopa Off = solo aspira)."""
     real = [r for r in (rooms or []) if r.get("named", True) and r.get("id") is not None]
     if not real:
         return []
 
-    def room_cfg(r):
-        d = cmd.floor_defaults(r.get("material"))
-        return {"room": r["id"], "fan": d["fan"], "water": d["water"],
-                "mop": d["mop"], "twice": False}
+    def by_floor(table, r):
+        f, w, m = table[_floor(r.get("material"))]
+        return {"room": r["id"], "fan": f, "water": w, "mop": m, "twice": False}
+
+    def profunda(r):
+        fan = _PROF_FAN_BY_CAT.get(_category(r.get("type")), "Turbo")
+        w, m = _PROF_WET_BY_FLOOR[_floor(r.get("material"))]
+        return {"room": r["id"], "fan": fan, "water": w, "mop": m, "twice": False}
 
     beds = [r for r in real if _category(r.get("type")) == CAT_BEDROOM]
     baths = [r for r in real if _category(r.get("type")) == CAT_BATHROOM]
@@ -48,15 +70,15 @@ def suggested_plans(rooms) -> list[dict]:
     if beds:
         out.append({"id": "sug_dormitorios", "name": "Solo dormitorios",
                     "time": "09:00", "days": ["lun", "jue"],
-                    "rooms": [room_cfg(r) for r in beds]})
+                    "rooms": [by_floor(_DORM_BY_FLOOR, r) for r in beds]})
     if baths:
         out.append({"id": "sug_banos", "name": "Solo baños",
                     "time": "09:00", "days": list(_ALL_DAYS),
-                    "rooms": [room_cfg(r) for r in baths]})
+                    "rooms": [by_floor(_BANOS_BY_FLOOR, r) for r in baths]})
     if len(real) >= 2:
         out.append({"id": "sug_profunda", "name": "Limpieza profunda",
-                    "time": "10:00", "days": list(_ALL_DAYS),
-                    "rooms": [room_cfg(r) for r in real]})
+                    "time": "09:00", "days": list(_ALL_DAYS),
+                    "rooms": [profunda(r) for r in real]})
     for p in out:
         p["enable"] = False
         p["suggested"] = True

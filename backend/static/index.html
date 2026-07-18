@@ -315,6 +315,13 @@
           <span><i class="sw-alfombra"></i>Alfombra</span>
         </div>
         <div id="floorList"></div>
+
+        <div class="phead" style="margin-top:18px;display:flex;align-items:center;gap:8px">
+          <span>Zonas guardadas en el robot</span>
+          <button class="btn ghost" id="refreshRobotZones" style="margin-left:auto;padding:6px 12px;font-size:12px">Consultar</button>
+        </div>
+        <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Las que hay en el robot (incluidas las de la app de Cecotec). Se leen del mapa; pulsa «Consultar» para releerlas.</p>
+        <div id="robotZonesList"></div>
       </div>
 
       <div class="tabpane" data-pane="horarios">
@@ -373,7 +380,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.7 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.8 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -597,6 +604,7 @@
     if(typeof renderSchedules==='function') renderSchedules();
     if(typeof renderFloors==='function') renderFloors();
     if(typeof loadSuggested==='function') loadSuggested();   // sugerencias según el mapa/suelo
+    if(typeof renderRobotZones==='function') renderRobotZones();   // zonas guardadas en el robot
   }
   function _hex(c){ c=(c||'').trim();
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
@@ -756,6 +764,26 @@
       d.querySelector('.zdel').addEventListener('click',function(){ delZone(z.id); });
       el.appendChild(d);
     });
+  }
+  // ---- zonas guardadas EN EL ROBOT (del mapa, campo 9; incluye las de la app Cecotec) ----
+  function renderRobotZones(){
+    var el=document.getElementById('robotZonesList'); if(!el)return; el.innerHTML='';
+    var zs=(MAP&&MAP.stored_zones)||[];
+    if(!zs.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin zonas en el robot. Pulsa «Consultar».</p>'; return; }
+    zs.forEach(function(z){
+      var k=ZK[z.kind]||{c:'--faint',l:z.kind};
+      var d=document.createElement('div'); d.className='zrow';
+      d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
+        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>';
+      d.querySelector('.n').textContent=z.name||'(sin nombre)';
+      el.appendChild(d);
+    });
+  }
+  function refreshRobotZones(){
+    fetch(BASE+'api/map').then(function(r){return r.json();}).then(function(m){
+      if(m&&!m.sample){ MAP=m; ROOMS=m.rooms||ROOMS; }
+      renderRobotZones(); if(MAP&&!MAP.sample)renderRealMap();
+    }).catch(function(){});
   }
   function delZone(id){
     fetch(BASE+'api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
@@ -1038,6 +1066,10 @@
     this.textContent='Consultando…';
     var b=this; fetch(BASE+'api/robot/orders/refresh',{method:'POST'}).then(function(r){return r.json();})
       .then(function(){ setTimeout(function(){b.textContent='Consultar';},1500); });
+  });
+  document.getElementById('refreshRobotZones').addEventListener('click',function(){
+    var b=this; b.textContent='Consultando…'; refreshRobotZones();
+    setTimeout(function(){b.textContent='Consultar';},900);
   });
 
   // ---- botones de orientación del mapa (girar / espejo) ----

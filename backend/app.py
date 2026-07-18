@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.7.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.8.0", lifespan=lifespan)
 
 
 @app.get("/api/state")

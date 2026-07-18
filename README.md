@@ -37,7 +37,7 @@ sin login aparte.
    horarios… Si dejas `MQTT_HOST` vacío y usas el broker estándar de HA, se
    autoconfigura solo.
 
-## Estado: v0.6 — funcional, verificada con robot real ✅
+## Estado: v0.8 — funcional, verificada con robot real ✅
 
 App completa y **verificada de punta a punta con un Conga real**, empaquetada para
 **Docker** y como **add-on de Home Assistant** (ingress). Incluye un **robot simulado**

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.0
+- Zonas guardadas en el robot: se leen del mapa (prohibidas / sin fregona, incluidas
+  las creadas en la app de Cecotec) y se listan en la pestaña Zonas con un botón
+  «Consultar».
+- Planes sugeridos afinados a la lógica de la app: succión por tipo de habitación
+  (dormitorio Eco, salón Normal, resto Turbo) y agua/mopa según el tipo de suelo.
+
 ## 0.7.0
 - Planes sugeridos según tu mapa (Solo dormitorios / Solo baños / Limpieza profunda):
   aparecen en Horarios y los añades con un toque; luego los editas o desactivas.

@@ -107,6 +107,7 @@ def _parse_protobuf(pb: bytes) -> dict:
     params = None
     pose = None
     robot = None
+    zones = []
     while pos < len(pb):
         try:
             tag, pos = _read_varint(pb, pos)
@@ -160,6 +161,8 @@ def _parse_protobuf(pb: bytes) -> dict:
                 pose = _parse_pose(chunk)
             elif fn == 8:                                 # robot vivo (se mueve al limpiar)
                 robot = _parse_robot(chunk)
+            elif fn == 9:                                 # zona / pared virtual guardada
+                zones.append(_parse_zone(chunk))
             elif fn == 5 and map_name is None:            # nombre del mapa
                 p = 0
                 while p < len(chunk):
@@ -179,7 +182,60 @@ def _parse_protobuf(pb: bytes) -> dict:
         else:
             break
     return {"grid": grid, "rooms": rooms, "map_name": map_name,
-            "params": params, "pose": pose, "robot": robot}
+            "params": params, "pose": pose, "robot": robot, "zones": zones}
+
+
+def _parse_zone(chunk: bytes) -> dict:
+    """Campo 9: zona/pared virtual guardada. sub2=tipo (200 prohibida, 301 sin fregona,
+    201 doble pasada), sub4 (rep)=puntos {x(1),y(2)} float32 en metros, sub5=nombre."""
+    ztype = None
+    name = ""
+    pts = []
+    p = 0
+    while p < len(chunk):
+        st, p = _read_varint(chunk, p)
+        sf, sw = st >> 3, st & 7
+        if sw == 0:
+            v, p = _read_varint(chunk, p)
+            if sf == 2:
+                ztype = v
+        elif sw == 5:
+            p += 4
+        elif sw == 1:
+            p += 8
+        elif sw == 2:
+            sl, p = _read_varint(chunk, p)
+            sub = chunk[p:p + sl]
+            p += sl
+            if sf == 5:
+                name = sub.decode("utf-8", "replace")
+            elif sf == 4:                                 # un punto (x, y) en metros
+                x = y = None
+                q = 0
+                while q < len(sub):
+                    t2, q = _read_varint(sub, q)
+                    f2, w2 = t2 >> 3, t2 & 7
+                    if w2 == 5:
+                        val = struct.unpack("<f", sub[q:q + 4])[0]
+                        q += 4
+                        if f2 == 1:
+                            x = val
+                        elif f2 == 2:
+                            y = val
+                    elif w2 == 0:
+                        _, q = _read_varint(sub, q)
+                    elif w2 == 1:
+                        q += 8
+                    elif w2 == 2:
+                        ll, q = _read_varint(sub, q)
+                        q += ll
+                    else:
+                        break
+                if x is not None and y is not None:
+                    pts.append((x, y))
+        else:
+            break
+    return {"type": ztype, "name": name, "points": pts}
 
 
 def decode_map(frame: bytes) -> dict:
@@ -259,6 +315,17 @@ def decode_map(frame: bytes) -> dict:
     # campo 8 = robot vivo; campo 7 = base de carga. Si no llega el 8, caemos al 7.
     charger = _to_cell(info.get("pose"))
     robot = _to_cell(info.get("robot")) or charger
+
+    # zonas guardadas EN EL ROBOT (campo 9): puntos de metros -> celda recortada.
+    _ZKIND = {200: "nogo", 301: "nomop", 201: "clean"}
+    stored_zones = []
+    for z in info.get("zones", []):
+        cells = [[round((mx - mnx) / res - minx, 1), round((my - mny) / res - miny, 1)]
+                 for (mx, my) in z.get("points", [])]
+        if cells:
+            stored_zones.append({"kind": _ZKIND.get(z.get("type"), "otro"),
+                                 "type": z.get("type"), "name": z.get("name", ""),
+                                 "points": cells})
     return {
         "name": info["map_name"] or "Interior",
         "grid_size": [GRID_W, GRID_H],
@@ -267,6 +334,8 @@ def decode_map(frame: bytes) -> dict:
         "rooms": rooms,
         "robot": robot,
         "charger": charger,
+        "stored_zones": stored_zones,     # zonas/paredes virtuales guardadas en el robot
+
         # origen del mundo para convertir celda(recortada)<->metros en el frontend:
         # metros = (celda_recortada + bbox_min) * res + min
         "world": {"min_x": mnx, "min_y": mny, "res": res},
