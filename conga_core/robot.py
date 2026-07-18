@@ -40,8 +40,11 @@ class RealRobot:
         self.on_pose = None            # callback opcional (solo pose -> push ligero)
         self.on_orders = None          # callback opcional (horarios del robot -> push)
         self.log = logger
+        self.link = getattr(cfg, "link_mode", "local")   # "local" | "cloud" (pasarela a la nube)
         self._sock = None
+        self._cloud = None
         self._lock = threading.Lock()
+        self._wlock = threading.Lock()   # serializa escrituras al socket del robot
         self._diag = {"quiet": 0, "info": 0}
         self._last_cells = None        # rejilla del último mapa emitido (para detectar cambios)
 
@@ -58,7 +61,8 @@ class RealRobot:
             return {"ok": False, "error": "robot no conectado"}
         msg = {"tag": "sweeper-transmit/to_bind", "content": json.dumps(control)}
         try:
-            ws.send(sock, json.dumps(msg))
+            with self._wlock:
+                ws.send(sock, json.dumps(msg))
             self.log(f"  --> robot: {control.get('control')}")
             return {"result": 0}
         except Exception as e:
@@ -109,9 +113,19 @@ class RealRobot:
                 tls.close()
                 return
             self.log("  [robot] conectado")
+            self._diag = {"quiet": 0, "info": 0}
+            if self.link == "cloud":
+                cloud = None
+                try:
+                    cloud = self._connect_cloud()
+                except Exception as e:
+                    self.log(f"  [cloud] nube no accesible ({e}); sigo en LOCAL esta sesión")
+                if cloud:
+                    self._relay_cloud(tls, cloud)   # bloquea hasta cerrar; la app oficial funciona
+                    return
+                # si la nube falla, cae al impersonador local (abajo)
             with self._lock:
                 self._sock = tls
-            self._diag = {"quiet": 0, "info": 0}
             while True:
                 opcode, payload = ws.read_frame(tls)
                 if opcode is None or opcode == 0x8:
@@ -132,6 +146,143 @@ class RealRobot:
             self._notify()
             try:
                 tls.close()
+            except Exception:
+                pass
+
+    # ---------------- modo cloud (pasarela robot <-> nube real) ----------------
+    _NOISE = ("heart-beat", "report_data", "info_report", "get_notice_config",
+              "get_pets", "stuff/config", "status")
+
+    def _connect_cloud(self):
+        raw = socket.create_connection((self.cfg.cloud_ip, self.cfg.cloud_port), timeout=8)
+        raw.settimeout(None)
+        cctx = ssl.create_default_context()
+        cctx.check_hostname = False
+        cctx.verify_mode = ssl.CERT_NONE
+        try:
+            cctx.set_ciphers("ALL:@SECLEVEL=0")
+        except Exception:
+            pass
+        tls = cctx.wrap_socket(raw, server_hostname=self.cfg.cloud_host)
+        key = base64.b64encode(os.urandom(16)).decode()
+        tls.sendall((f"GET / HTTP/1.1\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
+                     f"Sec-WebSocket-Key: {key}\r\nSec-WebSocket-Version: 13\r\n"
+                     f"Host: {self.cfg.cloud_host}:{self.cfg.cloud_port}\r\n\r\n").encode())
+        ws.recv_http_headers(tls)
+        self.log(f"  [cloud] conectado a la nube real {self.cfg.cloud_ip}")
+        return tls
+
+    def _relay_cloud(self, robot_tls, cloud):
+        self.log("  [cloud] pasarela robot<->nube ACTIVA (la app oficial funciona)")
+        with self._lock:
+            self._sock = robot_tls
+            self._cloud = cloud
+        self.state.online = True
+        self._notify()
+
+        def cloud_to_robot():
+            try:
+                while True:
+                    op, pl = ws.read_frame(cloud)
+                    if op is None or op == 0x8:
+                        break
+                    with self._wlock:
+                        ws.send(robot_tls, pl or b"", opcode=(0xA if op == 0x9 else (op or 0x1)))
+                    if pl and op != 0x9:
+                        self._observe("nube->robot", pl)
+            except Exception:
+                pass
+            finally:
+                for s in (robot_tls, cloud):
+                    try: s.close()
+                    except Exception: pass
+
+        threading.Thread(target=cloud_to_robot, daemon=True).start()
+        try:
+            while True:
+                op, pl = ws.read_frame(robot_tls)
+                if op is None or op == 0x8:
+                    break
+                ws.send(cloud, pl or b"", opcode=(0xA if op == 0x9 else (op or 0x1)), mask=True)
+                if pl and op != 0x9:
+                    self._observe("robot->nube", pl)
+        except Exception as e:
+            self.log(f"  [cloud] fin de pasarela: {e}")
+        finally:
+            with self._lock:
+                if self._sock is robot_tls:
+                    self._sock = None
+                self._cloud = None
+            self.state.online = False
+            self._notify()
+            for s in (robot_tls, cloud):
+                try: s.close()
+                except Exception: pass
+
+    def _observe(self, direction, payload):
+        """En modo cloud: alimenta estado/mapa desde el tráfico y registra los
+        comandos de la app (para depurar funciones aún no integradas)."""
+        if b"\x78\x9c" in payload and (b"syn_no_cache" in payload or b"sweeper-map" in payload):
+            try:
+                m = cmap.decode_map(payload)
+                self.map = m
+                self.pose = m.get("robot")
+                if m.get("cells_b64") != self._last_cells:
+                    self._last_cells = m["cells_b64"]
+                    self._notify_map()
+                elif self.pose:
+                    self._notify_pose()
+            except Exception:
+                pass
+            return
+        try:
+            msg = json.loads(payload.decode("utf-8"))
+        except Exception:
+            return
+        service = str(msg.get("service") or msg.get("tag") or "")
+        content = msg.get("content")
+        try:
+            parsed = json.loads(content) if content else {}
+        except Exception:
+            parsed = {}
+        if not isinstance(parsed, dict):
+            return
+        if service.endswith("device/report_data"):
+            d = parsed.get("data", {})
+            if isinstance(d, dict):
+                try:
+                    self.state.update_from_report(d)
+                    self._notify()
+                except Exception:
+                    pass
+            return
+        # acuse del robot ({data:{control,...}}) o comando de la app ({control,...})
+        d = parsed.get("data") if isinstance(parsed.get("data"), dict) else parsed
+        ctrl = d.get("control") if isinstance(d, dict) else None
+        if ctrl in ("get_quiet", "get_consumables", "get_upgrade_config",
+                    "get_voice", "getOrder6090"):
+            try:
+                self._parse_ack(d)   # aprovecha para leer no molestar/consumibles/voz/horarios
+            except Exception:
+                pass
+        if ctrl and ctrl not in self._NOISE:
+            extras = {k: v for k, v in d.items() if k != "control"}
+            self.log(f"  [cloud][{direction}] {ctrl} "
+                     f"{json.dumps(extras, ensure_ascii=False)[:220]}")
+
+    def set_link(self, mode):
+        """Cambia el modo de enlace ('local'/'cloud'); reinicia la conexión del robot."""
+        mode = "cloud" if str(mode).lower() == "cloud" else "local"
+        if mode == self.link:
+            return
+        self.link = mode
+        self.log(f"  [link] modo -> {mode}; reconectando el robot...")
+        with self._lock:
+            s, c = self._sock, self._cloud
+        for x in (s, c):
+            try:
+                if x:
+                    x.close()   # fuerza al robot a reconectar en el nuevo modo
             except Exception:
                 pass
 

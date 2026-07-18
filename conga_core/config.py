@@ -54,6 +54,11 @@ class RobotConfig:
     cert_path: str = "cert.pem"
     key_path: str = "key.pem"
     auth_jwt: str = ""     # vacío -> se genera un JWT sintético
+    # enlace: "local" (impersonador) o "cloud" (pasarela robot<->nube real, la app oficial funciona)
+    link_mode: str = "local"
+    cloud_ip: str = "43.158.121.228"          # IP real de tcp-cecotec.3irobotix.net
+    cloud_host: str = "tcp-cecotec.3irobotix.net"
+    cloud_port: int = 9090
 
     @property
     def jwt(self) -> str:
@@ -78,4 +83,8 @@ class RobotConfig:
             cert_path=e("CERT_PATH", "cert.pem"),
             key_path=e("KEY_PATH", "key.pem"),
             auth_jwt=(e("AUTH_JWT", "") or "").strip(),
+            link_mode=(e("CONGA_LINK", "local") or "local").lower(),
+            cloud_ip=e("CLOUD_IP", "43.158.121.228"),
+            cloud_host=e("CLOUD_HOST", "tcp-cecotec.3irobotix.net"),
+            cloud_port=int(e("CLOUD_PORT", "9090")),
         )

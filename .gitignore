@@ -20,6 +20,7 @@ zones.json
 schedules.json
 view.json
 map_cache.json
+link.json
 
 # Docker (volumen de datos local)
 data/

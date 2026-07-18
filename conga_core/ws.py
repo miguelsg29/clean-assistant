@@ -47,15 +47,23 @@ def read_frame(sock):
     return opcode, payload
 
 
-def send(sock, data, opcode=0x1):
+def send(sock, data, opcode=0x1, mask=False):
+    """Envía un frame WS. mask=True cuando actuamos como CLIENTE (hacia la nube)."""
+    import os
     if isinstance(data, str):
         data = data.encode("utf-8")
     b1 = 0x80 | opcode
     length = len(data)
+    mbit = 0x80 if mask else 0
     if length < 126:
-        header = struct.pack("!BB", b1, length)
+        header = struct.pack("!BB", b1, length | mbit)
     elif length < 65536:
-        header = struct.pack("!BBH", b1, 126, length)
+        header = struct.pack("!BBH", b1, 126 | mbit, length)
     else:
-        header = struct.pack("!BBQ", b1, 127, length)
-    sock.sendall(header + data)
+        header = struct.pack("!BBQ", b1, 127 | mbit, length)
+    if mask:
+        mk = os.urandom(4)
+        data = bytes(data[i] ^ mk[i % 4] for i in range(len(data)))
+        sock.sendall(header + mk + data)
+    else:
+        sock.sendall(header + data)

@@ -24,12 +24,16 @@ class MockRobot:
         self.map = None            # el mock no tiene mapa real -> se usa sample_map()
         self.pose = None
         self.orders = []           # el mock no tiene horarios reales del robot
+        self.link = "local"        # modo de enlace (sin efecto en el mock)
 
     def start(self):
         pass                       # el mock no arranca ningún servidor
 
     def query_orders(self):
         pass                       # el mock no tiene horarios reales que leer
+
+    def set_link(self, mode):
+        self.link = "cloud" if str(mode).lower() == "cloud" else "local"
 
     # --- recibe el objeto `control` ya construido y simula su efecto ---
     def command(self, control: dict) -> dict:

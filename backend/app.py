@@ -89,6 +89,26 @@ def _load_map():
         return None
 
 
+# modo de enlace persistente: "local" (impersonador) o "cloud" (pasarela a la nube real)
+LINK_PATH = "link.json"
+
+
+def _load_link():
+    try:
+        with open(LINK_PATH, encoding="utf-8") as f:
+            return "cloud" if json.load(f).get("mode") == "cloud" else "local"
+    except Exception:
+        return None
+
+
+def _save_link(mode: str):
+    try:
+        with open(LINK_PATH, "w", encoding="utf-8") as f:
+            json.dump({"mode": mode}, f)
+    except Exception:
+        pass
+
+
 def _map_head_id() -> int:
     return getattr(robot.state, "map_head_id", None) or 1700000000
 
@@ -218,6 +238,15 @@ async def broadcast_orders():
             clients.discard(ws)
 
 
+async def broadcast_link():
+    msg = json.dumps({"type": "link", "mode": getattr(robot, "link", "local")})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def _loop():
     while True:
         await asyncio.sleep(2)
@@ -245,6 +274,9 @@ async def lifespan(app: FastAPI):
         cached = _load_map()
         if cached:
             robot.map = cached
+    saved_link = _load_link()          # respeta el último modo elegido (local/cloud)
+    if saved_link:
+        robot.link = saved_link
 
     robot.on_update = on_update
     robot.on_map = on_map
@@ -287,6 +319,20 @@ async def post_command(payload: dict):
     mqtt.note_web_command(action, payload)
     await broadcast()
     return {"ok": True, "sent": control, "result": result}
+
+
+@app.get("/api/link")
+def get_link():
+    return {"mode": getattr(robot, "link", "local")}
+
+
+@app.post("/api/link/set")
+async def set_link(payload: dict):
+    mode = "cloud" if str(payload.get("mode")).lower() == "cloud" else "local"
+    robot.set_link(mode)
+    _save_link(mode)
+    await broadcast_link()
+    return {"ok": True, "mode": mode}
 
 
 @app.get("/api/view")
@@ -434,6 +480,7 @@ async def websocket(ws: WebSocket):
     clients.add(ws)
     await ws.send_text(json.dumps({"type": "state", "state": robot.state.to_dict()}))
     await ws.send_text(json.dumps({"type": "view", "view": view_settings}))
+    await ws.send_text(json.dumps({"type": "link", "mode": getattr(robot, "link", "local")}))
     if robot.map:
         await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
     if zones.zones:
