@@ -103,6 +103,31 @@ por horario. La disponibilidad sigue a la conexión del robot.
 > ⚠️ Esto **sustituye** al puente clásico `conga_mqtt_bridge.py`: ambos escuchan en el
 > 9090, así que no ejecutes los dos apuntando al mismo robot a la vez.
 
+## Docker
+
+```bash
+cp .env.example .env          # pon CONGA_MODE=real y los IDs de tu robot
+docker compose up -d --build
+```
+
+La web queda en `http://este-host:8000` y el servidor del robot en el `:9090`. Los
+certificados, el mapa, las zonas, los horarios y la vista se guardan en `./data`
+(persistente). También puedes construir la imagen a mano con el `Dockerfile`.
+
+## Add-on de Home Assistant (ingress)
+
+Este repositorio **es también un repositorio de add-ons de Home Assistant**. En HA:
+**Ajustes → Add-ons → Tienda de add-ons → ⋮ → Repositorios**, añade
+`https://github.com/miguelsg29/clean-assistant` e instala **Clean Assistant**.
+
+- La interfaz se abre **desde la barra lateral de HA** (ingress, con la sesión de HA;
+  sin login aparte).
+- El robot se conecta al **puerto 9090** del host de HA (redirige ahí el DNS de
+  `tcp-cecotec.3irobotix.net` y reinicia el robot).
+- Rellena los datos del robot (y MQTT opcional) en el formulario del add-on.
+- El add-on `clean_assistant/` instala la app desde este repo (sin duplicar código);
+  para fijar versión, pon `CA_REF` a un tag de release en su `Dockerfile`.
+
 ## Estructura
 
 ```
@@ -118,7 +143,14 @@ clean-assistant/
 │   ├── schedules.py     # horarios (setOrder6090) persistentes
 │   ├── mqtt_bridge.py   # puente Home Assistant (autodiscovery), opcional
 │   └── static/          # frontend (index.html)
-└── requirements.txt
+├── requirements.txt
+├── Dockerfile           # imagen Docker independiente
+├── docker-compose.yml   # despliegue con Compose
+├── repository.yaml      # este repo como repositorio de add-ons de HA
+└── clean_assistant/     # add-on de Home Assistant (ingress)
+    ├── config.yaml
+    ├── Dockerfile
+    └── run.sh
 ```
 
 ## Hoja de ruta
@@ -128,4 +160,5 @@ clean-assistant/
 3. ✅ **Zonas**: prohibidas / sin fregona / de limpieza sobre el mapa.
 4. ✅ **Horarios** visuales (`setOrder6090`).
 5. ✅ **MQTT** opcional para Home Assistant.
-6. ⬜ Empaquetado (Docker / add-on de HA con ingress).
+6. ✅ **Empaquetado**: Docker (`Dockerfile` + `docker-compose.yml`) y add-on de
+   Home Assistant con ingress (`repository.yaml` + `clean_assistant/`).

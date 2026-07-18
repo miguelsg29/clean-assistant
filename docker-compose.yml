@@ -1,0 +1,15 @@
+# Clean Assistant con Docker Compose.
+#   1) cp .env.example .env   # y rellena CONGA_MODE=real + los IDs de tu robot
+#   2) docker compose up -d --build
+#   3) redirige el DNS de tcp-cecotec.3irobotix.net a este host y reinicia el robot
+services:
+  clean-assistant:
+    build: .
+    container_name: clean-assistant
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8000:8000"   # interfaz web  -> http://este-host:8000
+      - "9090:9090"   # servidor del robot (TLS + WebSocket)
+    volumes:
+      - ./data:/data  # certificados, mapa, zonas, horarios y vista (persistente)

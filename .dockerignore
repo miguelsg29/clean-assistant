@@ -1,0 +1,24 @@
+.git
+.github
+.gitattributes
+.gitignore
+data/
+.env
+.env.example
+*.pem
+*.log
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+map_cache.json
+zones.json
+schedules.json
+view.json
+plans.json
+# ficheros de add-on y de empaquetado (no van dentro de la imagen standalone)
+clean_assistant/
+repository.yaml
+docker-compose.yml
+README.md
+Capturasdepantalla/

@@ -354,13 +354,15 @@
     return [VIEW.flip?(W-x):x,y]; }
   function applyViewBtns(){ var f=document.getElementById('flipB'); if(f)f.setAttribute('aria-pressed',VIEW.flip?'true':'false'); }
   function setView(patch){ Object.assign(VIEW,patch); applyViewBtns();
-    fetch('/api/view/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(VIEW)});
+    fetch(BASE+'api/view/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(VIEW)});
     if(MAP&&!MAP.sample)renderRealMap(); }
   function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
   var ROOM_TOKENS=['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8'];
 
+  // base de rutas: '/' en acceso directo, '/api/hassio_ingress/<token>/' bajo el ingress de HA
+  var BASE=location.pathname.endsWith('/')?location.pathname:location.pathname+'/';
   function api(action,extra){
-    return fetch('/api/command',{method:'POST',headers:{'Content-Type':'application/json'},
+    return fetch(BASE+'api/command',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify(Object.assign({action:action},extra||{}))}).then(function(r){return r.json();});
   }
   function pad(n){return (n<10?'0':'')+n;}
@@ -686,7 +688,7 @@
     });
   }
   function delZone(id){
-    fetch('/api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
+    fetch(BASE+'api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
       .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
   }
   function enterDraw(kind,btn){
@@ -720,7 +722,7 @@
         var pts=[cellToWorld(x0,y0),cellToWorld(x1,y0),cellToWorld(x1,y1),cellToWorld(x0,y1)];
         exitDraw();
         var name=prompt('Nombre de la zona:', ZK[kind].l); if(name===null){renderRealMap();return;}
-        fetch('/api/zones/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,points:pts,name:name||ZK[kind].l})})
+        fetch(BASE+'api/zones/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,points:pts,name:name||ZK[kind].l})})
           .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
       } else { exitDraw(); renderRealMap(); }
     } else {
@@ -842,11 +844,11 @@
     var p=collectPlan();
     if(!p.days.length){ alert('Elige al menos un día.'); return; }
     if(!p.rooms.length){ alert('Elige al menos una habitación.'); return; }
-    fetch('/api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:p})})
+    fetch(BASE+'api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:p})})
       .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); closeEditor(); });
   });
-  function toggleSched(id,on){ fetch('/api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
-  function delSched(id){ fetch('/api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
+  function toggleSched(id,on){ fetch(BASE+'api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
+  function delSched(id){ fetch(BASE+'api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
 
   // ---- botones de orientación del mapa (girar / espejo) ----
   document.getElementById('rotL').addEventListener('click',function(){ setView({rot:(VIEW.rot+3)%4}); });
@@ -854,13 +856,13 @@
   document.getElementById('flipB').addEventListener('click',function(){ setView({flip:VIEW.flip?0:1}); });
 
   // ---- carga inicial + WebSocket ----
-  fetch('/api/view').then(function(r){return r.json();}).then(function(v){VIEW=v||{rot:0,flip:0};applyViewBtns();if(MAP&&!MAP.sample)renderRealMap();});
-  fetch('/api/map').then(function(r){return r.json();}).then(applyMap);
-  fetch('/api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
-  fetch('/api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
+  fetch(BASE+'api/view').then(function(r){return r.json();}).then(function(v){VIEW=v||{rot:0,flip:0};applyViewBtns();if(MAP&&!MAP.sample)renderRealMap();});
+  fetch(BASE+'api/map').then(function(r){return r.json();}).then(applyMap);
+  fetch(BASE+'api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
+  fetch(BASE+'api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
-    var ws=new WebSocket(proto+'://'+location.host+'/ws');
+    var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
       if(m.type==='state'){st=m.state;render();}
       else if(m.type==='map'){applyMap(m.map);}
@@ -871,7 +873,7 @@
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
-  fetch('/api/state').then(function(r){return r.json();}).then(function(s){st=s;render();});
+  fetch(BASE+'api/state').then(function(r){return r.json();}).then(function(s){st=s;render();});
   connect();
 })();
 </script>

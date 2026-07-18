@@ -21,6 +21,9 @@ schedules.json
 view.json
 map_cache.json
 
+# Docker (volumen de datos local)
+data/
+
 # Sistema / editores
 .DS_Store
 Thumbs.db
