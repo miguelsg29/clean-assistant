@@ -138,6 +138,12 @@
   .fren{width:24px;height:24px;font-size:12px;border:none;background:transparent;box-shadow:none;color:var(--muted);cursor:pointer;padding:0;border-radius:6px}
   .fren:hover{background:var(--inset)}
   .inlineedit{padding:5px 9px;font-size:13px;max-width:220px}
+  .floorlegend{display:flex;flex-wrap:wrap;gap:8px 14px;margin:2px 0 6px;font-size:11.5px;color:var(--muted)}
+  .floorlegend span{display:inline-flex;align-items:center;gap:5px}
+  .floorlegend i{width:16px;height:16px;border-radius:4px;border:1px solid var(--line);background:var(--inset)}
+  .floorlegend .sw-azulejos{background-image:linear-gradient(var(--muted) 1px,transparent 1px),linear-gradient(90deg,var(--muted) 1px,transparent 1px);background-size:5px 5px;opacity:.9}
+  .floorlegend .sw-madera{background-image:repeating-linear-gradient(0deg,transparent 0 3px,var(--muted) 3px 4px)}
+  .floorlegend .sw-alfombra{background-image:repeating-linear-gradient(45deg,transparent 0 3px,var(--muted) 3px 4px)}
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
@@ -300,6 +306,12 @@
           <button class="btn zadd" data-kind="clean">+ Limpieza</button>
         </div>
         <div class="phead" style="margin-top:18px">Tipo de suelo por habitación</div>
+        <div class="floorlegend">
+          <span><i class="sw-suave"></i>Suave</span>
+          <span><i class="sw-azulejos"></i>Azulejos</span>
+          <span><i class="sw-madera"></i>Madera</span>
+          <span><i class="sw-alfombra"></i>Alfombra</span>
+        </div>
         <div id="floorList"></div>
       </div>
 
@@ -587,10 +599,16 @@
     // rejilla + selección en un offscreen en espacio ORIGEN (w×h), para girarlo entero
     var off=document.createElement('canvas'); off.width=w; off.height=h;
     var octx=off.getContext('2d'), img=octx.createImageData(w,h), D=img.data;
+    // material (tipo de suelo) por habitación, para pintar una textura sutil
+    var MAT={}; (MAP.rooms||[]).forEach(function(r){ if(r.material) MAT[r.id]=r.material; });
     for(var i=0;i<CELLS.length;i++){ var v=CELLS[i], o=i*4, col;
       if(v===0){ D[o+3]=0; continue; }
       if(v===255)col=wall; else if(v===1)col=thin;
-      else { var ix=IDX[v]; col=(ix!=null?pal[ix%pal.length]:[150,150,150]); }
+      else { var ix=IDX[v]; col=(ix!=null?pal[ix%pal.length]:[150,150,150]);
+        var mat=MAT[v];                                  // textura de suelo (en el mismo color, más oscuro)
+        if(mat){ var x=i%w, y=(i/w)|0, tx=(mat===3)?(y%6===0):(mat===2)?(x%7===0||y%7===0):(mat===4)?((x+y)%4===0):false;
+          if(tx) col=[col[0]*0.82|0, col[1]*0.82|0, col[2]*0.82|0]; }
+      }
       D[o]=col[0]; D[o+1]=col[1]; D[o+2]=col[2]; D[o+3]=255;
     }
     octx.putImageData(img,0,0);
