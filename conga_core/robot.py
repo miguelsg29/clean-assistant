@@ -34,9 +34,11 @@ class RealRobot:
         self.state = RobotState()
         self.map = None                # último mapa decodificado (dict del frontend)
         self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
+        self.orders = []               # horarios REALES guardados en el robot (getOrder6090)
         self.on_update = None          # callback opcional (estado -> push)
         self.on_map = None             # callback opcional (mapa -> push)
         self.on_pose = None            # callback opcional (solo pose -> push ligero)
+        self.on_orders = None          # callback opcional (horarios del robot -> push)
         self.log = logger
         self._sock = None
         self._lock = threading.Lock()
@@ -169,6 +171,17 @@ class RealRobot:
             except Exception:
                 pass
 
+    def _notify_orders(self):
+        if self.on_orders:
+            try:
+                self.on_orders()
+            except Exception:
+                pass
+
+    def query_orders(self):
+        """Pide al robot la lista REAL de horarios guardados (getOrder6090)."""
+        self.command(cmd.query("getOrder6090", self.cfg.userid))
+
     def _query_startup(self):
         """Pide no molestar / consumibles / OTA / voz (con reintentos)."""
         uid = self.cfg.userid
@@ -181,6 +194,11 @@ class RealRobot:
             self.command(cmd.query("get_consumables", uid))
             self.command(cmd.query("get_upgrade_config", uid))
             self.command(cmd.query("get_voice", uid))
+        # el robot solo responde a getOrder6090 en reposo -> consultarlo al estar en base
+        if (not self.orders and self._diag.get("orders", 0) < 4
+                and self.state.state in ("docked", "idle")):
+            self._diag["orders"] = self._diag.get("orders", 0) + 1
+            self.command(cmd.query("getOrder6090", uid))
 
     def _handle_msg(self, tls, payload: bytes):
         if payload.strip() == b"libuwsc":
@@ -283,6 +301,10 @@ class RealRobot:
         elif ctrl == "get_upgrade_config":
             self.state.auto_upgrade = 1 if data.get("auto_upgrade") else 0
             changed = True
+        elif ctrl == "getOrder6090":
+            self.orders = data.get("orders", []) or []
+            self.log(f"  [robot] horarios guardados en el robot: {len(self.orders)}")
+            self._notify_orders()
         elif ctrl == "get_voice":
             self.state.voice = {"voiceMode": data.get("voiceMode", 1),
                                 "volume": data.get("volume", 10)}

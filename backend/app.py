@@ -209,6 +209,15 @@ async def broadcast_view():
             clients.discard(ws)
 
 
+async def broadcast_orders():
+    msg = json.dumps({"type": "orders", "orders": getattr(robot, "orders", [])})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def _loop():
     while True:
         await asyncio.sleep(2)
@@ -240,6 +249,7 @@ async def lifespan(app: FastAPI):
     robot.on_update = on_update
     robot.on_map = on_map
     robot.on_pose = lambda: asyncio.run_coroutine_threadsafe(broadcast_pose(), loop)
+    robot.on_orders = lambda: asyncio.run_coroutine_threadsafe(broadcast_orders(), loop)
     try:
         robot.start()
     except Exception as e:
@@ -399,6 +409,25 @@ async def schedule_delete(payload: dict):
     return {"ok": True, "schedules": schedules.plans}
 
 
+# ---- horarios REALES guardados en el robot (getOrder6090), incluidos los de la app Cecotec ----
+@app.get("/api/robot/orders")
+def get_robot_orders():
+    return {"orders": getattr(robot, "orders", [])}
+
+
+@app.post("/api/robot/orders/refresh")
+async def refresh_robot_orders():
+    robot.query_orders()             # respuesta asíncrona -> llega por WS (broadcast_orders)
+    return {"ok": True}
+
+
+@app.post("/api/robot/orders/delete")
+async def delete_robot_order(payload: dict):
+    robot.command(cmd.delete_order(payload["orderid"]))
+    robot.query_orders()             # re-consulta para refrescar la lista
+    return {"ok": True}
+
+
 @app.websocket("/ws")
 async def websocket(ws: WebSocket):
     await ws.accept()
@@ -411,6 +440,8 @@ async def websocket(ws: WebSocket):
         await ws.send_text(json.dumps({"type": "zones", "zones": zones.zones}))
     if schedules.plans:
         await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.plans}))
+    if getattr(robot, "orders", None):
+        await ws.send_text(json.dumps({"type": "orders", "orders": robot.orders}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto

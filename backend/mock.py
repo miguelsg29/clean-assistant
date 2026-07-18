@@ -20,11 +20,16 @@ class MockRobot:
         self.on_update = None      # interfaz común con RealRobot (sin uso en el mock)
         self.on_map = None
         self.on_pose = None
+        self.on_orders = None
         self.map = None            # el mock no tiene mapa real -> se usa sample_map()
         self.pose = None
+        self.orders = []           # el mock no tiene horarios reales del robot
 
     def start(self):
         pass                       # el mock no arranca ningún servidor
+
+    def query_orders(self):
+        pass                       # el mock no tiene horarios reales que leer
 
     # --- recibe el objeto `control` ya construido y simula su efecto ---
     def command(self, control: dict) -> dict:

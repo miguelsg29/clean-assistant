@@ -333,6 +333,15 @@
             <button class="btn ghost" id="cancelSched">Cancelar</button>
           </div>
         </div>
+
+        <div id="robotOrdersWrap">
+          <div class="phead" style="margin-top:18px;display:flex;align-items:center;gap:8px">
+            <span>Horarios guardados en el robot</span>
+            <button class="btn ghost" id="refreshOrders" style="margin-left:auto;padding:6px 12px;font-size:12px">Consultar</button>
+          </div>
+          <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Incluye los creados en la app de Cecotec. Pulsa «Consultar» para leerlos del robot.</p>
+          <div id="robotOrdersList"></div>
+        </div>
       </div>
 
       <div class="tabpane" data-pane="ajustes">
@@ -827,6 +836,8 @@
 
   // ---- horarios (setOrder6090) ----
   var SCHEDULES=[], editingId=null, editorModes={}, editorSel=[];   // editorModes: modo {id:{...}}; editorSel: orden de limpieza
+  var ROBOT_ORDERS=[];   // horarios REALES leídos del robot (getOrder6090)
+  var WD=[[1,'D'],[2,'L'],[4,'M'],[8,'X'],[16,'J'],[32,'V'],[64,'S']];   // bit -> dia
   var MODE_OPTS={fan:['Eco','Normal','Turbo'],water:['Off','Bajo','Medio','Alto'],mop:['Off','Estándar','Fuerte','Potente']};
   var MODE_LBL={fan:'Succión',water:'Agua',mop:'Mopa'};
   var MODE_DEF={fan:'Normal',water:'Medio',mop:'Estándar',twice:false};
@@ -916,12 +927,14 @@
     renderRoomModes();
     document.getElementById('schedList').style.display='none';
     document.getElementById('schedListBtns').style.display='none';
+    document.getElementById('robotOrdersWrap').style.display='none';
     document.getElementById('schedEditor').style.display='block';
   }
   function closeEditor(){
     document.getElementById('schedEditor').style.display='none';
     document.getElementById('schedList').style.display='';
     document.getElementById('schedListBtns').style.display='';
+    document.getElementById('robotOrdersWrap').style.display='';
     editingId=null;
   }
   function collectPlan(){
@@ -944,6 +957,33 @@
   function toggleSched(id,on){ fetch(BASE+'api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
   function delSched(id){ fetch(BASE+'api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
 
+  // ---- horarios reales guardados en el robot (getOrder6090) ----
+  function renderRobotOrders(){
+    var el=document.getElementById('robotOrdersList'); if(!el)return; el.innerHTML='';
+    if(!ROBOT_ORDERS.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin datos. Pulsa «Consultar».</p>'; return; }
+    ROBOT_ORDERS.forEach(function(o){
+      var mask=o.weekday||0, sat=(mask&64), rooms=(o.roomPer||[]).map(function(r){return r.room_id;});
+      var days=WD.map(function(d){return '<span class="day'+((mask&d[0])?' on':'')+'">'+d[1]+'</span>';}).join('');
+      var card=document.createElement('div'); card.className='sched';
+      card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+hhmm(o.day_time||0)+'</span>'+
+        '<span class="chiplbl" style="margin-left:auto">'+(o.enable?'ON':'OFF')+'</span></div>'+
+        '<div class="days">'+days+'</div>'+
+        '<div class="perroom"><span class="pr">Habitaciones: '+(rooms.join(', ')||'todas')+'</span></div>'+
+        '<div class="actions"><button class="btn ghost odel">Borrar del robot</button></div>';
+      card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">⚠ sábado</b>':'');
+      card.querySelector('.odel').addEventListener('click',function(){
+        if(confirm('¿Borrar del robot el horario "'+(o.order_name||o.orderid)+'"? (orderid '+o.orderid+')'))
+          fetch(BASE+'api/robot/orders/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderid:o.orderid})}).then(function(r){return r.json();});
+      });
+      el.appendChild(card);
+    });
+  }
+  document.getElementById('refreshOrders').addEventListener('click',function(){
+    this.textContent='Consultando…';
+    var b=this; fetch(BASE+'api/robot/orders/refresh',{method:'POST'}).then(function(r){return r.json();})
+      .then(function(){ setTimeout(function(){b.textContent='Consultar';},1500); });
+  });
+
   // ---- botones de orientación del mapa (girar / espejo) ----
   document.getElementById('rotL').addEventListener('click',function(){ setView({rot:(VIEW.rot+3)%4}); });
   document.getElementById('rotR').addEventListener('click',function(){ setView({rot:(VIEW.rot+1)%4}); });
@@ -954,6 +994,7 @@
   fetch(BASE+'api/map').then(function(r){return r.json();}).then(applyMap);
   fetch(BASE+'api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
   fetch(BASE+'api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
+  fetch(BASE+'api/robot/orders').then(function(r){return r.json();}).then(function(d){ROBOT_ORDERS=d.orders||[];renderRobotOrders();});
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');
@@ -963,7 +1004,8 @@
       else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
       else if(m.type==='view'){ VIEW=m.view||{rot:0,flip:0}; applyViewBtns(); if(MAP&&!MAP.sample)renderRealMap(); }
       else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
-      else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}};
+      else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}
+      else if(m.type==='orders'){ROBOT_ORDERS=m.orders||[];renderRobotOrders();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
