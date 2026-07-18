@@ -93,6 +93,17 @@ def query(name: str, userid: int | None = None):
     return d
 
 
+# ---------------- mapa ----------------
+def get_map():
+    """Pide el estado con el map_head_id (igual que la app oficial)."""
+    return {"control": "get_map", "mapid": 0, "type": 0, "mask": 1}
+
+
+def get_map_all(map_id: int):
+    """Pide el mapa binario completo (frame syn_no_cache) por su id."""
+    return {"control": "getMapAll", "maplist": [{"map_id": int(map_id)}]}
+
+
 # ---------------- zonas (coords en METROS del mapa) ----------------
 def _zone(points, ztype, name, zid, area_type=2):
     return {"PointList": [{"PointX": str(x), "PointY": str(y)} for x, y in points],

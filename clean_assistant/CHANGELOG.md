@@ -1,6 +1,9 @@
 # Changelog
 
-## 0.4.1
+## 0.5.0
+- El mapa real se carga al arrancar: se pide al robot (get_map + getMapAll) en cuanto
+  está en la base, sin tener que ponerlo a limpiar. Antes salía el mapa de ejemplo
+  hasta la primera limpieza.
 - MQTT automático: si no rellenas los campos MQTT_*, el add-on coge el broker
   (Mosquitto) directamente de Home Assistant (servicio `mqtt`), sin escribir nada.
   Puedes seguir poniendo un broker externo a mano si lo prefieres.

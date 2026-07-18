@@ -50,6 +50,7 @@ class RealRobot:
         self._wlock = threading.Lock()   # serializa escrituras al socket del robot
         self._diag = {"quiet": 0, "info": 0}
         self._last_cells = None        # rejilla del último mapa emitido (para detectar cambios)
+        self._got_map = False          # ya llegó un mapa real del robot en esta sesión
 
     # ---------------- interfaz común (como MockRobot) ----------------
     def start(self):
@@ -117,6 +118,7 @@ class RealRobot:
                 return
             self.log("  [robot] conectado")
             self._diag = {"quiet": 0, "info": 0}
+            self._got_map = False
             if self.link == "cloud":
                 cloud = None
                 try:
@@ -394,6 +396,13 @@ class RealRobot:
                 and self.state.state in ("docked", "idle")):
             self._diag["orders"] = self._diag.get("orders", 0) + 1
             self.command(cmd.query("getOrder6090", uid))
+        # pedir el mapa guardado al arrancar (la app hace get_map + getMapAll) para no
+        # depender de que el robot lo empuje al limpiar. map_head_id llega en report_data.
+        if (not self._got_map and self._diag.get("map", 0) < 8
+                and self.state.map_head_id):
+            self._diag["map"] = self._diag.get("map", 0) + 1
+            self.command(cmd.get_map())
+            self.command(cmd.get_map_all(self.state.map_head_id))
 
     def _handle_msg(self, tls, payload: bytes):
         if payload.strip() == b"libuwsc":
@@ -405,6 +414,7 @@ class RealRobot:
             try:
                 m = cmap.decode_map(payload)
                 self.map = m
+                self._got_map = True
                 self.pose = m.get("robot")
                 cells = m.get("cells_b64")
                 if cells != self._last_cells:
