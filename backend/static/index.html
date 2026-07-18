@@ -133,7 +133,10 @@
   .rmx2{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:13px;font-weight:500}
   .frow{padding:10px 0;border-top:1px solid var(--line)}
   .frow:first-of-type{border-top:none}
-  .frow .fn{font-weight:600;font-size:13px;margin-bottom:6px}
+  .frow .fn{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;margin-bottom:6px}
+  .fren{width:24px;height:24px;font-size:12px;border:none;background:transparent;box-shadow:none;color:var(--muted);cursor:pointer;padding:0;border-radius:6px}
+  .fren:hover{background:var(--inset)}
+  .inlineedit{padding:5px 9px;font-size:13px;max-width:220px}
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
@@ -446,13 +449,19 @@
     if(st.auto_upgrade!=null)document.getElementById('otaTog').setAttribute('aria-pressed',!!st.auto_upgrade);
     if(st.consumables)renderCons(st.consumables);
   }
+  // vida típica de cada consumible (minutos); el robot reporta minutos de uso
+  var CONS={main_brush:{n:'Cepillo central',max:18000},side_brush:{n:'Cepillo lateral',max:12000},
+            filter:{n:'Filtro',max:9000},dishcloth:{n:'Mopa',max:9000}};
   function renderCons(c){
-    var names={main_brush:'Cepillo central',side_brush:'Cepillo lateral',filter:'Filtro',dishcloth:'Mopa'};
     var el=document.getElementById('consList');el.innerHTML='';
-    Object.keys(names).forEach(function(k){
-      var v=c[k];if(v==null)return;var warn=v<25?' warn':'';
+    Object.keys(CONS).forEach(function(k){
+      var used=c[k];if(used==null)return;
+      var m=CONS[k];
+      // lecturas absurdas (algunos robots devuelven basura en un campo) -> desconocido
+      var pct=(used>m.max*3)?null:Math.max(0,Math.min(100,Math.round(100-used/m.max*100)));
+      var warn=(pct!=null&&pct<20)?'warn':'';
       var d=document.createElement('div');d.className='cons';
-      d.innerHTML='<span class="cn">'+names[k]+'</span><span class="track"><i class="'+warn.trim()+'" style="width:'+Math.min(100,v)+'%"></i></span><span class="pct">'+v+'%</span>';
+      d.innerHTML='<span class="cn">'+m.n+'</span><span class="track"><i class="'+warn+'" style="width:'+(pct==null?0:pct)+'%"></i></span><span class="pct">'+(pct==null?'—':pct+'%')+'</span>';
       el.appendChild(d);
     });
   }
@@ -690,7 +699,13 @@
         '<button class="iconbtn zren" title="Renombrar zona" aria-label="Renombrar">✎</button>'+
         '<button class="iconbtn zdel" title="Borrar zona" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=z.name;
-      d.querySelector('.zren').addEventListener('click',function(){ renameZone(z); });
+      d.querySelector('.zren').addEventListener('click',function(){
+        inlineEdit(d.querySelector('.n'), z.name, function(nv){
+          if(nv){ fetch(BASE+'api/zones/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:z.id,name:nv})})
+            .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); }); }
+          else renderZones();
+        });
+      });
       d.querySelector('.zdel').addEventListener('click',function(){ delZone(z.id); });
       el.appendChild(d);
     });
@@ -699,10 +714,14 @@
     fetch(BASE+'api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
       .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
   }
-  function renameZone(z){
-    var name=prompt('Nombre de la zona:', z.name); if(name===null||!name.trim())return;
-    fetch(BASE+'api/zones/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:z.id,name:name})})
-      .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
+  // edición en línea: reemplaza una etiqueta por un input; onSave(nuevoValor|null)
+  function inlineEdit(labelEl,current,onSave){
+    var inp=document.createElement('input'); inp.type='text'; inp.className='tinput inlineedit'; inp.value=current;
+    labelEl.replaceWith(inp); inp.focus(); inp.select();
+    var fin=function(save){ if(inp._done)return; inp._done=true; var nv=inp.value.trim();
+      onSave(save&&nv&&nv!==current ? nv : null); };
+    inp.addEventListener('keydown',function(e){ if(e.key==='Enter')fin(true); else if(e.key==='Escape')fin(false); });
+    inp.addEventListener('blur',function(){ fin(true); });
   }
 
   // ---- tipo de suelo por habitación (setPlanData6090) ----
@@ -713,7 +732,17 @@
     if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Necesita el mapa real del robot.</p>'; return; }
     rooms.forEach(function(r){
       var row=document.createElement('div'); row.className='frow';
-      var nm=document.createElement('div'); nm.className='fn'; nm.textContent=r.name; row.appendChild(nm);
+      var nm=document.createElement('div'); nm.className='fn';
+      var nt=document.createElement('span'); nt.className='fnt'; nt.textContent=r.name;
+      var ed=document.createElement('button'); ed.className='iconbtn fren'; ed.textContent='✎';
+      ed.title='Renombrar habitación'; ed.setAttribute('aria-label','Renombrar habitación');
+      ed.addEventListener('click',function(){
+        inlineEdit(nt, r.name, function(nv){
+          if(nv){ r.name=nv; fetch(BASE+'api/room/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:r.id,name:nv})}).then(function(x){return x.json();}); }
+          renderFloors();
+        });
+      });
+      nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
       var seg=document.createElement('div'); seg.className='seg';
       FLOORS.forEach(function(opt,i){
         var b=document.createElement('button'); b.textContent=opt; b.dataset.v=i+1;
@@ -728,7 +757,7 @@
     });
   }
   function setFloor(room,material){
-    fetch(BASE+'api/room/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,material:material})})
+    fetch(BASE+'api/room/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,material:material})})
       .then(function(r){return r.json();});
   }
   function enterDraw(kind,btn){

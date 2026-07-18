@@ -331,25 +331,37 @@ async def zone_rename(payload: dict):
     return {"ok": True, "zones": zones.zones}
 
 
-@app.post("/api/room/material")
-async def room_material(payload: dict):
-    """Cambia el tipo de suelo de una habitación (setPlanData6090, lista completa)."""
+@app.post("/api/room/update")
+async def room_update(payload: dict):
+    """Cambia nombre y/o tipo de suelo de una habitación (setPlanData6090, lista completa)."""
     m = getattr(robot, "map", None)
     if not m or not m.get("rooms"):
         return {"ok": False, "error": "sin mapa"}
     rid = int(payload["room"])
-    material = payload["material"]
-    rooms = [{"room_id": r["id"], "room_name": r["name"], "room_type": r.get("type") or 0,
-              "material": material if r["id"] == rid else (r.get("material") or 1)}
-             for r in m["rooms"] if r.get("named", True)]
+    new_name = payload.get("name")
+    new_material = payload.get("material")
+    rooms = []
+    for r in m["rooms"]:
+        if not r.get("named", True):
+            continue
+        name, material = r["name"], (r.get("material") or 1)
+        if r["id"] == rid:
+            if new_name:
+                name = new_name
+            if new_material is not None:
+                material = new_material
+        rooms.append({"room_id": r["id"], "room_name": name,
+                      "room_type": r.get("type") or 0, "material": material})
     robot.command(cmd.set_plan_data(_map_head_id(), rooms))
-    # reflejo optimista en el mapa cacheado (el suelo no cambia la geometría)
-    mat_num = cmd._lvl(cmd.MATERIALS, material)
+    # reflejo optimista en el mapa cacheado
     for r in m["rooms"]:
         if r["id"] == rid:
-            r["material"] = mat_num
+            if new_name:
+                r["name"] = new_name
+            if new_material is not None:
+                r["material"] = cmd._lvl(cmd.MATERIALS, new_material)
     _save_map()
-    return {"ok": True, "room": rid, "material": mat_num}
+    return {"ok": True}
 
 
 @app.get("/api/schedules")
