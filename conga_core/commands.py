@@ -93,6 +93,13 @@ def query(name: str, userid: int | None = None):
     return d
 
 
+# ---------------- control de sesión ----------------
+def lock_device(userid: int):
+    """La app 'toma el control' del robot. Necesario para que el robot envíe el
+    mapa bajo demanda estando en base (la app lo manda antes de get_map)."""
+    return {"control": "lock_device", "userid": int(userid)}
+
+
 # ---------------- mapa ----------------
 def get_map():
     """Pide el estado con el map_head_id (igual que la app oficial)."""

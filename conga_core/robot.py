@@ -396,11 +396,13 @@ class RealRobot:
                 and self.state.state in ("docked", "idle")):
             self._diag["orders"] = self._diag.get("orders", 0) + 1
             self.command(cmd.query("getOrder6090", uid))
-        # pedir el mapa guardado al arrancar (la app hace get_map + getMapAll) para no
-        # depender de que el robot lo empuje al limpiar. map_head_id llega en report_data.
+        # pedir el mapa guardado al arrancar (la app hace lock_device + get_map + getMapAll)
+        # para no depender de que el robot lo empuje al limpiar. map_head_id llega en report_data.
+        # lock_device = "tomar el control": sin él el robot no envía el mapa estando en base.
         if (not self._got_map and self._diag.get("map", 0) < 8
                 and self.state.map_head_id):
             self._diag["map"] = self._diag.get("map", 0) + 1
+            self.command(cmd.lock_device(uid))
             self.command(cmd.get_map())
             self.command(cmd.get_map_all(self.state.map_head_id))
 

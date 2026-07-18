@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.1
+- Arreglado el mapa real: faltaba "tomar el control" del robot (`lock_device`) antes
+  de pedir el mapa. Sin eso el robot ignoraba `get_map` estando en base y salía el
+  mapa de ejemplo. Verificado en vivo con el robot (mapa Interior, 7 habitaciones).
+- Diagnóstico de MQTT más claro cuando Home Assistant no expone un broker (indica si
+  falta el add-on de Mosquitto).
+
 ## 0.5.0
 - El mapa real se carga al arrancar: se pide al robot (get_map + getMapAll) en cuanto
   está en la base, sin tener que ponerlo a limpiar. Antes salía el mapa de ejemplo

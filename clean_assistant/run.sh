@@ -19,15 +19,19 @@ export MQTT_PASS=$(jq -r '.MQTT_PASS // ""' $CONFIG)
 # el Supervisor nos da host/puerto/usuario/contraseña del add-on de Mosquitto (u otro
 # broker configurado en HA) sin tener que escribir nada. Requiere "services: mqtt:want".
 if [ -z "$MQTT_HOST" ] && [ -n "$SUPERVISOR_TOKEN" ]; then
-    MQTT_SVC=$(curl -s -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/services/mqtt)
-    if [ "$(echo "$MQTT_SVC" | jq -r '.result // ""')" = "ok" ]; then
-        export MQTT_HOST=$(echo "$MQTT_SVC" | jq -r '.data.host // ""')
-        export MQTT_PORT=$(echo "$MQTT_SVC" | jq -r '.data.port // 1883')
-        export MQTT_USER=$(echo "$MQTT_SVC" | jq -r '.data.username // ""')
-        export MQTT_PASS=$(echo "$MQTT_SVC" | jq -r '.data.password // ""')
+    MQTT_SVC=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" http://supervisor/services/mqtt)
+    HTTP_CODE=$(echo "$MQTT_SVC" | tail -n1)
+    BODY=$(echo "$MQTT_SVC" | sed '$d')
+    if [ "$(echo "$BODY" | jq -r '.result // ""')" = "ok" ]; then
+        export MQTT_HOST=$(echo "$BODY" | jq -r '.data.host // ""')
+        export MQTT_PORT=$(echo "$BODY" | jq -r '.data.port // 1883')
+        export MQTT_USER=$(echo "$BODY" | jq -r '.data.username // ""')
+        export MQTT_PASS=$(echo "$BODY" | jq -r '.data.password // ""')
         echo "[INFO] MQTT autoconfigurado desde Home Assistant: ${MQTT_HOST}:${MQTT_PORT}"
     else
-        echo "[INFO] MQTT: sin broker en Home Assistant y sin datos manuales (se omite)."
+        echo "[INFO] MQTT: Home Assistant no devolvió broker (http ${HTTP_CODE}). ¿Tienes el"
+        echo "       add-on 'Mosquitto broker' instalado? Respuesta: $(echo "$BODY" | head -c 200)"
+        echo "       (o rellena MQTT_HOST/USER/PASS a mano para un broker externo)."
     fi
 fi
 
