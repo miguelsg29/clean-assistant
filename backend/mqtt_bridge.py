@@ -155,6 +155,10 @@ class MqttBridge:
                 "name": f"Conga {name}", "unique_id": f"{uid}_cons_{key}",
                 "state_topic": f"conga/{node}/consumable/{key}",
                 "unit_of_measurement": "%", "icon": icon})
+            self._disc("button", f"{uid}_creset_{key}", {
+                "name": f"Conga Restablecer {name}", "unique_id": f"{uid}_creset_{key}",
+                "command_topic": f"conga/{node}/consumable/{key}/reset",
+                "payload_press": key, "icon": "mdi:restart"})
 
         # botones de limpieza por habitación (del mapa vivo)
         for rid, meta in (self._rooms() or {}).items():
@@ -313,6 +317,7 @@ class MqttBridge:
         client.publish(self.t_cmd, "", retain=True)      # limpia comandos retained viejos
         for sub in (self.t_cmd, "homeassistant/status",
                     f"conga/{node}/room_command", f"conga/{node}/dust_action",
+                    f"conga/{node}/consumable/+/reset",
                     f"conga/{node}/pref/+/set", f"conga/{node}/sched/+/set",
                     f"conga/{node}/twice/set", f"conga/{node}/turbo_carpet/set",
                     f"conga/{node}/ota/set", f"conga/{node}/quiet/set",
@@ -409,6 +414,12 @@ class MqttBridge:
 
             if topic == f"conga/{node}/dust_action":
                 self._cmd(cmd.dust_action())
+                return
+
+            if topic.startswith(f"conga/{node}/consumable/") and topic.endswith("/reset"):
+                key = topic.split("/")[-2]
+                if key in cmd.CONSUMABLE_RESET:
+                    self._cmd(cmd.reset_consumable(key))
                 return
 
             if topic.startswith(f"conga/{node}/sched/") and topic.endswith("/set"):

@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.9.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.10.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -560,6 +560,29 @@ async def robot_zone_update(payload: dict):
         zs[idx]["points_m"] = [list(p) for p in payload["points_m"]]
     _push_robot_zones(zs)
     await _reflect_robot_zones(zs)
+    return {"ok": True}
+
+
+# ---- reset de consumibles (set_consumables): pone a 0 las horas de uso de una pieza ----
+@app.post("/api/consumable/reset")
+async def consumable_reset(payload: dict):
+    key = payload.get("key")
+    if key not in cmd.CONSUMABLE_RESET:
+        return {"ok": False, "error": "consumible desconocido"}
+    robot.command(cmd.reset_consumable(key))
+    # reflejo optimista (horas de uso -> 0) y re-consulta para confirmar
+    try:
+        cons = dict(getattr(robot.state, "consumables", None) or {})
+        cons[key] = 0
+        robot.state.consumables = cons
+    except Exception:
+        pass
+    try:
+        robot.command(cmd.query("get_consumables", getattr(robot.cfg, "userid", 0)))
+    except Exception:
+        pass
+    await broadcast()
+    mqtt.publish_state()
     return {"ok": True}
 
 

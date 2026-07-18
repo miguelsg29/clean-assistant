@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.10.0
+- Botón para restablecer cada consumible (cepillo central/lateral, filtro, mopa) al
+  cambiar la pieza; pone el contador a 0. También como botones en Home Assistant (MQTT).
+- Tipo de habitación como desplegable con icono + nombre.
+- Zonas guardadas en el robot dibujadas sobre el mapa (rectángulo punteado con su nombre).
+
 ## 0.9.0
 - Arreglado el modo "Cloud + Local": ya no se vuelve solo a local. La auto-provisión
   (captura de identidad) solo actúa en el primer arranque sin configurar.

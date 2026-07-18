@@ -91,6 +91,16 @@ def base_type(name): return set_pref(17, _lvl(BASE_TYPES, name))
 def dust_action():  return {"control": "set_dust_action", "action": 1}
 
 
+# reset de consumibles (set_consumables). resetType capturado de la app oficial:
+# 1=cepillo central, 2=cepillo lateral, 3=filtro, 4=mopa. Pone las horas de uso a 0.
+CONSUMABLE_RESET = {"main_brush": 1, "side_brush": 2, "filter": 3, "dishcloth": 4}
+
+
+def reset_consumable(which) -> dict:
+    rt = CONSUMABLE_RESET.get(which, which)
+    return {"control": "set_consumables", "resetType": int(rt)}
+
+
 def set_voice(voice_on: bool, volume: int):
     return {"control": "set_voice", "voiceMode": 1 if voice_on else 0,
             "volume": max(0, min(10, int(volume)))}

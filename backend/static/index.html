@@ -380,7 +380,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.9 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.10 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -505,7 +505,12 @@
       var cls=(absurd||(pct!=null&&pct<=0))?'crit':((pct!=null&&pct<20)?'warn':'');
       var d=document.createElement('div');d.className='cons';
       d.innerHTML='<span class="cn">'+m.n+'</span><span class="track"><i class="'+cls+'" style="width:'+barw+'%"></i></span>'+
-        '<span class="pct '+(cls==='crit'?'crit':'')+'">'+(absurd?'⚠':pct+'%')+'</span>';
+        '<span class="pct '+(cls==='crit'?'crit':'')+'">'+(absurd?'⚠':pct+'%')+'</span>'+
+        '<button class="iconbtn consreset" title="Restablecer al cambiar la pieza" aria-label="Restablecer">↺</button>';
+      d.querySelector('.consreset').addEventListener('click',function(){
+        if(confirm('¿Restablecer "'+m.n+'" a 0? Hazlo cuando cambies la pieza.'))
+          fetch(BASE+'api/consumable/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})}).then(function(r){return r.json();});
+      });
       el.appendChild(d);
     });
   }
@@ -665,6 +670,21 @@
       ctx.closePath();
       ctx.fillStyle=col; ctx.globalAlpha=0.16; ctx.fill(); ctx.globalAlpha=1;
       ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.7); ctx.setLineDash([scale*2,scale*1.5]); ctx.stroke(); ctx.setLineDash([]);
+    });
+    // zonas guardadas EN EL ROBOT (campo 9): puntos ya en celda recortada; punteado + nombre
+    ((MAP.stored_zones)||[]).forEach(function(z){
+      if(!z.points||!z.points.length)return;
+      var col=cssVar((ZK[z.kind]||{}).c||'--faint'), cx=0, cy=0;
+      ctx.beginPath();
+      z.points.forEach(function(p,i){ var vp=s2v(p[0],p[1]),X=vp[0]*scale,Y=vp[1]*scale; cx+=X; cy+=Y; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+      ctx.closePath();
+      ctx.fillStyle=col; ctx.globalAlpha=0.10; ctx.fill(); ctx.globalAlpha=1;
+      ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.6); ctx.setLineDash([scale,scale*1.3]); ctx.stroke(); ctx.setLineDash([]);
+      if(z.name){ cx/=z.points.length; cy/=z.points.length;
+        ctx.font='600 '+Math.max(9,Math.round(scale*3.4))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        ctx.lineWidth=Math.max(2,scale); ctx.strokeStyle=cssVar('--surface'); ctx.strokeText(z.name,cx,cy);
+        ctx.fillStyle=col; ctx.fillText(z.name,cx,cy); }
     });
     // etiquetas de habitación: halo (contorno del color de fondo) para leerse sobre cualquier zona
     ctx.font='700 '+Math.max(12,Math.round(scale*5.2))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
@@ -848,20 +868,19 @@
         });
       });
       nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
-      // selector de TIPO de habitación (iconos)
+      // selector de TIPO de habitación (desplegable con icono + nombre)
       var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent='Tipo'; row.appendChild(tlbl);
-      var tseg=document.createElement('div'); tseg.className='seg'; tseg.style.flexWrap='wrap';
+      var tsel=document.createElement('select'); tsel.className='tinput typesel';
       var ti=typeIndex(r.type);
       ROOMTYPES.forEach(function(t,i){
-        var b=document.createElement('button'); b.innerHTML=t.i; b.title=t.n; b.style.cssText='flex:0 0 auto;font-size:16px;padding:6px 10px';
-        if(i===ti)b.setAttribute('aria-pressed','true');
-        b.addEventListener('click',function(){
-          tseg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
-          r.type=t.id; ic.textContent=t.i; setRoomType(r.id,t.id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
-        });
-        tseg.appendChild(b);
+        var o=document.createElement('option'); o.value=t.id; o.textContent=t.i+'  '+t.n;
+        if(i===ti)o.selected=true; tsel.appendChild(o);
       });
-      row.appendChild(tseg);
+      tsel.addEventListener('change',function(){
+        var id=+tsel.value; r.type=id; ic.textContent=typeIcon(id);
+        setRoomType(r.id,id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
+      });
+      row.appendChild(tsel);
       // selector de SUELO
       var slbl=document.createElement('div'); slbl.className='rmlbl'; slbl.textContent='Suelo'; row.appendChild(slbl);
       var seg=document.createElement('div'); seg.className='seg';
