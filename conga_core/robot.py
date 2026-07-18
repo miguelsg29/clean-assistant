@@ -41,7 +41,9 @@ class RealRobot:
         self.on_orders = None          # callback opcional (horarios del robot -> push)
         self.captured = {}             # identidad capturada de la nube (auto-provisión)
         self.on_provision = None       # callback cuando se captura la identidad completa
-        self._provisioned = False
+        # si ya hay identidad, NO auto-provisionar (evita que el modo cloud manual vuelva
+        # a local): la auto-provisión es solo para el primer arranque sin configurar.
+        self._provisioned = cfg.configured
         self.log = logger
         self.link = getattr(cfg, "link_mode", "local")   # "local" | "cloud" (pasarela a la nube)
         self._sock = None

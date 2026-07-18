@@ -380,7 +380,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.8 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.9 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -389,7 +389,7 @@
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
   var MAP=null, CELLS=null, IDX={}; // mapa actual + rejilla real + id->indice
-  var ZONES=[], drawKind=null, drawStart=null, drawRect=null;
+  var ZONES=[], drawKind=null, drawStart=null, drawRect=null, moveZoneIdx=null;
   var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
   // orientación de la VISTA del mapa (no afecta a las coords que van al robot)
@@ -766,16 +766,33 @@
     });
   }
   // ---- zonas guardadas EN EL ROBOT (del mapa, campo 9; incluye las de la app Cecotec) ----
+  function robotVirwallZones(){ return ((MAP&&MAP.stored_zones)||[]).filter(function(z){return z.kind==='nogo'||z.kind==='nomop';}); }
   function renderRobotZones(){
     var el=document.getElementById('robotZonesList'); if(!el)return; el.innerHTML='';
-    var zs=(MAP&&MAP.stored_zones)||[];
+    var zs=robotVirwallZones();
     if(!zs.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin zonas en el robot. Pulsa «Consultar».</p>'; return; }
-    zs.forEach(function(z){
+    zs.forEach(function(z,idx){
       var k=ZK[z.kind]||{c:'--faint',l:z.kind};
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>';
+        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
+        '<button class="iconbtn rzmov" title="Editar posición (dibuja en el mapa)" aria-label="Mover">⤢</button>'+
+        '<button class="iconbtn rzren" title="Renombrar" aria-label="Renombrar">✎</button>'+
+        '<button class="iconbtn rzdel" title="Borrar del robot" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=z.name||'(sin nombre)';
+      d.querySelector('.rzren').addEventListener('click',function(){
+        inlineEdit(d.querySelector('.n'), z.name||'', function(nv){
+          if(nv){ fetch(BASE+'api/robot/zones/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx,name:nv})})
+            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); }); }
+          else renderRobotZones();
+        });
+      });
+      d.querySelector('.rzdel').addEventListener('click',function(){
+        if(confirm('¿Borrar del robot la zona "'+(z.name||'(sin nombre)')+'"?'))
+          fetch(BASE+'api/robot/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx})})
+            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); });
+      });
+      d.querySelector('.rzmov').addEventListener('click',function(){ enterMoveZone(idx,z); });
       el.appendChild(d);
     });
   }
@@ -799,6 +816,18 @@
     inp.addEventListener('blur',function(){ fin(true); });
   }
 
+  // ---- tipo de habitación (roomTypeId, familia 21xx) con icono ----
+  var ROOMTYPES=[
+    {n:'Dormitorio', id:2101, i:'🛏️'}, {n:'Comedor', id:2102, i:'🍽️'},
+    {n:'Baño', id:2103, i:'🛁'},       {n:'Pasillo', id:2104, i:'🚶'},
+    {n:'Cocina', id:2105, i:'🍳'},      {n:'Salón', id:2106, i:'🛋️'},
+    {n:'Terraza', id:2107, i:'🪴'},     {n:'Otros', id:2108, i:'📦'}];
+  function typeIndex(t){ var c=(t||0)%100; for(var i=0;i<ROOMTYPES.length;i++){ if(ROOMTYPES[i].id%100===c)return i; } return -1; }
+  function typeIcon(t){ var i=typeIndex(t); return i>=0?ROOMTYPES[i].i:'🏠'; }
+  function setRoomType(room,type){
+    fetch(BASE+'api/room/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,type:type})}).then(function(r){return r.json();});
+  }
+
   // ---- tipo de suelo por habitación (setPlanData6090) ----
   var FLOORS=['Suave','Azulejos','Madera','Alfombra'];   // roomMaterialId 1..4
   function renderFloors(){
@@ -806,8 +835,9 @@
     var rooms=(MAP&&!MAP.sample?(MAP.rooms||[]):[]).filter(function(r){return r.named!==false;});
     if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Necesita el mapa real del robot.</p>'; return; }
     rooms.forEach(function(r){
-      var row=document.createElement('div'); row.className='frow';
+      var row=document.createElement('div'); row.className='frow'; row.style.cssText='display:flex;flex-direction:column;gap:7px;align-items:stretch';
       var nm=document.createElement('div'); nm.className='fn';
+      var ic=document.createElement('span'); ic.className='rtico'; ic.textContent=typeIcon(r.type); ic.style.marginRight='6px';
       var nt=document.createElement('span'); nt.className='fnt'; nt.textContent=r.name;
       var ed=document.createElement('button'); ed.className='iconbtn fren'; ed.textContent='✎';
       ed.title='Renombrar habitación'; ed.setAttribute('aria-label','Renombrar habitación');
@@ -817,7 +847,23 @@
           renderFloors(); buildChips(); if(MAP&&!MAP.sample)renderRealMap();   // refleja el nombre en mapa y chips
         });
       });
-      nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
+      nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
+      // selector de TIPO de habitación (iconos)
+      var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent='Tipo'; row.appendChild(tlbl);
+      var tseg=document.createElement('div'); tseg.className='seg'; tseg.style.flexWrap='wrap';
+      var ti=typeIndex(r.type);
+      ROOMTYPES.forEach(function(t,i){
+        var b=document.createElement('button'); b.innerHTML=t.i; b.title=t.n; b.style.cssText='flex:0 0 auto;font-size:16px;padding:6px 10px';
+        if(i===ti)b.setAttribute('aria-pressed','true');
+        b.addEventListener('click',function(){
+          tseg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
+          r.type=t.id; ic.textContent=t.i; setRoomType(r.id,t.id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
+        });
+        tseg.appendChild(b);
+      });
+      row.appendChild(tseg);
+      // selector de SUELO
+      var slbl=document.createElement('div'); slbl.className='rmlbl'; slbl.textContent='Suelo'; row.appendChild(slbl);
       var seg=document.createElement('div'); seg.className='seg';
       FLOORS.forEach(function(opt,i){
         var b=document.createElement('button'); b.textContent=opt; b.dataset.v=i+1;
@@ -843,9 +889,14 @@
     var h=document.getElementById('zoneHint');
     if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa el botón otra vez para cancelar).'; }
   }
-  function exitDraw(){ drawKind=null; drawStart=null; drawRect=null;
+  function exitDraw(){ drawKind=null; drawStart=null; drawRect=null; moveZoneIdx=null;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
     var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; } }
+  function enterMoveZone(idx,z){
+    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    moveZoneIdx=idx; drawKind=z.kind; drawStart=null; drawRect=null;
+    var h=document.getElementById('zoneHint'); if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja el nuevo rectángulo para "'+(z.name||ZK[z.kind].l)+'" sobre el mapa.'; }
+  }
   document.querySelectorAll('.zadd').forEach(function(b){
     b.addEventListener('click',function(){ drawKind===b.dataset.kind ? exitDraw() : enterDraw(b.dataset.kind,b); });
   });
@@ -865,10 +916,16 @@
           x1=Math.max(drawStart[0],end[0]),y1=Math.max(drawStart[1],end[1]), kind=drawKind;
       if((x1-x0)>3&&(y1-y0)>3){
         var pts=[cellToWorld(x0,y0),cellToWorld(x1,y0),cellToWorld(x1,y1),cellToWorld(x0,y1)];
-        exitDraw();
-        // se crea con el nombre por defecto; se puede renombrar en línea en la lista
-        fetch(BASE+'api/zones/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,points:pts,name:ZK[kind].l})})
-          .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
+        if(moveZoneIdx!=null){                                  // reposicionar una zona del robot
+          var mi=moveZoneIdx; exitDraw();
+          fetch(BASE+'api/robot/zones/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:mi,points_m:pts})})
+            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); });
+        } else {
+          exitDraw();
+          // se crea con el nombre por defecto; se puede renombrar en línea en la lista
+          fetch(BASE+'api/zones/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind:kind,points:pts,name:ZK[kind].l})})
+            .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
+        }
       } else { exitDraw(); renderRealMap(); }
     } else {
       var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];

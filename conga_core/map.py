@@ -325,7 +325,8 @@ def decode_map(frame: bytes) -> dict:
         if cells:
             stored_zones.append({"kind": _ZKIND.get(z.get("type"), "otro"),
                                  "type": z.get("type"), "name": z.get("name", ""),
-                                 "points": cells})
+                                 "points": cells,                     # celdas (para dibujar)
+                                 "points_m": [list(p) for p in z.get("points", [])]})  # metros (para reeditar)
     return {
         "name": info["map_name"] or "Interior",
         "grid_size": [GRID_W, GRID_H],

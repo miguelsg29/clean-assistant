@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.0
+- Arreglado el modo "Cloud + Local": ya no se vuelve solo a local. La auto-provisión
+  (captura de identidad) solo actúa en el primer arranque sin configurar.
+- Zonas guardadas en el robot: ahora se pueden renombrar, mover (redibujando el
+  rectángulo en el mapa) y borrar (reescribe las paredes virtuales del robot).
+- Tipo de habitación por estancia con icono (Dormitorio, Comedor, Baño, Pasillo,
+  Cocina, Salón, Terraza, Otros) en la pestaña Zonas.
+
 ## 0.8.0
 - Zonas guardadas en el robot: se leen del mapa (prohibidas / sin fregona, incluidas
   las creadas en la app de Cecotec) y se listan en la pestaña Zonas con un botón

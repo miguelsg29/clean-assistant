@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.8.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.9.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -417,18 +417,22 @@ async def room_update(payload: dict):
     rid = int(payload["room"])
     new_name = payload.get("name")
     new_material = payload.get("material")
+    new_type = payload.get("type")
     rooms = []
     for r in m["rooms"]:
         if not r.get("named", True):
             continue
         name, material = r["name"], (r.get("material") or 1)
+        rtype = r.get("type") or 0
         if r["id"] == rid:
             if new_name:
                 name = new_name
             if new_material is not None:
                 material = new_material
+            if new_type is not None:
+                rtype = int(new_type)
         rooms.append({"room_id": r["id"], "room_name": name,
-                      "room_type": r.get("type") or 0, "material": material})
+                      "room_type": rtype, "material": material})
     robot.command(cmd.set_plan_data(_map_head_id(), rooms))
     # reflejo optimista en el mapa cacheado
     for r in m["rooms"]:
@@ -437,6 +441,8 @@ async def room_update(payload: dict):
                 r["name"] = new_name
             if new_material is not None:
                 r["material"] = cmd._lvl(cmd.MATERIALS, new_material)
+            if new_type is not None:
+                r["type"] = int(new_type)
     _save_map()
     return {"ok": True}
 
@@ -502,6 +508,58 @@ async def refresh_robot_orders():
 async def delete_robot_order(payload: dict):
     robot.command(cmd.delete_order(payload["orderid"]))
     robot.query_orders()             # re-consulta para refrescar la lista
+    return {"ok": True}
+
+
+# ---- zonas guardadas en el robot (paredes virtuales del mapa): editar / borrar ----
+def _robot_virwall_zones() -> list:
+    m = getattr(robot, "map", None) or {}
+    return [z for z in m.get("stored_zones", []) if z.get("kind") in ("nogo", "nomop")]
+
+
+def _push_robot_zones(zlist):
+    """Reescribe TODAS las paredes virtuales del robot (set_virwall reemplaza la lista)."""
+    zones = [{"points": [tuple(p) for p in z.get("points_m", [])],
+              "type": z.get("type") or cmd.VIRWALL_NOGO,
+              "name": z.get("name", ""), "id": i + 1}
+             for i, z in enumerate(zlist) if z.get("points_m")]
+    robot.command(cmd.set_virwall(zones, _map_head_id()))
+
+
+async def _reflect_robot_zones(zlist):
+    """Actualiza el mapa cacheado (stored_zones solo virwall) y avisa a la web."""
+    m = getattr(robot, "map", None)
+    if m is not None:
+        others = [z for z in m.get("stored_zones", []) if z.get("kind") not in ("nogo", "nomop")]
+        m["stored_zones"] = zlist + others
+        _save_map()
+        await broadcast_map()
+
+
+@app.post("/api/robot/zones/delete")
+async def robot_zone_delete(payload: dict):
+    idx = int(payload.get("index", -1))
+    zs = _robot_virwall_zones()
+    if not (0 <= idx < len(zs)):
+        return {"ok": False, "error": "índice fuera de rango"}
+    remaining = [z for i, z in enumerate(zs) if i != idx]
+    _push_robot_zones(remaining)
+    await _reflect_robot_zones(remaining)
+    return {"ok": True}
+
+
+@app.post("/api/robot/zones/update")
+async def robot_zone_update(payload: dict):
+    idx = int(payload.get("index", -1))
+    zs = _robot_virwall_zones()
+    if not (0 <= idx < len(zs)):
+        return {"ok": False, "error": "índice fuera de rango"}
+    if payload.get("name") is not None:
+        zs[idx]["name"] = str(payload["name"])
+    if payload.get("points_m"):
+        zs[idx]["points_m"] = [list(p) for p in payload["points_m"]]
+    _push_robot_zones(zs)
+    await _reflect_robot_zones(zs)
     return {"ok": True}
 
 
