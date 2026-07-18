@@ -617,13 +617,16 @@
       ctx.fillStyle=col; ctx.globalAlpha=0.16; ctx.fill(); ctx.globalAlpha=1;
       ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.7); ctx.setLineDash([scale*2,scale*1.5]); ctx.stroke(); ctx.setLineDash([]);
     });
-    ctx.font='600 '+Math.max(11,Math.round(scale*5))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
-    ctx.textAlign='center'; ctx.textBaseline='middle';
+    // etiquetas de habitación: halo (contorno del color de fondo) para leerse sobre cualquier zona
+    ctx.font='700 '+Math.max(12,Math.round(scale*5.2))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineJoin='round'; ctx.miterLimit=2;
+    var _halo=cssVar('--surface');
     (MAP.rooms||[]).forEach(function(r){
       if(r.named===false)return;                      // no etiquetar segmentos temporales
-      var vp=s2v(r.center[0],r.center[1]);
+      var vp=s2v(r.center[0],r.center[1]), X=vp[0]*scale, Y=vp[1]*scale;
+      ctx.lineWidth=Math.max(3,scale*1.6); ctx.strokeStyle=_halo; ctx.strokeText(r.name, X, Y);
       ctx.fillStyle=selected.has(r.id)?cssVar('--accent-ink'):cssVar('--ink');
-      ctx.fillText(r.name, vp[0]*scale, vp[1]*scale); });
+      ctx.fillText(r.name, X, Y); });
     // rectángulo en curso de dibujo (4 esquinas transformadas -> bounding box en vista)
     if(drawRect&&drawKind){ var a=drawRect[0],b=drawRect[1], dcol=cssVar(ZK[drawKind].c),
         corners=[[a[0],a[1]],[b[0],a[1]],[b[0],b[1]],[a[0],b[1]]], xs=[], ys=[];
