@@ -9,10 +9,11 @@ aquellos proyectos).
 > Se apoya en la ingeniería inversa del repo de documentación:
 > [conga_8090_mqtt_bridge](https://github.com/miguelsg29/conga_8090_mqtt_bridge).
 
-## Estado: v0.1 — base funcional 🚧
+## Estado: v0.2 — funcional, verificada con robot real ✅
 
-Esta versión ya **arranca y se ve**, con un **robot simulado** para poder
-desarrollar la interfaz sin un Conga real:
+App completa y **verificada de punta a punta con un Conga real**, empaquetada para
+**Docker** y como **add-on de Home Assistant** (ingress). Incluye un **robot simulado**
+para desarrollar/probar la interfaz sin un Conga:
 
 - ✅ `conga_core`: constructores de todos los comandos confirmados, modelo de estado
   y mapa (de ejemplo).
