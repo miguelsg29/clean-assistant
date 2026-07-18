@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.2
+- Arreglado el "Conga duplicado" en MQTT: el dispositivo se identificaba por el
+  ROBOT_DID del entorno (0 en el add-on), no por el DID real capturado. Ahora usa
+  el DID real, así que el add-on y cualquier prueba convergen en UN solo dispositivo,
+  y al cambiar el DID se retira automáticamente el descubrimiento del duplicado viejo.
+
 ## 0.5.1
 - Arreglado el mapa real: faltaba "tomar el control" del robot (`lock_device`) antes
   de pedir el mapa. Sin eso el robot ignoraba `get_map` estando en base y salía el

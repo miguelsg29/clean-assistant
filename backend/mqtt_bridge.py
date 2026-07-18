@@ -46,9 +46,10 @@ class MqttBridge:
         self.port = int(env("MQTT_PORT", "1883") or 1883)
         self.user = env("MQTT_USER")
         self.password = env("MQTT_PASS") or env("MQTT_PASSWORD")
-        did = env("ROBOT_DID", "123456")
-        self.uid = f"conga_{did}"
+        self._env_did = env("ROBOT_DID", "123456")
         self.node = "conga8090"
+        self.uid = self._current_uid()
+        self._published_uid = None
         self.disc = "homeassistant"
         self.client = None
         # preferencias "para la próxima limpieza" (sombra local: el robot no las reporta)
@@ -60,6 +61,15 @@ class MqttBridge:
         self.t_state = f"conga/{self.node}/state"
         self.t_cmd = f"conga/{self.node}/command"
         self.t_avail = f"conga/{self.node}/availability"
+
+    def _current_uid(self) -> str:
+        """Identidad del dispositivo en HA. Usa el DID REAL del robot (capturado por
+        auto-provisión o del .env), no el del entorno del add-on (que es 0). Así el
+        add-on y las pruebas del PC convergen en UN solo Conga y no salen duplicados."""
+        did = getattr(getattr(self.robot, "cfg", None), "did", 0) or 0
+        if did in (0, 123456):
+            did = self._env_did
+        return f"conga_{did}"
 
     def enabled(self) -> bool:
         return bool(self.host)
@@ -108,7 +118,14 @@ class MqttBridge:
     def publish_discovery(self):
         if not self.client:
             return
-        node, uid = self.node, self.uid
+        node = self.node
+        uid = self._current_uid()
+        # si el DID cambió (p. ej. tras la auto-provisión pasó de conga_0 al DID real),
+        # borra el descubrimiento retenido del anterior para no dejar un Conga duplicado.
+        if self._published_uid and self._published_uid != uid:
+            self._clear_discovery(self._published_uid)
+        self.uid = uid
+        self._published_uid = uid
         device = {"identifiers": [uid], "name": "Conga 8090", "manufacturer": "Cecotec",
                   "model": "Conga 8090 Ultra", "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
@@ -208,6 +225,28 @@ class MqttBridge:
         self.publish_state()
         self.log(f"[MQTT] autodiscovery publicado ({len(self._rooms() or {})} hab., "
                  f"{len(self.schedules.plans)} horario(s))")
+
+    def _clear_discovery(self, uid: str):
+        """Borra el descubrimiento retenido de un dispositivo viejo (uid distinto al
+        actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
+        objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
+                ("sensor", f"{uid}_time"), ("number", f"{uid}_volume"),
+                ("button", f"{uid}_dust")]
+        for key in ("main_brush", "side_brush", "filter", "dishcloth"):
+            objs.append(("sensor", f"{uid}_cons_{key}"))
+        for rid in (self._rooms() or {}):
+            objs.append(("button", f"{uid}_room_{rid}"))
+        for key in ("fan", "water", "mop", "mode", "base_type"):
+            objs.append(("select", f"{uid}_sel_{key}"))
+        for key in ("twice", "turbo_carpet", "quiet", "voice", "ota"):
+            objs.append(("switch", f"{uid}_{key}"))
+        for part in ("begin", "end"):
+            objs.append(("text", f"{uid}_quiet_{part}"))
+        for p in self.schedules.plans:
+            objs.append(("switch", f"{uid}_sched_{p['id']}"))
+        for comp, obj in objs:
+            self._pub(f"{self.disc}/{comp}/{obj}/config", "")
+        self.log(f"[MQTT] retirado descubrimiento duplicado ({uid})")
 
     def note_web_command(self, action, p):
         """Sincroniza la sombra de preferencias en HA cuando el cambio viene de la web."""
