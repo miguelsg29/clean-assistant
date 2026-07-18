@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.10.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.11.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -404,6 +404,16 @@ async def zone_rename(payload: dict):
     z = zones.rename(payload["id"], payload.get("name", ""))
     if z:
         _send_zone_group(zones.group_of(z["kind"]))   # el nombre viaja en el comando
+    await broadcast_zones()
+    return {"ok": True, "zones": zones.zones}
+
+
+@app.post("/api/zones/update")
+async def zone_update(payload: dict):
+    """Mueve una zona: nuevos puntos (metros) -> reenvía el grupo al robot."""
+    z = zones.update_points(payload["id"], payload.get("points") or [])
+    if z:
+        _send_zone_group(zones.group_of(z["kind"]))
     await broadcast_zones()
     return {"ok": True, "zones": zones.zones}
 

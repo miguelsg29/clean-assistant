@@ -315,13 +315,6 @@
           <span><i class="sw-alfombra"></i>Alfombra</span>
         </div>
         <div id="floorList"></div>
-
-        <div class="phead" style="margin-top:18px;display:flex;align-items:center;gap:8px">
-          <span>Zonas guardadas en el robot</span>
-          <button class="btn ghost" id="refreshRobotZones" style="margin-left:auto;padding:6px 12px;font-size:12px">Consultar</button>
-        </div>
-        <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Las que hay en el robot (incluidas las de la app de Cecotec). Se leen del mapa; pulsa «Consultar» para releerlas.</p>
-        <div id="robotZonesList"></div>
       </div>
 
       <div class="tabpane" data-pane="horarios">
@@ -380,7 +373,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.10 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.11 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -389,7 +382,7 @@
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
   var MAP=null, CELLS=null, IDX={}; // mapa actual + rejilla real + id->indice
-  var ZONES=[], drawKind=null, drawStart=null, drawRect=null, moveZoneIdx=null;
+  var ZONES=[], drawKind=null, drawStart=null, drawRect=null, moveZoneId=null;
   var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
   // orientación de la VISTA del mapa (no afecta a las coords que van al robot)
@@ -609,7 +602,6 @@
     if(typeof renderSchedules==='function') renderSchedules();
     if(typeof renderFloors==='function') renderFloors();
     if(typeof loadSuggested==='function') loadSuggested();   // sugerencias según el mapa/suelo
-    if(typeof renderRobotZones==='function') renderRobotZones();   // zonas guardadas en el robot
   }
   function _hex(c){ c=(c||'').trim();
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
@@ -626,7 +618,9 @@
   }
   function renderRealMap(){
     if(!MAP||MAP.sample||!CELLS)return;
-    var w=MAP.bbox[2], h=MAP.bbox[3], vd=vdims(), scale=Math.max(2,Math.ceil(560/vd.w));
+    // escala por densidad de pantalla (retina): más píxeles reales -> texto nítido, no pixelado
+    var DPR=Math.min(2.5,window.devicePixelRatio||1);
+    var w=MAP.bbox[2], h=MAP.bbox[3], vd=vdims(), scale=Math.min(8,Math.max(2,Math.ceil(560*DPR/vd.w)));
     SCALE=scale;
     var cv=document.getElementById('mapCanvas'); cv.width=vd.w*scale; cv.height=vd.h*scale;
     var ctx=cv.getContext('2d');
@@ -662,25 +656,15 @@
     ctx.clearRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false;
     gridTransform(ctx,scale); ctx.drawImage(off,0,0,w*scale,h*scale);
     ctx.setTransform(1,0,0,1,0,0);
-    // zonas guardadas (transformadas punto a punto, rectas)
+    // zonas (transformadas punto a punto, rectas) con su nombre en el centro
     ZONES.forEach(function(z){
-      var col=cssVar((ZK[z.kind]||{}).c||'--faint');
+      var col=cssVar((ZK[z.kind]||{}).c||'--faint'), cx=0, cy=0;
       ctx.beginPath();
-      z.points.forEach(function(p,i){ var c=worldToCell(p[0],p[1]),vp=s2v(c[0],c[1]),X=vp[0]*scale,Y=vp[1]*scale; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
+      z.points.forEach(function(p,i){ var c=worldToCell(p[0],p[1]),vp=s2v(c[0],c[1]),X=vp[0]*scale,Y=vp[1]*scale; cx+=X; cy+=Y; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
       ctx.closePath();
       ctx.fillStyle=col; ctx.globalAlpha=0.16; ctx.fill(); ctx.globalAlpha=1;
       ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.7); ctx.setLineDash([scale*2,scale*1.5]); ctx.stroke(); ctx.setLineDash([]);
-    });
-    // zonas guardadas EN EL ROBOT (campo 9): puntos ya en celda recortada; punteado + nombre
-    ((MAP.stored_zones)||[]).forEach(function(z){
-      if(!z.points||!z.points.length)return;
-      var col=cssVar((ZK[z.kind]||{}).c||'--faint'), cx=0, cy=0;
-      ctx.beginPath();
-      z.points.forEach(function(p,i){ var vp=s2v(p[0],p[1]),X=vp[0]*scale,Y=vp[1]*scale; cx+=X; cy+=Y; i?ctx.lineTo(X,Y):ctx.moveTo(X,Y); });
-      ctx.closePath();
-      ctx.fillStyle=col; ctx.globalAlpha=0.10; ctx.fill(); ctx.globalAlpha=1;
-      ctx.strokeStyle=col; ctx.lineWidth=Math.max(1.5,scale*0.6); ctx.setLineDash([scale,scale*1.3]); ctx.stroke(); ctx.setLineDash([]);
-      if(z.name){ cx/=z.points.length; cy/=z.points.length;
+      if(z.name&&z.points.length){ cx/=z.points.length; cy/=z.points.length;
         ctx.font='600 '+Math.max(9,Math.round(scale*3.4))+'px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
         ctx.textAlign='center'; ctx.textBaseline='middle';
         ctx.lineWidth=Math.max(2,scale); ctx.strokeStyle=cssVar('--surface'); ctx.strokeText(z.name,cx,cy);
@@ -771,9 +755,11 @@
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
         '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
+        '<button class="iconbtn zmov" title="Mover (redibuja en el mapa)" aria-label="Mover">⤢</button>'+
         '<button class="iconbtn zren" title="Renombrar zona" aria-label="Renombrar">✎</button>'+
         '<button class="iconbtn zdel" title="Borrar zona" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=z.name;
+      d.querySelector('.zmov').addEventListener('click',function(){ enterMoveZone(z); });
       d.querySelector('.zren').addEventListener('click',function(){
         inlineEdit(d.querySelector('.n'), z.name, function(nv){
           if(nv){ fetch(BASE+'api/zones/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:z.id,name:nv})})
@@ -786,42 +772,6 @@
     });
   }
   // ---- zonas guardadas EN EL ROBOT (del mapa, campo 9; incluye las de la app Cecotec) ----
-  function robotVirwallZones(){ return ((MAP&&MAP.stored_zones)||[]).filter(function(z){return z.kind==='nogo'||z.kind==='nomop';}); }
-  function renderRobotZones(){
-    var el=document.getElementById('robotZonesList'); if(!el)return; el.innerHTML='';
-    var zs=robotVirwallZones();
-    if(!zs.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin zonas en el robot. Pulsa «Consultar».</p>'; return; }
-    zs.forEach(function(z,idx){
-      var k=ZK[z.kind]||{c:'--faint',l:z.kind};
-      var d=document.createElement('div'); d.className='zrow';
-      d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
-        '<button class="iconbtn rzmov" title="Editar posición (dibuja en el mapa)" aria-label="Mover">⤢</button>'+
-        '<button class="iconbtn rzren" title="Renombrar" aria-label="Renombrar">✎</button>'+
-        '<button class="iconbtn rzdel" title="Borrar del robot" aria-label="Borrar">✕</button>';
-      d.querySelector('.n').textContent=z.name||'(sin nombre)';
-      d.querySelector('.rzren').addEventListener('click',function(){
-        inlineEdit(d.querySelector('.n'), z.name||'', function(nv){
-          if(nv){ fetch(BASE+'api/robot/zones/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx,name:nv})})
-            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); }); }
-          else renderRobotZones();
-        });
-      });
-      d.querySelector('.rzdel').addEventListener('click',function(){
-        if(confirm('¿Borrar del robot la zona "'+(z.name||'(sin nombre)')+'"?'))
-          fetch(BASE+'api/robot/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:idx})})
-            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); });
-      });
-      d.querySelector('.rzmov').addEventListener('click',function(){ enterMoveZone(idx,z); });
-      el.appendChild(d);
-    });
-  }
-  function refreshRobotZones(){
-    fetch(BASE+'api/map').then(function(r){return r.json();}).then(function(m){
-      if(m&&!m.sample){ MAP=m; ROOMS=m.rooms||ROOMS; }
-      renderRobotZones(); if(MAP&&!MAP.sample)renderRealMap();
-    }).catch(function(){});
-  }
   function delZone(id){
     fetch(BASE+'api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
       .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
@@ -908,12 +858,12 @@
     var h=document.getElementById('zoneHint');
     if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa el botón otra vez para cancelar).'; }
   }
-  function exitDraw(){ drawKind=null; drawStart=null; drawRect=null; moveZoneIdx=null;
+  function exitDraw(){ drawKind=null; drawStart=null; drawRect=null; moveZoneId=null;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
     var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; } }
-  function enterMoveZone(idx,z){
+  function enterMoveZone(z){
     if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
-    moveZoneIdx=idx; drawKind=z.kind; drawStart=null; drawRect=null;
+    moveZoneId=z.id; drawKind=z.kind; drawStart=null; drawRect=null;
     var h=document.getElementById('zoneHint'); if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja el nuevo rectángulo para "'+(z.name||ZK[z.kind].l)+'" sobre el mapa.'; }
   }
   document.querySelectorAll('.zadd').forEach(function(b){
@@ -935,10 +885,10 @@
           x1=Math.max(drawStart[0],end[0]),y1=Math.max(drawStart[1],end[1]), kind=drawKind;
       if((x1-x0)>3&&(y1-y0)>3){
         var pts=[cellToWorld(x0,y0),cellToWorld(x1,y0),cellToWorld(x1,y1),cellToWorld(x0,y1)];
-        if(moveZoneIdx!=null){                                  // reposicionar una zona del robot
-          var mi=moveZoneIdx; exitDraw();
-          fetch(BASE+'api/robot/zones/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({index:mi,points_m:pts})})
-            .then(function(r){return r.json();}).then(function(){ refreshRobotZones(); });
+        if(moveZoneId!=null){                                   // reposicionar una zona existente
+          var mid=moveZoneId; exitDraw();
+          fetch(BASE+'api/zones/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:mid,points:pts})})
+            .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
         } else {
           exitDraw();
           // se crea con el nombre por defecto; se puede renombrar en línea en la lista
@@ -1142,10 +1092,6 @@
     this.textContent='Consultando…';
     var b=this; fetch(BASE+'api/robot/orders/refresh',{method:'POST'}).then(function(r){return r.json();})
       .then(function(){ setTimeout(function(){b.textContent='Consultar';},1500); });
-  });
-  document.getElementById('refreshRobotZones').addEventListener('click',function(){
-    var b=this; b.textContent='Consultando…'; refreshRobotZones();
-    setTimeout(function(){b.textContent='Consultar';},900);
   });
 
   // ---- botones de orientación del mapa (girar / espejo) ----

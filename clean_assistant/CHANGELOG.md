@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.0
+- Zonas: una sola lista. Se quita la sección duplicada "zonas guardadas en el robot";
+  las zonas se dibujan sobre el mapa con su nombre y ahora se pueden **mover**
+  (redibujar el rectángulo) desde la lista, además de renombrar y borrar.
+- Texto del mapa nítido en pantallas de alta densidad (retina): se acabó el pixelado.
+
 ## 0.10.0
 - Botón para restablecer cada consumible (cepillo central/lateral, filtro, mopa) al
   cambiar la pieza; pone el contador a 0. También como botones en Home Assistant (MQTT).
