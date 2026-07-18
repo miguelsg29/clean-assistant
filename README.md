@@ -9,7 +9,35 @@ aquellos proyectos).
 > Se apoya en la ingeniería inversa del repo de documentación:
 > [conga_8090_mqtt_bridge](https://github.com/miguelsg29/conga_8090_mqtt_bridge).
 
-## Estado: v0.5 — funcional, verificada con robot real ✅
+![Clean Assistant — mapa en vivo y controles](panel.png)
+
+## Instalación en Home Assistant (rápida)
+
+La forma recomendada de usar Clean Assistant. Se abre desde la barra lateral de HA,
+sin login aparte.
+
+1. **Añade este repositorio de add-ons**: en Home Assistant, **Ajustes → Add-ons →
+   Tienda de add-ons → menú ⋮ (arriba a la derecha) → Repositorios**, pega
+   `https://github.com/miguelsg29/clean-assistant` y pulsa **Añadir**.
+2. **Instala "Clean Assistant"** desde la tienda (si no aparece, recarga con ⋮ →
+   Recargar) y ábrelo.
+3. **Redirige el robot a Home Assistant**: en tu router o servidor DNS, haz que
+   `tcp-cecotec.3irobotix.net` apunte a la **IP de Home Assistant** (el robot se
+   conecta al puerto **9090** de HA). Luego **reinicia el robot** (corte de luz) para
+   que reconecte ahí.
+4. **Arranca el add-on.** No hace falta rellenar los IDs del robot: se
+   **autoconfiguran** en el primer arranque (captura la identidad de la nube y pasa
+   solo a modo local; a partir de ahí funciona sin nube).
+5. Abre **Clean Assistant** en la barra lateral: verás el **mapa real** y todos los
+   controles. 🎉
+6. *(Opcional)* **Entidades en Home Assistant (MQTT):** si tienes el add-on de
+   **Mosquitto broker**, rellena en la configuración del add-on `MQTT_HOST`
+   (`core-mosquitto`), `MQTT_USER` y `MQTT_PASS`. Aparecerá el dispositivo
+   **Conga 8090** con aspiradora, batería, botones por habitación, selectores,
+   horarios… Si dejas `MQTT_HOST` vacío y usas el broker estándar de HA, se
+   autoconfigura solo.
+
+## Estado: v0.6 — funcional, verificada con robot real ✅
 
 App completa y **verificada de punta a punta con un Conga real**, empaquetada para
 **Docker** y como **add-on de Home Assistant** (ingress). Incluye un **robot simulado**

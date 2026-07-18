@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+- Identidad persistente: una vez capturada (auto-provisión), se guarda en `/data` y
+  ya **no se vuelve a la nube** en cada arranque. Todos los datos (mapa, zonas,
+  horarios, vista, enlace, identidad) se guardan de forma explícita en `/data`.
+- Icono y logo del add-on para Home Assistant.
+- README con instrucciones fáciles de instalación en Home Assistant y captura de la app.
+
 ## 0.5.2
 - Arreglado el "Conga duplicado" en MQTT: el dispositivo se identificaba por el
   ROBOT_DID del entorno (0 en el add-on), no por el DID real capturado. Ahora usa

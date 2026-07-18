@@ -27,6 +27,12 @@ from backend.mqtt_bridge import MqttBridge
 STATIC = Path(__file__).parent / "static"
 env = load_env()
 
+# Carpeta de datos persistentes (mapa, zonas, horarios, vista, enlace, identidad).
+# Por defecto el directorio actual (desarrollo); en el add-on se apunta a /data.
+DATA_DIR = os.environ.get("DATA_DIR", ".")
+def _data(name: str) -> str:
+    return os.path.join(DATA_DIR, name)
+
 # CONGA_MODE=real -> servidor TLS+WS que habla con tu Conga (necesita datos en .env
 # y certificados). Por defecto 'mock': robot simulado, para desarrollar sin robot.
 MODE = (env("CONGA_MODE", "mock") or "mock").lower()
@@ -38,11 +44,11 @@ else:
     robot = MockRobot()
 
 clients: set[WebSocket] = set()
-zones = ZoneStore()               # zonas de Clean Assistant (persiste en zones.json)
-schedules = ScheduleStore()       # horarios (persiste en schedules.json)
+zones = ZoneStore(_data("zones.json"))       # zonas de Clean Assistant (persistentes)
+schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
-VIEW_PATH = "view.json"
+VIEW_PATH = _data("view.json")
 
 
 def _load_view() -> dict:
@@ -67,7 +73,7 @@ def _save_view():
 
 # caché del último mapa: se muestra al arrancar (aunque el robot esté en la base) y se
 # refresca cuando el robot envía uno nuevo (al empezar a limpiar y durante la limpieza).
-MAP_CACHE = "map_cache.json"
+MAP_CACHE = _data("map_cache.json")
 
 
 def _save_map():
@@ -90,7 +96,7 @@ def _load_map():
 
 
 # modo de enlace persistente: "local" (impersonador) o "cloud" (pasarela a la nube real)
-LINK_PATH = "link.json"
+LINK_PATH = _data("link.json")
 
 
 def _load_link():
@@ -309,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.5.2", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.6.0", lifespan=lifespan)
 
 
 @app.get("/api/state")

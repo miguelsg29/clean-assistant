@@ -39,6 +39,10 @@ export DEFAULT_FAN=$(jq -r '.DEFAULT_FAN // "Normal"' $CONFIG)
 export DEFAULT_WATER=$(jq -r '.DEFAULT_WATER // "Medio"' $CONFIG)
 export DEFAULT_MOP=$(jq -r '.DEFAULT_MOP // "Estándar"' $CONFIG)
 
+# Datos persistentes en /data (mapa, zonas, horarios, vista, enlace e identidad).
+# Con esto la identidad capturada se recuerda y NO se vuelve a la nube en cada arranque.
+export DATA_DIR=/data
+
 # Certificados TLS persistentes en /data (se generan una vez)
 export CERT_PATH=/data/cert.pem
 export KEY_PATH=/data/key.pem

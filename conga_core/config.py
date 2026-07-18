@@ -103,7 +103,9 @@ class RobotConfig:
                 setattr(self, k, str(ident[k]))
 
 
-IDENTITY_PATH = "identity.json"
+# Identidad capturada de la nube (auto-provisión). Se guarda en DATA_DIR (en el
+# add-on, /data) para que persista y NO haya que volver a la nube en cada arranque.
+IDENTITY_PATH = os.path.join(os.environ.get("DATA_DIR", "."), "identity.json")
 
 
 def load_identity(path: str = IDENTITY_PATH) -> dict:
