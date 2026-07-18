@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.1
+- Las zonas creadas en la app de Cecotec aparecen ahora automáticamente en la lista de
+  Clean Assistant (se adoptan del mapa del robot, sin duplicar las que ya tienes).
+- El mapa web se actualiza también cuando cambian solo las zonas (antes solo se
+  refrescaba al cambiar la rejilla del mapa).
+
 ## 0.11.0
 - Zonas: una sola lista. Se quita la sección duplicada "zonas guardadas en el robot";
   las zonas se dibujan sobre el mapa con su nombre y ahora se pueden **mover**

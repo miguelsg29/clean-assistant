@@ -273,6 +273,8 @@ async def lifespan(app: FastAPI):
     def on_map():
         _save_map()                # persiste el último mapa para verlo tras reiniciar
         asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
+        # adopta las zonas creadas en la app de Cecotec (campo 9 del mapa) que no tengamos
+        asyncio.run_coroutine_threadsafe(_reconcile_robot_zones(), loop)
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
 
     # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
@@ -315,7 +317,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.11.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.11.1", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -416,6 +418,43 @@ async def zone_update(payload: dict):
         _send_zone_group(zones.group_of(z["kind"]))
     await broadcast_zones()
     return {"ok": True, "zones": zones.zones}
+
+
+# ---- reconciliación: adopta las zonas del robot (mapa, campo 9) que no tengamos ya ----
+def _zone_bbox(points):
+    xs = [p[0] for p in points]
+    ys = [p[1] for p in points]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _zones_match(a_pts, b_pts, tol=0.25) -> bool:
+    """Dos zonas (rectángulos) son la misma si su caja envolvente coincide (± tol m)."""
+    if not a_pts or not b_pts:
+        return False
+    a, b = _zone_bbox(a_pts), _zone_bbox(b_pts)
+    return all(abs(a[i] - b[i]) <= tol for i in range(4))
+
+
+async def _reconcile_robot_zones():
+    """Añade a la lista de Clean Assistant las zonas que hay en el robot (creadas en la
+    app de Cecotec) y que aún no tenemos, sin duplicar las nuestras."""
+    m = getattr(robot, "map", None) or {}
+    changed = False
+    for z in m.get("stored_zones", []):
+        kind = z.get("kind")
+        pts = z.get("points_m") or []
+        if kind not in ("nogo", "nomop", "clean") or not pts:
+            continue
+        if any(zz.get("kind") == kind and _zones_match(pts, zz.get("points", []))
+               for zz in zones.zones):
+            continue                      # ya la tenemos
+        try:
+            zones.add(kind, [(p[0], p[1]) for p in pts], z.get("name") or "")
+            changed = True
+        except Exception:
+            pass
+    if changed:
+        await broadcast_zones()
 
 
 @app.post("/api/room/update")
