@@ -26,6 +26,27 @@ def _lvl(table, v):
     return table.get(v, v)
 
 
+# ---------------- config sugerida según el tipo de suelo (roomMaterialId) ----------------
+# La app oficial propone distinta succión/agua/mopa según el suelo. Regla sensata:
+#   Alfombra -> solo aspirar (no se friega);  Madera -> suave y poca agua;
+#   Azulejos -> fregado fuerte;               Suave -> normal.
+FLOOR_DEFAULTS = {
+    4: {"fan": "Turbo",  "water": "Off",   "mop": "Off"},       # Alfombra
+    3: {"fan": "Eco",    "water": "Bajo",  "mop": "Estándar"},  # Madera
+    2: {"fan": "Turbo",  "water": "Alto",  "mop": "Potente"},   # Azulejos
+    1: {"fan": "Normal", "water": "Medio", "mop": "Estándar"},  # Suave
+}
+
+
+def floor_defaults(material) -> dict:
+    """Config {fan, water, mop} recomendada para un tipo de suelo (1..4)."""
+    try:
+        m = int(material or 1)
+    except (TypeError, ValueError):
+        m = 1
+    return dict(FLOOR_DEFAULTS.get(m, FLOOR_DEFAULTS[1]))
+
+
 # ---------------- limpieza (set_mode) ----------------
 def start():        return {"control": "set_mode", "mapid": 0, "type": 0, "value": 1}
 def pause():        return {"control": "set_mode", "mapid": 0, "type": 2, "value": 2}

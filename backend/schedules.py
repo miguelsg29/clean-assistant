@@ -17,6 +17,52 @@ def _slug(name: str) -> str:
     return s or f"plan_{int(time.time())}"
 
 
+# Categoría de habitación = dos últimos dígitos del roomTypeId. El robot usa varias
+# familias (2001 y 2101 = dormitorio; 2006 y 2106 = salón), por eso miramos type % 100.
+CAT_BEDROOM, CAT_BATHROOM = 1, 3   # 1=dormitorio, 3=baño, 4=pasillo, 5=cocina, 6=salón
+_ALL_DAYS = ["lun", "mar", "mie", "jue", "vie", "sab", "dom"]
+
+
+def _category(rtype) -> int:
+    try:
+        return int(rtype) % 100
+    except (TypeError, ValueError):
+        return -1
+
+
+def suggested_plans(rooms) -> list[dict]:
+    """Planes sugeridos (inactivos) generados del mapa actual, tipo los que propone
+    la app de Cecotec. La config de cada habitación sale de su tipo de suelo."""
+    real = [r for r in (rooms or []) if r.get("named", True) and r.get("id") is not None]
+    if not real:
+        return []
+
+    def room_cfg(r):
+        d = cmd.floor_defaults(r.get("material"))
+        return {"room": r["id"], "fan": d["fan"], "water": d["water"],
+                "mop": d["mop"], "twice": False}
+
+    beds = [r for r in real if _category(r.get("type")) == CAT_BEDROOM]
+    baths = [r for r in real if _category(r.get("type")) == CAT_BATHROOM]
+    out = []
+    if beds:
+        out.append({"id": "sug_dormitorios", "name": "Solo dormitorios",
+                    "time": "09:00", "days": ["lun", "jue"],
+                    "rooms": [room_cfg(r) for r in beds]})
+    if baths:
+        out.append({"id": "sug_banos", "name": "Solo baños",
+                    "time": "09:00", "days": list(_ALL_DAYS),
+                    "rooms": [room_cfg(r) for r in baths]})
+    if len(real) >= 2:
+        out.append({"id": "sug_profunda", "name": "Limpieza profunda",
+                    "time": "10:00", "days": list(_ALL_DAYS),
+                    "rooms": [room_cfg(r) for r in real]})
+    for p in out:
+        p["enable"] = False
+        p["suggested"] = True
+    return out
+
+
 class ScheduleStore:
     def __init__(self, path: str = "schedules.json"):
         self.path = path

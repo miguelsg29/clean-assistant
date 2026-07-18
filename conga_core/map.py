@@ -238,7 +238,8 @@ def decode_map(frame: bytes) -> dict:
             # nombre en el mapa): se pinta el suelo pero NO se lista como habitación.
             "named": bool(names.get(rid)),
             "type": mt[1] if mt else None,        # roomTypeId (categoría)
-            "material": mt[2] if mt else None,    # roomMaterialId (tipo de suelo)
+            # roomMaterialId (tipo de suelo) 1..4; fuera de rango -> None (sin definir)
+            "material": (mt[2] if mt and mt[2] in (1, 2, 3, 4) else None),
             "center": [round(r[5] / cnt - minx, 1), round(r[6] / cnt - miny, 1)],
             "bbox": [r[0] - minx, r[1] - miny, r[2] - r[0] + 1, r[3] - r[1] + 1],
         })

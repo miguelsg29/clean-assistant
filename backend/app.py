@@ -21,7 +21,7 @@ from conga_core import map as cmap
 from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
-from backend.schedules import ScheduleStore
+from backend.schedules import ScheduleStore, suggested_plans
 from backend.mqtt_bridge import MqttBridge
 
 STATIC = Path(__file__).parent / "static"
@@ -315,7 +315,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.6.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.7.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -444,6 +444,16 @@ async def room_update(payload: dict):
 @app.get("/api/schedules")
 def get_schedules():
     return {"schedules": schedules.plans}
+
+
+@app.get("/api/schedules/suggested")
+def get_suggested_schedules():
+    """Planes sugeridos según el mapa (dormitorios / baños / limpieza profunda).
+    Se omiten los que ya existen (por nombre)."""
+    rooms = (getattr(robot, "map", None) or {}).get("rooms", [])
+    existing = {(p.get("name") or "").lower() for p in schedules.plans}
+    sug = [s for s in suggested_plans(rooms) if s["name"].lower() not in existing]
+    return {"suggested": sug}
 
 
 @app.post("/api/schedules/save")

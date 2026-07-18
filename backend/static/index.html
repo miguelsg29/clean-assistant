@@ -322,6 +322,12 @@
         <div id="schedList"></div>
         <div class="btnrow" id="schedListBtns"><button class="btn ghost" id="newSched">+ Nuevo horario</button></div>
 
+        <div id="suggestedWrap" style="display:none">
+          <div class="phead" style="margin-top:18px">Planes sugeridos</div>
+          <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Según tu mapa y el tipo de suelo de cada habitación. Púlsalos para añadirlos; luego los editas o desactivas como cualquier horario.</p>
+          <div id="suggestedList"></div>
+        </div>
+
         <div id="schedEditor" style="display:none">
           <div class="phead" id="schedEditTitle">Nuevo horario</div>
           <div class="field"><label>Nombre</label><input type="text" id="sName" class="tinput" placeholder="Noche entre semana"/></div>
@@ -367,7 +373,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.6 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.7 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -590,6 +596,7 @@
     syncSel();
     if(typeof renderSchedules==='function') renderSchedules();
     if(typeof renderFloors==='function') renderFloors();
+    if(typeof loadSuggested==='function') loadSuggested();   // sugerencias según el mapa/suelo
   }
   function _hex(c){ c=(c||'').trim();
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
@@ -850,6 +857,15 @@
   var MODE_OPTS={fan:['Eco','Normal','Turbo'],water:['Off','Bajo','Medio','Alto'],mop:['Off','Estándar','Fuerte','Potente']};
   var MODE_LBL={fan:'Succión',water:'Agua',mop:'Mopa'};
   var MODE_DEF={fan:'Normal',water:'Medio',mop:'Estándar',twice:false};
+  // config sugerida según el tipo de suelo (roomMaterialId 1..4): alfombra solo aspira,
+  // madera suave/poca agua, azulejos fregado fuerte, suave normal.
+  var FLOOR_DEF={4:{fan:'Turbo',water:'Off',mop:'Off'},3:{fan:'Eco',water:'Bajo',mop:'Estándar'},
+                 2:{fan:'Turbo',water:'Alto',mop:'Potente'},1:{fan:'Normal',water:'Medio',mop:'Estándar'}};
+  function floorDefaults(id){
+    var r=(ROOMS||[]).filter(function(x){return x.id===id;})[0];
+    var d=FLOOR_DEF[(r&&r.material)||1]||FLOOR_DEF[1];
+    return {fan:d.fan,water:d.water,mop:d.mop,twice:false};
+  }
   var DAY_KEYS=[['lun','L'],['mar','M'],['mie','X'],['jue','J'],['vie','V'],['sab','S'],['dom','D']];
   function roomName(id){ var r=(ROOMS||[]).filter(function(x){return x.id===id;})[0]; return r?r.name:('Hab '+id); }
 
@@ -870,6 +886,34 @@
       el.appendChild(card);
     });
   }
+  // ---- planes sugeridos (según el mapa y el tipo de suelo) ----
+  var SUGGESTED=[];
+  function renderSuggested(){
+    var wrap=document.getElementById('suggestedWrap'), el=document.getElementById('suggestedList');
+    if(!el)return; el.innerHTML='';
+    if(!SUGGESTED.length){ if(wrap)wrap.style.display='none'; return; }
+    if(wrap)wrap.style.display='';
+    SUGGESTED.forEach(function(p){
+      var days=DAY_KEYS.map(function(d){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+d[1]+'</span>';}).join('');
+      var names=(p.rooms||[]).map(function(r){return roomName(r.room);}).join(', ');
+      var card=document.createElement('div'); card.className='sched';
+      card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+(p.time||'')+'</span>'+
+        '<button class="btn sAdd" style="margin-left:auto;padding:6px 14px;font-size:12px">+ Añadir</button></div>'+
+        '<div class="days">'+days+'</div><div class="perroom"><span class="pr">'+names+'</span></div>';
+      card.querySelector('.nm').textContent=p.name;
+      card.querySelector('.sAdd').addEventListener('click',function(){ addSuggested(p); });
+      el.appendChild(card);
+    });
+  }
+  function addSuggested(p){
+    var plan={name:p.name,time:p.time,days:p.days,rooms:p.rooms,enable:true};   // sin id -> slug por nombre
+    fetch(BASE+'api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:plan})})
+      .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); loadSuggested(); });
+  }
+  function loadSuggested(){
+    fetch(BASE+'api/schedules/suggested').then(function(r){return r.json();})
+      .then(function(d){ SUGGESTED=d.suggested||[]; renderSuggested(); }).catch(function(){});
+  }
   function buildEditorDays(sel){
     var el=document.getElementById('sDays'); el.innerHTML='';
     DAY_KEYS.forEach(function(d){ var s=document.createElement('span'); s.className='day'+(sel.indexOf(d[0])>=0?' on':''); s.textContent=d[1]; s.dataset.day=d[0];
@@ -884,7 +928,8 @@
       b.innerHTML='<span class="sw" style="background:var('+roomToken(r,(IDX[r.id]!=null?IDX[r.id]:0))+')"></span>'+r.name+'<span class="ord"></span>';
       b.addEventListener('click',function(){
         var i=editorSel.indexOf(r.id);
-        if(i>=0)editorSel.splice(i,1); else editorSel.push(r.id);   // orden de clic = orden de limpieza
+        if(i>=0){ editorSel.splice(i,1); }
+        else { editorSel.push(r.id); if(!editorModes[r.id])editorModes[r.id]=floorDefaults(r.id); }  // orden de clic = orden de limpieza; config por suelo
         b.classList.toggle('sel'); editorRenumber(); renderRoomModes();
       });
       el.appendChild(b);
@@ -937,6 +982,7 @@
     document.getElementById('schedList').style.display='none';
     document.getElementById('schedListBtns').style.display='none';
     document.getElementById('robotOrdersWrap').style.display='none';
+    var sw=document.getElementById('suggestedWrap'); if(sw)sw.style.display='none';
     document.getElementById('schedEditor').style.display='block';
   }
   function closeEditor(){
@@ -945,6 +991,7 @@
     document.getElementById('schedListBtns').style.display='';
     document.getElementById('robotOrdersWrap').style.display='';
     editingId=null;
+    renderSuggested();
   }
   function collectPlan(){
     var days=Array.prototype.map.call(document.querySelectorAll('#sDays .day.on'),function(s){return s.dataset.day;});
@@ -964,7 +1011,7 @@
       .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); closeEditor(); });
   });
   function toggleSched(id,on){ fetch(BASE+'api/schedules/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,enable:on})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];}); }
-  function delSched(id){ fetch(BASE+'api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();}); }
+  function delSched(id){ fetch(BASE+'api/schedules/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})}).then(function(r){return r.json();}).then(function(res){SCHEDULES=res.schedules||[];renderSchedules();loadSuggested();}); }
 
   // ---- horarios reales guardados en el robot (getOrder6090) ----
   function renderRobotOrders(){
@@ -1013,7 +1060,7 @@
   fetch(BASE+'api/view').then(function(r){return r.json();}).then(function(v){VIEW=v||{rot:0,flip:0};applyViewBtns();if(MAP&&!MAP.sample)renderRealMap();});
   fetch(BASE+'api/map').then(function(r){return r.json();}).then(applyMap);
   fetch(BASE+'api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
-  fetch(BASE+'api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();});
+  fetch(BASE+'api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();loadSuggested();});
   fetch(BASE+'api/robot/orders').then(function(r){return r.json();}).then(function(d){ROBOT_ORDERS=d.orders||[];renderRobotOrders();});
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';

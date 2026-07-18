@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.0
+- Planes sugeridos según tu mapa (Solo dormitorios / Solo baños / Limpieza profunda):
+  aparecen en Horarios y los añades con un toque; luego los editas o desactivas.
+- Config automática por tipo de suelo al añadir una habitación a un horario: alfombra
+  solo aspira, madera suave con poca agua, azulejos fregado fuerte.
+- Detección de categoría de habitación por familia de tipo (2001/2101 = dormitorio…)
+  y saneo de materiales de suelo fuera de rango.
+
 ## 0.6.0
 - Identidad persistente: una vez capturada (auto-provisión), se guarda en `/data` y
   ya **no se vuelve a la nube** en cada arranque. Todos los datos (mapa, zonas,
