@@ -66,8 +66,8 @@ class RobotConfig:
 
     @property
     def configured(self) -> bool:
-        """True si parece configurado con datos reales (no los de ejemplo)."""
-        return self.did != 123456 and self.sn != "500400000000"
+        """True si hay una identidad real (no los ejemplos ni el 0 del add-on)."""
+        return self.did not in (0, 123456)
 
     @classmethod
     def from_env(cls, path: str = ".env") -> "RobotConfig":

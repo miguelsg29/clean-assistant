@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.0
+- Autoconfiguración en el primer arranque: capta la identidad del robot (DID,
+  userid, SN, MAC…) de la nube y pasa solo a modo local (no hay que meter los IDs).
+- Modo "Cloud + Local": pasarela a la nube real de Cecotec — la app oficial
+  funciona y se capturan sus comandos (para depurar). Selector en Ajustes.
+- Lee los horarios reales guardados en el robot (incluidos los de la app Cecotec).
+- Consumibles en horas con la vida real de cada pieza.
+
 ## 0.3.0
 - Tipo de suelo por habitación: elegirlo y verlo en el mapa con una textura
   (madera, azulejos, alfombra, suave).
