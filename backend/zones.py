@@ -60,6 +60,13 @@ class ZoneStore:
         self._save()
         return z
 
+    def rename(self, zid: int, name: str) -> dict | None:
+        z = next((x for x in self.zones if x["id"] == int(zid)), None)
+        if z and name.strip():
+            z["name"] = name.strip()
+            self._save()
+        return z
+
     def delete(self, zid: int) -> bool:
         n = len(self.zones)
         self.zones = [z for z in self.zones if z["id"] != int(zid)]

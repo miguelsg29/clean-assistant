@@ -322,6 +322,36 @@ async def zone_delete(payload: dict):
     return {"ok": True, "zones": zones.zones}
 
 
+@app.post("/api/zones/rename")
+async def zone_rename(payload: dict):
+    z = zones.rename(payload["id"], payload.get("name", ""))
+    if z:
+        _send_zone_group(zones.group_of(z["kind"]))   # el nombre viaja en el comando
+    await broadcast_zones()
+    return {"ok": True, "zones": zones.zones}
+
+
+@app.post("/api/room/material")
+async def room_material(payload: dict):
+    """Cambia el tipo de suelo de una habitación (setPlanData6090, lista completa)."""
+    m = getattr(robot, "map", None)
+    if not m or not m.get("rooms"):
+        return {"ok": False, "error": "sin mapa"}
+    rid = int(payload["room"])
+    material = payload["material"]
+    rooms = [{"room_id": r["id"], "room_name": r["name"], "room_type": r.get("type") or 0,
+              "material": material if r["id"] == rid else (r.get("material") or 1)}
+             for r in m["rooms"] if r.get("named", True)]
+    robot.command(cmd.set_plan_data(_map_head_id(), rooms))
+    # reflejo optimista en el mapa cacheado (el suelo no cambia la geometría)
+    mat_num = cmd._lvl(cmd.MATERIALS, material)
+    for r in m["rooms"]:
+        if r["id"] == rid:
+            r["material"] = mat_num
+    _save_map()
+    return {"ok": True, "room": rid, "material": mat_num}
+
+
 @app.get("/api/schedules")
 def get_schedules():
     return {"schedules": schedules.plans}

@@ -128,8 +128,8 @@ def _parse_protobuf(pb: bytes) -> dict:
                 _, p = _read_varint(chunk, p)
                 glen, p = _read_varint(chunk, p)
                 grid = chunk[p:p + glen]
-            elif fn == 12:                                # habitación {id, nombre}
-                rid = name = None
+            elif fn == 12:                                # habitación {id, nombre, tipo, suelo}
+                rid = name = rtype = material = None
                 p = 0
                 while p < len(chunk):
                     st, p = _read_varint(chunk, p)
@@ -138,6 +138,10 @@ def _parse_protobuf(pb: bytes) -> dict:
                         v, p = _read_varint(chunk, p)
                         if sf == 1:
                             rid = v
+                        elif sf == 3:                     # roomTypeId (categoría)
+                            rtype = v
+                        elif sf == 4:                     # roomMaterialId (tipo de suelo)
+                            material = v
                     elif sw == 2:
                         sl, p = _read_varint(chunk, p)
                         if sf == 2:
@@ -149,7 +153,7 @@ def _parse_protobuf(pb: bytes) -> dict:
                         p += 8
                     else:
                         break
-                rooms.append((rid, name))
+                rooms.append((rid, name, rtype, material))
             elif fn == 3:                                 # params (origen, resolución)
                 params = _parse_params(chunk)
             elif fn == 7:                                 # base de carga (estática)
@@ -184,7 +188,8 @@ def decode_map(frame: bytes) -> dict:
     grid = info["grid"]
     if not grid or len(grid) < GRID_W * GRID_H:
         raise ValueError("rejilla de mapa incompleta")
-    names = {rid: n for rid, n in info["rooms"] if rid is not None}
+    meta = {rid: (n, t, mat) for rid, n, t, mat in info["rooms"] if rid is not None}
+    names = {rid: v[0] for rid, v in meta.items()}
 
     # caja envolvente + acumuladores por habitación (una sola pasada, saltando filas vacías)
     minx = miny = 10 ** 9
@@ -225,12 +230,15 @@ def decode_map(frame: bytes) -> dict:
     for rid in sorted(rp):
         r = rp[rid]
         cnt = r[4]
+        mt = meta.get(rid)
         rooms.append({
             "id": rid,
             "name": names.get(rid) or f"Habitación {rid}",
             # named=False -> segmento temporal que el firmware crea al limpiar (sin
             # nombre en el mapa): se pinta el suelo pero NO se lista como habitación.
             "named": bool(names.get(rid)),
+            "type": mt[1] if mt else None,        # roomTypeId (categoría)
+            "material": mt[2] if mt else None,    # roomMaterialId (tipo de suelo)
             "center": [round(r[5] / cnt - minx, 1), round(r[6] / cnt - miny, 1)],
             "bbox": [r[0] - minx, r[1] - miny, r[2] - r[0] + 1, r[3] - r[1] + 1],
         })

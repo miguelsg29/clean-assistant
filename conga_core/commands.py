@@ -14,6 +14,7 @@ MOP = {"Off": 0, "Estándar": 1, "Fuerte": 2, "Potente": 3}
 CLEAN_MODES = {"Auto": 0, "Limpieza completa": 14, "Fregado": 2, "Bordes": 1,
                "Espiral": 5, "Espiral cuadrada": 15, "Punto": 6}
 BASE_TYPES = {"Base de carga": 0, "Colector automático": 1}
+MATERIALS = {"Suave": 1, "Azulejos": 2, "Madera": 3, "Alfombra": 4}   # tipo de suelo (roomMaterialId)
 WEEKDAY_BITS = {"dom": 1, "lun": 2, "mar": 4, "mie": 8, "jue": 16, "vie": 32, "sab": 64}
 # tipos de zona (relativos a cada comando)
 VIRWALL_NOGO, VIRWALL_NOMOP = 200, 301   # set_virwall: prohibida / sin fregona
@@ -167,3 +168,17 @@ def build_order(plan, map_head_id, rooms_meta=None, enable=None):
 
 
 def delete_order(orderid): return {"control": "deleteOrder6090", "orderid": int(orderid)}
+
+
+# ---------------- config de habitaciones: nombre, categoría y tipo de suelo ----------------
+def set_plan_data(map_head_id, rooms, map_name="Interior"):
+    """Guarda la config de habitaciones (setPlanData6090). Reemplazo de lista completa.
+    rooms: [{room_id, room_name, room_type, material}]. material acepta nombre
+    ('Madera') o número (1-4)."""
+    info = [{"roomID": int(r["room_id"]), "roomName": r.get("room_name", ""),
+             "roomTypeId": int(r.get("room_type") or 0),
+             "roomMaterialId": _lvl(MATERIALS, r.get("material", 1)),
+             "cleanStatus": int(r.get("clean_status") or 0)}
+            for r in rooms]
+    return {"control": "setPlanData6090", "mapid": int(map_head_id),
+            "mapName": map_name, "roomInfo": info}

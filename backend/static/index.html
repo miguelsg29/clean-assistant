@@ -131,6 +131,9 @@
   .rmhead{font-weight:600;font-size:13.5px}
   .rmlbl{font-size:10.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:9px 0 4px}
   .rmx2{display:flex;align-items:center;justify-content:space-between;margin-top:10px;font-size:13px;font-weight:500}
+  .frow{padding:10px 0;border-top:1px solid var(--line)}
+  .frow:first-of-type{border-top:none}
+  .frow .fn{font-weight:600;font-size:13px;margin-bottom:6px}
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
@@ -292,6 +295,8 @@
           <button class="btn zadd" data-kind="nomop" style="background:var(--water);box-shadow:none">+ Sin fregona</button>
           <button class="btn zadd" data-kind="clean">+ Limpieza</button>
         </div>
+        <div class="phead" style="margin-top:18px">Tipo de suelo por habitación</div>
+        <div id="floorList"></div>
       </div>
 
       <div class="tabpane" data-pane="horarios">
@@ -544,6 +549,7 @@
     }
     syncSel();
     if(typeof renderSchedules==='function') renderSchedules();
+    if(typeof renderFloors==='function') renderFloors();
   }
   function _hex(c){ c=(c||'').trim();
     if(c[0]==='#'){ if(c.length===4)c='#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3];
@@ -681,8 +687,10 @@
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
         '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
+        '<button class="iconbtn zren" title="Renombrar zona" aria-label="Renombrar">✎</button>'+
         '<button class="iconbtn zdel" title="Borrar zona" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=z.name;
+      d.querySelector('.zren').addEventListener('click',function(){ renameZone(z); });
       d.querySelector('.zdel').addEventListener('click',function(){ delZone(z.id); });
       el.appendChild(d);
     });
@@ -690,6 +698,38 @@
   function delZone(id){
     fetch(BASE+'api/zones/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id})})
       .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
+  }
+  function renameZone(z){
+    var name=prompt('Nombre de la zona:', z.name); if(name===null||!name.trim())return;
+    fetch(BASE+'api/zones/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:z.id,name:name})})
+      .then(function(r){return r.json();}).then(function(res){ ZONES=res.zones||[]; renderZones(); if(MAP&&!MAP.sample)renderRealMap(); });
+  }
+
+  // ---- tipo de suelo por habitación (setPlanData6090) ----
+  var FLOORS=['Suave','Azulejos','Madera','Alfombra'];   // roomMaterialId 1..4
+  function renderFloors(){
+    var el=document.getElementById('floorList'); if(!el)return; el.innerHTML='';
+    var rooms=(MAP&&!MAP.sample?(MAP.rooms||[]):[]).filter(function(r){return r.named!==false;});
+    if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Necesita el mapa real del robot.</p>'; return; }
+    rooms.forEach(function(r){
+      var row=document.createElement('div'); row.className='frow';
+      var nm=document.createElement('div'); nm.className='fn'; nm.textContent=r.name; row.appendChild(nm);
+      var seg=document.createElement('div'); seg.className='seg';
+      FLOORS.forEach(function(opt,i){
+        var b=document.createElement('button'); b.textContent=opt; b.dataset.v=i+1;
+        if((r.material||1)===(i+1))b.setAttribute('aria-pressed','true');
+        b.addEventListener('click',function(){
+          seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
+          r.material=i+1; setFloor(r.id,opt);
+        });
+        seg.appendChild(b);
+      });
+      row.appendChild(seg); el.appendChild(row);
+    });
+  }
+  function setFloor(room,material){
+    fetch(BASE+'api/room/material',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,material:material})})
+      .then(function(r){return r.json();});
   }
   function enterDraw(kind,btn){
     if(!MAP||MAP.sample){ alert('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).'); return; }
