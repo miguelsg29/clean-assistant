@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1
+- MQTT automático: si no rellenas los campos MQTT_*, el add-on coge el broker
+  (Mosquitto) directamente de Home Assistant (servicio `mqtt`), sin escribir nada.
+  Puedes seguir poniendo un broker externo a mano si lo prefieres.
+
 ## 0.4.0
 - Autoconfiguración en el primer arranque: capta la identidad del robot (DID,
   userid, SN, MAC…) de la nube y pasa solo a modo local (no hay que meter los IDs).

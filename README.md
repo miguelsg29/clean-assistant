@@ -131,7 +131,10 @@ Este repositorio **es también un repositorio de add-ons de Home Assistant**. En
   sin login aparte).
 - El robot se conecta al **puerto 9090** del host de HA (redirige ahí el DNS de
   `tcp-cecotec.3irobotix.net` y reinicia el robot).
-- Rellena los datos del robot (y MQTT opcional) en el formulario del add-on.
+- Los datos del robot se **autocapturan** en el primer arranque (puedes dejarlos a 0).
+- **MQTT automático**: si tienes el add-on de Mosquitto (u otro broker) en HA, el
+  add-on coge host/usuario/contraseña **solos**, sin rellenar nada. Solo tienes que
+  poner los campos `MQTT_*` a mano si usas un broker externo a Home Assistant.
 - El add-on `clean_assistant/` instala la app desde este repo (sin duplicar código);
   para fijar versión, pon `CA_REF` a un tag de release en su `Dockerfile`.
 

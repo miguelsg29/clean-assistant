@@ -4,7 +4,7 @@
 FROM alpine:3.20
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --no-cache python3 py3-pip openssl jq git
+RUN apk add --no-cache python3 py3-pip openssl jq git curl
 
 ARG CA_REF=v0.4.0
 RUN git clone --depth 1 --branch ${CA_REF} https://github.com/miguelsg29/clean-assistant /app \

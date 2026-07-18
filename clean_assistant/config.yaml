@@ -1,5 +1,5 @@
 name: "Clean Assistant"
-version: "0.4.0"
+version: "0.4.1"
 slug: "clean_assistant"
 description: "Interfaz local (sin nube) para el Conga 8090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
 url: "https://github.com/miguelsg29/clean-assistant"
@@ -15,6 +15,11 @@ panel_icon: "mdi:robot-vacuum"
 # El robot se conecta a este puerto (redirige el DNS tcp-cecotec.3irobotix.net a HA).
 ports:
   9090/tcp: 9090
+# Descubrimiento del broker MQTT de Home Assistant (Mosquitto): si no rellenas los
+# campos MQTT_* a mano, se autoconfiguran desde HA. "want" = opcional (la app funciona
+# igual sin MQTT).
+services:
+  - mqtt:want
 options:
   ROBOT_DID: 0
   ROBOT_USERID: 0
