@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 
 from conga_core import commands as cmd
 from conga_core import map as cmap
-from conga_core.config import load_env
+from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore
@@ -274,14 +274,29 @@ async def lifespan(app: FastAPI):
         cached = _load_map()
         if cached:
             robot.map = cached
-    saved_link = _load_link()          # respeta el último modo elegido (local/cloud)
-    if saved_link:
-        robot.link = saved_link
+    def on_provision():
+        # primer arranque: captura la identidad del robot de la nube y pasa a local
+        save_identity(robot.captured)
+        robot.cfg.apply_identity(robot.captured)
+        print(f"[provision] identidad guardada {robot.captured}; cambiando a modo local")
+        robot.set_link("local")
+        _save_link("local")
+        asyncio.run_coroutine_threadsafe(broadcast_link(), loop)
+
+    # sin identidad configurada -> auto-provisión: arrancar en cloud, capturar y pasar a local
+    if MODE == "real" and not robot.cfg.configured:
+        robot.link = "cloud"
+        print("[provision] primer arranque: capturo la identidad del robot de la nube")
+    else:
+        saved_link = _load_link()      # respeta el último modo elegido (local/cloud)
+        if saved_link:
+            robot.link = saved_link
 
     robot.on_update = on_update
     robot.on_map = on_map
     robot.on_pose = lambda: asyncio.run_coroutine_threadsafe(broadcast_pose(), loop)
     robot.on_orders = lambda: asyncio.run_coroutine_threadsafe(broadcast_orders(), loop)
+    robot.on_provision = on_provision
     try:
         robot.start()
     except Exception as e:

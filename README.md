@@ -77,12 +77,18 @@ Abre **http://localhost:8000**. Verás la interfaz con el robot simulado: pulsa
 
 ### Modo real (contra tu Conga)
 
-1. Copia `.env.example` a `.env`, pon `CONGA_MODE=real` y rellena los IDs de tu robot
-   (`ROBOT_DID`, `ROBOT_USERID`, `ROBOT_SN`, `ROBOT_MAC`) — salen del login capturado.
+1. Copia `.env.example` a `.env` y pon `CONGA_MODE=real`. **No hace falta rellenar los
+   IDs del robot**: se autocapturan en el primer arranque (ver abajo).
 2. Redirige el DNS de `tcp-cecotec.3irobotix.net` a la IP de esta máquina y abre el
    puerto 9090. Los certificados se generan solos (openssl) si no existen.
-3. Arranca igual (`uvicorn backend.app:app`) y reinicia el robot (corte de luz). En
-   el log verás `[robot] conectado` y el estado real en la interfaz.
+3. Arranca (`uvicorn backend.app:app`) y reinicia el robot (corte de luz). En el log
+   verás `[robot] conectado` y el estado real en la interfaz.
+
+**Autoconfiguración (primer arranque):** si no has puesto los IDs, Clean Assistant
+arranca en modo **pasarela a la nube**, captura la identidad del robot (DID, userid,
+SN, MAC…) de la respuesta de login, la guarda en `identity.json` y **pasa solo a modo
+local**. A partir de ahí funciona sin nube. También puedes elegir el modo a mano en
+**Ajustes → Modo de funcionamiento** (Local / Cloud + Local).
 
 ### Home Assistant (puente MQTT, opcional)
 

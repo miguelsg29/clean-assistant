@@ -72,7 +72,7 @@ class RobotConfig:
     @classmethod
     def from_env(cls, path: str = ".env") -> "RobotConfig":
         e = load_env(path)
-        return cls(
+        cfg = cls(
             did=int(e("ROBOT_DID", "123456")),
             userid=int(e("ROBOT_USERID", "654321")),
             sn=e("ROBOT_SN", "500400000000"),
@@ -88,3 +88,35 @@ class RobotConfig:
             cloud_host=e("CLOUD_HOST", "tcp-cecotec.3irobotix.net"),
             cloud_port=int(e("CLOUD_PORT", "9090")),
         )
+        cfg.apply_identity(load_identity())   # identidad capturada de la nube (si existe) manda
+        return cfg
+
+    def apply_identity(self, ident: dict):
+        """Aplica una identidad capturada (auto-provisión) sobre los IDs del robot."""
+        if not ident:
+            return
+        for k in ("did", "userid"):
+            if ident.get(k) is not None:
+                setattr(self, k, int(ident[k]))
+        for k in ("sn", "mac", "factory_id", "project_type"):
+            if ident.get(k):
+                setattr(self, k, str(ident[k]))
+
+
+IDENTITY_PATH = "identity.json"
+
+
+def load_identity(path: str = IDENTITY_PATH) -> dict:
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def save_identity(ident: dict, path: str = IDENTITY_PATH):
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(ident, f, ensure_ascii=False, indent=1)
+    except Exception:
+        pass

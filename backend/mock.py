@@ -25,6 +25,9 @@ class MockRobot:
         self.pose = None
         self.orders = []           # el mock no tiene horarios reales del robot
         self.link = "local"        # modo de enlace (sin efecto en el mock)
+        self.captured = {}
+        self.on_provision = None
+        self._provisioned = True    # el mock no auto-provisiona
 
     def start(self):
         pass                       # el mock no arranca ningún servidor

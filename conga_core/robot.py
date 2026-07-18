@@ -39,6 +39,9 @@ class RealRobot:
         self.on_map = None             # callback opcional (mapa -> push)
         self.on_pose = None            # callback opcional (solo pose -> push ligero)
         self.on_orders = None          # callback opcional (horarios del robot -> push)
+        self.captured = {}             # identidad capturada de la nube (auto-provisión)
+        self.on_provision = None       # callback cuando se captura la identidad completa
+        self._provisioned = False
         self.log = logger
         self.link = getattr(cfg, "link_mode", "local")   # "local" | "cloud" (pasarela a la nube)
         self._sock = None
@@ -240,6 +243,8 @@ class RealRobot:
         except Exception:
             return
         service = str(msg.get("service") or msg.get("tag") or "")
+        if not self._provisioned and service.endswith("auth/login"):
+            self._capture_login(msg.get("result") or {})   # identidad del robot (nube->robot)
         content = msg.get("content")
         try:
             parsed = json.loads(content) if content else {}
@@ -259,6 +264,8 @@ class RealRobot:
         # acuse del robot ({data:{control,...}}) o comando de la app ({control,...})
         d = parsed.get("data") if isinstance(parsed.get("data"), dict) else parsed
         ctrl = d.get("control") if isinstance(d, dict) else None
+        if not self._provisioned and isinstance(d, dict):
+            self._capture({"did": d.get("did"), "userid": d.get("userid")})
         if ctrl in ("get_quiet", "get_consumables", "get_upgrade_config",
                     "get_voice", "getOrder6090"):
             try:
@@ -269,6 +276,43 @@ class RealRobot:
             extras = {k: v for k, v in d.items() if k != "control"}
             self.log(f"  [cloud][{direction}] {ctrl} "
                      f"{json.dumps(extras, ensure_ascii=False)[:220]}")
+
+    def _capture_login(self, result):
+        """Extrae la identidad del robot de la respuesta de login de la nube."""
+        if not isinstance(result, dict):
+            return
+        data = result.get("data") or {}
+        upd = {"did": result.get("id"),
+               "sn": data.get("SN") or data.get("USERNAME"),
+               "mac": data.get("MAC"),
+               "factory_id": data.get("FACTORY_ID"),
+               "project_type": data.get("PROJECT_TYPE")}
+        bl = data.get("BIND_LIST")
+        if bl:
+            try:
+                upd["userid"] = json.loads(bl)[0]
+            except Exception:
+                pass
+        self._capture(upd)
+
+    def _capture(self, upd):
+        """Acumula campos de identidad; cuando están los esenciales, provisiona."""
+        changed = False
+        for k, v in (upd or {}).items():
+            if v in (None, "", 0, "0"):
+                continue
+            if not self.captured.get(k):
+                self.captured[k] = v
+                changed = True
+        if changed:
+            self.log(f"  [provision] identidad capturada: {self.captured}")
+        if (not self._provisioned and self.captured.get("did")
+                and self.captured.get("userid") and self.on_provision):
+            self._provisioned = True
+            try:
+                self.on_provision()
+            except Exception:
+                pass
 
     def set_link(self, mode):
         """Cambia el modo de enlace ('local'/'cloud'); reinicia la conexión del robot."""

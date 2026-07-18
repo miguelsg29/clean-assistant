@@ -21,6 +21,7 @@ schedules.json
 view.json
 map_cache.json
 link.json
+identity.json
 
 # Docker (volumen de datos local)
 data/
