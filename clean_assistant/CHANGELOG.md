@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.0
+- Gestión de mapas de la casa (Ajustes → "Mapas de la casa"): Clean Assistant recuerda
+  los mapas que va viendo (nombre + casa) y permite cambiar entre ellos (selectMapPlan)
+  y renombrarlos. La lista se forma según los mapas que visitas: el robot no expone la
+  lista completa en local (vive en la nube de Cecotec). Al cambiar de mapa, las zonas y
+  horarios pueden no coincidir (son por mapa).
+
 ## 0.11.2
 - Rediseño del selector de tipo de habitación (pestaña Zonas): desplegable propio con
   el estilo de la app (icono + nombre, acento teal) en vez del desplegable del sistema.

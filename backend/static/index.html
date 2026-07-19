@@ -372,6 +372,11 @@
         <div class="phead">Modo de funcionamiento</div>
         <div class="seg" id="linkSeg"><button data-v="local" aria-pressed="true">Local</button><button data-v="cloud">Cloud + Local</button></div>
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:6px 0 2px">Local: sin nube (la app de Cecotec no llega al robot). Cloud + Local: el robot pasa por la nube real, la app oficial funciona y se capturan sus comandos (útil para depurar).</p>
+
+        <div class="phead">Mapas de la casa</div>
+        <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas/horarios pueden no coincidir: son por mapa.)</p>
+        <div id="mapsList"></div>
+
         <div class="phead">Robot</div>
         <div class="row"><div class="rt"><div class="t">No molestar</div><div class="d" id="quietDesc">—</div></div><button class="toggle" id="quietTog"></button></div>
         <div class="field" style="margin-top:2px"><label>Franja de silencio (inicio – fin)</label>
@@ -389,7 +394,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.11 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.12 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -1142,6 +1147,35 @@
   fetch(BASE+'api/zones').then(function(r){return r.json();}).then(function(d){ZONES=d.zones||[];renderZones();});
   fetch(BASE+'api/schedules').then(function(r){return r.json();}).then(function(d){SCHEDULES=d.schedules||[];renderSchedules();loadSuggested();});
   fetch(BASE+'api/robot/orders').then(function(r){return r.json();}).then(function(d){ROBOT_ORDERS=d.orders||[];renderRobotOrders();});
+  // ---- mapas de la casa (Clean Assistant los va recordando) ----
+  var HOUSE_MAPS={maps:[],active:null};
+  function renderMaps(){
+    var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
+    var ms=HOUSE_MAPS.maps||[];
+    if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.</p>'; return; }
+    ms.forEach(function(m){
+      var d=document.createElement('div'); d.className='zrow';
+      d.innerHTML='<span class="zdot" style="background:var('+(m.active?'--accent':'--faint')+')"></span>'+
+        '<div class="zt"><div class="n"></div><div class="k">'+(m.active?'Activo · '+(m.house||''):(m.house||'—'))+'</div></div>'+
+        (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">Activar</button>')+
+        '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>';
+      d.querySelector('.n').textContent=m.name;
+      var sel=d.querySelector('.mSel');
+      if(sel) sel.addEventListener('click',function(){
+        if(confirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.'))
+          fetch(BASE+'api/maps/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})}).then(function(r){return r.json();});
+      });
+      d.querySelector('.mRen').addEventListener('click',function(){
+        inlineEdit(d.querySelector('.n'), m.name, function(nv){
+          if(nv) fetch(BASE+'api/maps/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id,name:nv})}).then(function(r){return r.json();}).then(function(res){HOUSE_MAPS={maps:res.maps||[],active:res.active};renderMaps();});
+          else renderMaps();
+        });
+      });
+      el.appendChild(d);
+    });
+  }
+  function loadMaps(){ fetch(BASE+'api/maps').then(function(r){return r.json();}).then(function(d){HOUSE_MAPS=d;renderMaps();}).catch(function(){}); }
+  loadMaps();
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');
@@ -1153,6 +1187,7 @@
       else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
       else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}
       else if(m.type==='orders'){ROBOT_ORDERS=m.orders||[];renderRobotOrders();}
+      else if(m.type==='maps'){HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();}
       else if(m.type==='link'){LINKMODE=m.mode||'local';applyLinkSeg();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};

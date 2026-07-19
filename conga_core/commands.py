@@ -142,6 +142,11 @@ def get_map_all(map_id: int):
     return {"control": "getMapAll", "maplist": [{"map_id": int(map_id)}]}
 
 
+def select_map(map_id: int):
+    """Cambia el mapa activo de la casa (selectMapPlan)."""
+    return {"control": "selectMapPlan", "mapid": int(map_id), "planid": 0, "type": 1}
+
+
 # ---------------- zonas (coords en METROS del mapa) ----------------
 def _zone(points, ztype, name, zid, area_type=2):
     return {"PointList": [{"PointX": str(x), "PointY": str(y)} for x, y in points],

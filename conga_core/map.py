@@ -108,6 +108,7 @@ def _parse_protobuf(pb: bytes) -> dict:
     pose = None
     robot = None
     zones = []
+    house = None
     while pos < len(pb):
         try:
             tag, pos = _read_varint(pb, pos)
@@ -163,6 +164,8 @@ def _parse_protobuf(pb: bytes) -> dict:
                 robot = _parse_robot(chunk)
             elif fn == 9:                                 # zona / pared virtual guardada
                 zones.append(_parse_zone(chunk))
+            elif fn == 17:                                # casa actual + sus mapas
+                house = _parse_house(chunk)
             elif fn == 5 and map_name is None:            # nombre del mapa
                 p = 0
                 while p < len(chunk):
@@ -182,7 +185,59 @@ def _parse_protobuf(pb: bytes) -> dict:
         else:
             break
     return {"grid": grid, "rooms": rooms, "map_name": map_name,
-            "params": params, "pose": pose, "robot": robot, "zones": zones}
+            "params": params, "pose": pose, "robot": robot, "zones": zones,
+            "house": house}
+
+
+def _parse_house(chunk: bytes) -> dict:
+    """Campo 17: casa actual y sus mapas. sub1=id casa, sub2=nombre casa,
+    sub5 (rep)=mapa {id(1), nombre(2)}."""
+    hid = hname = None
+    maps = []
+    p = 0
+    while p < len(chunk):
+        st, p = _read_varint(chunk, p)
+        sf, sw = st >> 3, st & 7
+        if sw == 0:
+            v, p = _read_varint(chunk, p)
+            if sf == 1:
+                hid = v
+        elif sw == 2:
+            sl, p = _read_varint(chunk, p)
+            d = chunk[p:p + sl]
+            p += sl
+            if sf == 2:
+                hname = d.decode("utf-8", "replace")
+            elif sf == 5:                                 # un mapa {id, nombre}
+                mid = mname = None
+                q = 0
+                while q < len(d):
+                    t2, q = _read_varint(d, q)
+                    f2, w2 = t2 >> 3, t2 & 7
+                    if w2 == 0:
+                        v2, q = _read_varint(d, q)
+                        if f2 == 1:
+                            mid = v2
+                    elif w2 == 2:
+                        l2, q = _read_varint(d, q)
+                        if f2 == 2:
+                            mname = d[q:q + l2].decode("utf-8", "replace")
+                        q += l2
+                    elif w2 == 5:
+                        q += 4
+                    elif w2 == 1:
+                        q += 8
+                    else:
+                        break
+                if mid is not None:
+                    maps.append({"id": mid, "name": mname or ""})
+        elif sw == 5:
+            p += 4
+        elif sw == 1:
+            p += 8
+        else:
+            break
+    return {"id": hid, "name": hname, "maps": maps}
 
 
 def _parse_zone(chunk: bytes) -> dict:
@@ -336,6 +391,7 @@ def decode_map(frame: bytes) -> dict:
         "robot": robot,
         "charger": charger,
         "stored_zones": stored_zones,     # zonas/paredes virtuales guardadas en el robot
+        "house": info.get("house"),       # casa actual + sus mapas (campo 17)
 
         # origen del mundo para convertir celda(recortada)<->metros en el frontend:
         # metros = (celda_recortada + bbox_min) * res + min

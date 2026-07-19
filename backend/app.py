@@ -22,6 +22,7 @@ from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore, suggested_plans
+from backend.maps import MapStore
 from backend.mqtt_bridge import MqttBridge
 
 STATIC = Path(__file__).parent / "static"
@@ -46,6 +47,7 @@ else:
 clients: set[WebSocket] = set()
 zones = ZoneStore(_data("zones.json"))       # zonas de Clean Assistant (persistentes)
 schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
+house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -244,6 +246,20 @@ async def broadcast_orders():
             clients.discard(ws)
 
 
+def _maps_payload() -> dict:
+    return {"maps": house_maps.as_list(getattr(robot.state, "map_head_id", None)),
+            "active": getattr(robot.state, "map_head_id", None)}
+
+
+async def broadcast_maps():
+    msg = json.dumps({"type": "maps", **_maps_payload()})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 async def broadcast_link():
     msg = json.dumps({"type": "link", "mode": getattr(robot, "link", "local")})
     for ws in list(clients):
@@ -275,6 +291,14 @@ async def lifespan(app: FastAPI):
         asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
         # adopta las zonas creadas en la app de Cecotec (campo 9 del mapa) que no tengamos
         asyncio.run_coroutine_threadsafe(_reconcile_robot_zones(), loop)
+        # recuerda los mapas para poder listarlos y cambiar: el mapa ACTIVO (id fiable =
+        # map_head_id, nombre = campo 5) y también los que liste el campo 17.
+        _m = getattr(robot, "map", None) or {}
+        _ch = house_maps.record(_m.get("house"))
+        _ch = house_maps.record_active(getattr(robot.state, "map_head_id", None),
+                                       _m.get("name")) or _ch
+        if _ch:
+            asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
 
     # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
@@ -317,7 +341,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.11.2", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.12.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -455,6 +479,27 @@ async def _reconcile_robot_zones():
             pass
     if changed:
         await broadcast_zones()
+
+
+# ---- mapas de la casa: listar / cambiar / renombrar (Clean Assistant los va recordando) ----
+@app.get("/api/maps")
+def get_maps():
+    return _maps_payload()
+
+
+@app.post("/api/maps/select")
+async def maps_select(payload: dict):
+    """Cambia el mapa activo (selectMapPlan). Llegará un mapa nuevo por el WS."""
+    robot.command(cmd.select_map(int(payload["id"])))
+    return {"ok": True}
+
+
+@app.post("/api/maps/rename")
+async def maps_rename(payload: dict):
+    """Renombra un mapa en Clean Assistant (alias local; no toca el nombre del robot)."""
+    house_maps.rename(payload["id"], payload.get("name", ""))
+    await broadcast_maps()
+    return {"ok": True, **_maps_payload()}
 
 
 @app.post("/api/room/update")
@@ -650,6 +695,8 @@ async def websocket(ws: WebSocket):
         await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.plans}))
     if getattr(robot, "orders", None):
         await ws.send_text(json.dumps({"type": "orders", "orders": robot.orders}))
+    if house_maps.maps:
+        await ws.send_text(json.dumps({"type": "maps", **_maps_payload()}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto
