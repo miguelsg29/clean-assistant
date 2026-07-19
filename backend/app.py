@@ -121,6 +121,11 @@ def _map_head_id() -> int:
     return getattr(robot.state, "map_head_id", None) or 1700000000
 
 
+def _active_map():
+    """id del mapa activo (None si aún no se conoce), para filtrar horarios por mapa."""
+    return getattr(robot.state, "map_head_id", None)
+
+
 def _rooms_meta() -> dict:
     m = getattr(robot, "map", None)
     if m and m.get("rooms"):
@@ -220,7 +225,7 @@ async def broadcast_zones():
 
 
 async def broadcast_schedules():
-    msg = json.dumps({"type": "schedules", "schedules": schedules.plans})
+    msg = json.dumps({"type": "schedules", "schedules": schedules.for_map(_active_map())})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -291,14 +296,17 @@ async def lifespan(app: FastAPI):
         asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
         # adopta las zonas creadas en la app de Cecotec (campo 9 del mapa) que no tengamos
         asyncio.run_coroutine_threadsafe(_reconcile_robot_zones(), loop)
-        # recuerda los mapas para poder listarlos y cambiar: el mapa ACTIVO (id fiable =
-        # map_head_id, nombre = campo 5) y también los que liste el campo 17.
+        # recuerda el mapa ACTIVO (id fiable = map_head_id). El nombre se toma del campo 17
+        # SOLO si su id coincide con el activo (campo 17/5 sueltos no son fiables tras cambiar).
         _m = getattr(robot, "map", None) or {}
-        _ch = house_maps.record(_m.get("house"))
-        _ch = house_maps.record_active(getattr(robot.state, "map_head_id", None),
-                                       _m.get("name")) or _ch
-        if _ch:
-            asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
+        _aid = getattr(robot.state, "map_head_id", None)
+        _house = _m.get("house") or {}
+        _name = next((mm.get("name") for mm in _house.get("maps", []) if mm.get("id") == _aid), None)
+        house_maps.record_active(_aid, _name or _m.get("name"), _house.get("name") or "")
+        # reenvía siempre: al cambiar de mapa cambia el "activo" aunque la lista no cambie
+        asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
+        # al cambiar de mapa, los horarios visibles son los de ese mapa
+        asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
 
     # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
@@ -341,7 +349,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.12.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.13.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -502,6 +510,18 @@ async def maps_rename(payload: dict):
     return {"ok": True, **_maps_payload()}
 
 
+@app.post("/api/maps/delete")
+async def maps_delete(payload: dict):
+    """Borra un mapa del robot (selectMapPlan type=2). No se permite el activo."""
+    mid = int(payload["id"])
+    if mid == getattr(robot.state, "map_head_id", None):
+        return {"ok": False, "error": "no se puede borrar el mapa activo; cambia a otro primero"}
+    robot.command(cmd.delete_map(mid))
+    house_maps.remove(mid)
+    await broadcast_maps()
+    return {"ok": True, **_maps_payload()}
+
+
 @app.post("/api/room/update")
 async def room_update(payload: dict):
     """Cambia nombre y/o tipo de suelo de una habitación (setPlanData6090, lista completa)."""
@@ -543,7 +563,7 @@ async def room_update(payload: dict):
 
 @app.get("/api/schedules")
 def get_schedules():
-    return {"schedules": schedules.plans}
+    return {"schedules": schedules.for_map(_active_map())}
 
 
 @app.get("/api/schedules/suggested")
@@ -551,7 +571,7 @@ def get_suggested_schedules():
     """Planes sugeridos según el mapa (dormitorios / baños / limpieza profunda).
     Se omiten los que ya existen (por nombre)."""
     rooms = (getattr(robot, "map", None) or {}).get("rooms", [])
-    existing = {(p.get("name") or "").lower() for p in schedules.plans}
+    existing = {(p.get("name") or "").lower() for p in schedules.for_map(_active_map())}
     sug = [s for s in suggested_plans(rooms) if s["name"].lower() not in existing]
     return {"suggested": sug}
 
@@ -559,11 +579,12 @@ def get_suggested_schedules():
 @app.post("/api/schedules/save")
 async def schedule_save(payload: dict):
     plan = payload.get("plan") or payload
+    plan.setdefault("mapid", _active_map())      # el horario pertenece al mapa activo
     p = schedules.upsert(plan)
     robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
     await broadcast_schedules()
     mqtt.publish_discovery()          # añade/refresca el switch del horario en HA
-    return {"ok": True, "plan": p, "schedules": schedules.plans}
+    return {"ok": True, "plan": p, "schedules": schedules.for_map(_active_map())}
 
 
 @app.post("/api/schedules/toggle")
@@ -573,7 +594,7 @@ async def schedule_toggle(payload: dict):
         robot.command(schedules.order_command(p, _map_head_id(), _rooms_meta()))
         mqtt.reflect_schedule(p)
     await broadcast_schedules()
-    return {"ok": True, "schedules": schedules.plans}
+    return {"ok": True, "schedules": schedules.for_map(_active_map())}
 
 
 @app.post("/api/schedules/delete")
@@ -583,7 +604,7 @@ async def schedule_delete(payload: dict):
         robot.command(schedules.delete_command(p))
         mqtt.forget_schedule(p["id"])   # retira el switch del horario en HA
     await broadcast_schedules()
-    return {"ok": True, "schedules": schedules.plans}
+    return {"ok": True, "schedules": schedules.for_map(_active_map())}
 
 
 # ---- horarios REALES guardados en el robot (getOrder6090), incluidos los de la app Cecotec ----
@@ -692,7 +713,7 @@ async def websocket(ws: WebSocket):
     if zones.zones:
         await ws.send_text(json.dumps({"type": "zones", "zones": zones.zones}))
     if schedules.plans:
-        await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.plans}))
+        await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.for_map(_active_map())}))
     if getattr(robot, "orders", None):
         await ws.send_text(json.dumps({"type": "orders", "orders": robot.orders}))
     if house_maps.maps:

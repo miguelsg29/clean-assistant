@@ -78,6 +78,14 @@ class MapStore:
             self._save()
         return changed
 
+    def remove(self, mid) -> bool:
+        n = len(self.maps)
+        self.maps = [x for x in self.maps if x["id"] != int(mid)]
+        if len(self.maps) != n:
+            self._save()
+            return True
+        return False
+
     def rename(self, mid, alias: str) -> dict | None:
         m = next((x for x in self.maps if x["id"] == int(mid)), None)
         if m is not None:

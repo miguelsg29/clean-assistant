@@ -113,6 +113,20 @@ class ScheduleStore:
         self._save()
         return plan
 
+    def for_map(self, mapid):
+        """Horarios del mapa dado. Los antiguos (sin mapid) se asignan al mapa activo
+        la primera vez que se consultan (antes solo había un mapa)."""
+        if mapid is None:
+            return list(self.plans)
+        migrated = False
+        for p in self.plans:
+            if p.get("mapid") is None:
+                p["mapid"] = mapid
+                migrated = True
+        if migrated:
+            self._save()
+        return [p for p in self.plans if p.get("mapid") == mapid]
+
     def delete(self, pid: str) -> dict | None:
         p = next((x for x in self.plans if x.get("id") == pid), None)
         if p:
@@ -129,7 +143,9 @@ class ScheduleStore:
 
     # --- comandos para el robot ---
     def order_command(self, plan: dict, map_head_id: int, rooms_meta=None):
-        return cmd.build_order(plan, map_head_id, rooms_meta, plan.get("enable", True))
+        # el horario se guarda en SU mapa (mapid del plan), no en el activo
+        mid = plan.get("mapid") or map_head_id
+        return cmd.build_order(plan, mid, rooms_meta, plan.get("enable", True))
 
     def delete_command(self, plan: dict):
         return cmd.delete_order(cmd._order_id(plan))

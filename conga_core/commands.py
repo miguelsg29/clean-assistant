@@ -142,9 +142,14 @@ def get_map_all(map_id: int):
     return {"control": "getMapAll", "maplist": [{"map_id": int(map_id)}]}
 
 
-def select_map(map_id: int):
-    """Cambia el mapa activo de la casa (selectMapPlan)."""
-    return {"control": "selectMapPlan", "mapid": int(map_id), "planid": 0, "type": 1}
+def select_map(map_id: int, op: int = 1):
+    """selectMapPlan: op 1 = activar el mapa, op 2 = borrarlo."""
+    return {"control": "selectMapPlan", "mapid": int(map_id), "planid": 0, "type": int(op)}
+
+
+def delete_map(map_id: int):
+    """Borra un mapa de la casa (selectMapPlan type=2)."""
+    return select_map(map_id, 2)
 
 
 # ---------------- zonas (coords en METROS del mapa) ----------------

@@ -394,7 +394,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.12 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.13 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -1156,14 +1156,23 @@
     ms.forEach(function(m){
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+(m.active?'--accent':'--faint')+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k">'+(m.active?'Activo · '+(m.house||''):(m.house||'—'))+'</div></div>'+
+        '<div class="zt"><div class="n"></div>'+(m.active?'<div class="k">Activo</div>':'')+'</div>'+
         (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">Activar</button>')+
-        '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>';
+        '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>'+
+        (m.active?'':'<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>');
       d.querySelector('.n').textContent=m.name;
       var sel=d.querySelector('.mSel');
       if(sel) sel.addEventListener('click',function(){
-        if(confirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.'))
+        if(confirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.')){
+          HOUSE_MAPS.maps.forEach(function(x){x.active=(x.id===m.id);}); HOUSE_MAPS.active=m.id; renderMaps();   // feedback inmediato
           fetch(BASE+'api/maps/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})}).then(function(r){return r.json();});
+        }
+      });
+      var del=d.querySelector('.mDel');
+      if(del) del.addEventListener('click',function(){
+        if(confirm('¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.'))
+          fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})
+            .then(function(r){return r.json();}).then(function(res){ if(res.maps){HOUSE_MAPS={maps:res.maps,active:res.active};renderMaps();} });
       });
       d.querySelector('.mRen').addEventListener('click',function(){
         inlineEdit(d.querySelector('.n'), m.name, function(nv){

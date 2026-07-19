@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.13.0
+- Borrar mapas: botón para eliminar del robot un mapa que no sea el activo
+  (selectMapPlan type=2).
+- Horarios por mapa: cada horario pertenece a su mapa y solo se ven/ejecutan los del
+  mapa activo; los de otros mapas aparecen al cambiar a ese mapa. Los horarios antiguos
+  se asignan al mapa activo la primera vez.
+- Arreglado el botón "Activar" de mapa: la lista se actualiza al instante al cambiar.
+- La lista de mapas muestra solo el nombre del mapa (sin la casa) y con nombre fiable.
+
 ## 0.12.0
 - Gestión de mapas de la casa (Ajustes → "Mapas de la casa"): Clean Assistant recuerda
   los mapas que va viendo (nombre + casa) y permite cambiar entre ellos (selectMapPlan)
