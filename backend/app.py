@@ -367,7 +367,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.14.1", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.15.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -551,6 +551,24 @@ async def maps_delete(payload: dict):
     house_maps.remove(mid)
     await broadcast_maps()
     return {"ok": True, **_maps_payload()}
+
+
+@app.post("/api/rooms/merge")
+async def rooms_merge(payload: dict):
+    """Une habitaciones (mergeRoom). El robot devolverá un mapa nuevo con el cambio."""
+    ids = payload.get("rooms") or []
+    if len(ids) < 2:
+        return {"ok": False, "error": "elige 2 habitaciones"}
+    robot.command(cmd.merge_rooms(_map_head_id(), ids))
+    return {"ok": True}
+
+
+@app.post("/api/rooms/split")
+async def rooms_split(payload: dict):
+    """Separa una habitación con una línea de corte (splitRoom). start/end en metros."""
+    robot.command(cmd.split_room(_map_head_id(), int(payload["room"]),
+                                 payload["start"], payload["end"]))
+    return {"ok": True}
 
 
 @app.post("/api/room/update")

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.15.0
+- Unir y separar habitaciones (pestaña Zonas → "Editar habitaciones"): "Unir" (toca
+  dos habitaciones en el mapa) y "Separar" (dibuja una línea de corte cruzando una
+  habitación). Usa mergeRoom / splitRoom; el mapa se actualiza al aplicarlo.
+
 ## 0.14.1
 - Crear mapa: ahora se GUARDA. Al terminar el mapeo (el robot vuelve solo a la base),
   Clean Assistant envía `setSaveMap` para conservar el mapa nuevo. Antes faltaba ese

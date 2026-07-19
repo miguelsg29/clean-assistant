@@ -210,6 +210,7 @@
   .zbtns .btn{padding:10px;font-size:12.5px}
   .zrow .iconbtn{width:28px;height:28px;font-size:13px}
   .btn.zadd.arming{outline:2px solid var(--ink);outline-offset:2px}
+  .btn.arming{outline:2px solid var(--accent);outline-offset:2px}
   .hint.armed{color:var(--accent);font-weight:600}
   .cons{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--line)}
   .cons:first-of-type{border-top:none}
@@ -323,6 +324,14 @@
           <button class="btn zadd" data-kind="nomop" style="background:var(--water);box-shadow:none">+ Sin fregona</button>
           <button class="btn zadd" data-kind="clean">+ Limpieza</button>
         </div>
+
+        <div class="phead" style="margin-top:18px">Editar habitaciones</div>
+        <p class="hint" id="roomEditHint" style="opacity:.65;font-size:11.5px;margin:0 0 6px">Une dos habitaciones en una, o separa una dibujando una línea de corte sobre el mapa.</p>
+        <div class="zbtns">
+          <button class="btn ghost" id="mergeBtn">Unir habitaciones</button>
+          <button class="btn ghost" id="splitBtn">Separar habitación</button>
+        </div>
+
         <div class="phead" style="margin-top:18px">Tipo de suelo por habitación</div>
         <div class="floorlegend">
           <span><i class="sw-suave"></i>Suave</span>
@@ -401,7 +410,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.14 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.15 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <script>
@@ -672,7 +681,7 @@
     octx.putImageData(img,0,0);
     octx.fillStyle=cssVar('--accent'); octx.globalAlpha=0.33;
     for(var j=0;j<CELLS.length;j++){ var vv=CELLS[j];
-      if(vv>1&&vv!==255&&selected.has(vv)) octx.fillRect(j%w,(j/w)|0,1,1); }
+      if(vv>1&&vv!==255&&(selected.has(vv)||(typeof mergeSel!=='undefined'&&mergeSel.indexOf(vv)>=0))) octx.fillRect(j%w,(j/w)|0,1,1); }
     octx.globalAlpha=1;
     // habitación en limpieza: azul claro (1ª pasada) / azul intenso (2ª pasada)
     var croom=(st&&(st.state==='cleaning'||st.state==='paused'))?(st.cleaning_room||0):0;
@@ -715,6 +724,10 @@
       var X=Math.min.apply(null,xs),Y=Math.min.apply(null,ys),W2=Math.max.apply(null,xs)-X,H2=Math.max.apply(null,ys)-Y;
       ctx.fillStyle=dcol; ctx.globalAlpha=0.18; ctx.fillRect(X,Y,W2,H2); ctx.globalAlpha=1;
       ctx.strokeStyle=dcol; ctx.lineWidth=Math.max(2,scale); ctx.setLineDash([scale*2,scale*1.5]); ctx.strokeRect(X,Y,W2,H2); ctx.setLineDash([]); }
+    // línea de corte (separar habitación)
+    if(drawRect&&typeof roomEdit!=='undefined'&&roomEdit==='split'){ var la=s2v(drawRect[0][0],drawRect[0][1]), lb=s2v(drawRect[1][0],drawRect[1][1]);
+      ctx.strokeStyle=cssVar('--accent'); ctx.lineWidth=Math.max(2.5,scale*1.2); ctx.lineCap='round'; ctx.setLineDash([scale*2,scale*1.5]);
+      ctx.beginPath(); ctx.moveTo(la[0]*scale,la[1]*scale); ctx.lineTo(lb[0]*scale,lb[1]*scale); ctx.stroke(); ctx.setLineDash([]); }
     sizeOverlay(); drawRobot();
   }
 
@@ -908,16 +921,61 @@
     b.addEventListener('click',function(){ drawKind===b.dataset.kind ? exitDraw() : enterDraw(b.dataset.kind,b); });
   });
 
+  // ---- unir / separar habitaciones ----
+  var roomEdit=null, mergeSel=[], splitStart=null;   // roomEdit: null | 'merge' | 'split'
+  function roomEditHint(t){ var h=document.getElementById('roomEditHint'); if(h)h.textContent=t; }
+  function exitRoomEdit(){ roomEdit=null; mergeSel=[]; splitStart=null; drawRect=null;
+    document.getElementById('mergeBtn').classList.remove('arming'); document.getElementById('splitBtn').classList.remove('arming');
+    roomEditHint('Une dos habitaciones en una, o separa una dibujando una línea de corte sobre el mapa.');
+    if(MAP&&!MAP.sample)renderRealMap();
+  }
+  function mergeTap(v){
+    var i=mergeSel.indexOf(v); if(i>=0){mergeSel.splice(i,1);} else {mergeSel.push(v);}
+    if(mergeSel.length>=2){
+      var ids=mergeSel.slice(0,2);
+      fetch(BASE+'api/rooms/merge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rooms:ids})}).then(function(r){return r.json();});
+      roomEditHint('Uniendo '+roomName(ids[0])+' + '+roomName(ids[1])+'… el mapa se actualizará en unos segundos.');
+      roomEdit=null; mergeSel=[]; document.getElementById('mergeBtn').classList.remove('arming');
+    } else { roomEditHint('«'+roomName(v)+'» seleccionada. Toca otra habitación para unirlas.'); }
+    if(MAP&&!MAP.sample)renderRealMap();
+  }
+  document.getElementById('mergeBtn').addEventListener('click',function(){
+    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    if(roomEdit==='merge'){ exitRoomEdit(); return; }
+    exitDraw(); exitRoomEdit(); roomEdit='merge'; this.classList.add('arming');
+    roomEditHint('Toca 2 habitaciones en el mapa para unirlas.');
+  });
+  document.getElementById('splitBtn').addEventListener('click',function(){
+    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    if(roomEdit==='split'){ exitRoomEdit(); return; }
+    exitDraw(); exitRoomEdit(); roomEdit='split'; this.classList.add('arming');
+    roomEditHint('Dibuja una línea de corte cruzando la habitación que quieras separar.');
+  });
+
   var cvEl=document.getElementById('mapCanvas');
   cvEl.addEventListener('pointerdown',function(e){
-    if(!MAP||MAP.sample||!CELLS||!drawKind)return;
+    if(!MAP||MAP.sample||!CELLS)return;
+    if(roomEdit==='split'){ cvEl.setPointerCapture(e.pointerId); splitStart=evtCell(e); drawRect=[splitStart,splitStart]; e.preventDefault(); return; }
+    if(!drawKind)return;
     cvEl.setPointerCapture(e.pointerId); drawStart=evtCell(e); drawRect=[drawStart,drawStart]; e.preventDefault();
   });
   cvEl.addEventListener('pointermove',function(e){
     if(drawKind&&drawStart){ drawRect=[drawStart,evtCell(e)]; renderRealMap(); }
+    else if(roomEdit==='split'&&splitStart){ drawRect=[splitStart,evtCell(e)]; renderRealMap(); }
   });
   cvEl.addEventListener('pointerup',function(e){
     if(!MAP||MAP.sample||!CELLS)return;
+    if(roomEdit==='split'&&splitStart){
+      var s=splitStart, end=evtCell(e); splitStart=null; drawRect=null;
+      var sx=Math.floor(s[0]), sy=Math.floor(s[1]), w=MAP.bbox[2];
+      var room=(sx>=0&&sy>=0&&sx<w&&sy<MAP.bbox[3])?CELLS[sy*w+sx]:0;
+      if(room>1&&room!==255&&(Math.abs(end[0]-s[0])>3||Math.abs(end[1]-s[1])>3)){
+        fetch(BASE+'api/rooms/split',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,start:cellToWorld(s[0],s[1]),end:cellToWorld(end[0],end[1])})}).then(function(r){return r.json();});
+        roomEditHint('Separando «'+roomName(room)+'»… el mapa se actualizará en unos segundos.');
+        exitRoomEdit();
+      } else { roomEditHint('Empieza la línea DENTRO de la habitación y cruza hasta el otro lado.'); renderRealMap(); }
+      return;
+    }
     if(drawKind&&drawStart){
       var end=evtCell(e), x0=Math.min(drawStart[0],end[0]),y0=Math.min(drawStart[1],end[1]),
           x1=Math.max(drawStart[0],end[0]),y1=Math.max(drawStart[1],end[1]), kind=drawKind;
@@ -936,7 +994,9 @@
       } else { exitDraw(); renderRealMap(); }
     } else {
       var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];
-      if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x]; if(v>1&&v!==255)toggleRoom(v); }
+      if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x];
+        if(v>1&&v!==255){ if(roomEdit==='merge'){ mergeTap(v); } else { toggleRoom(v); } }
+      }
     }
   });
 

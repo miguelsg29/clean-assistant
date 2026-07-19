@@ -171,6 +171,20 @@ def save_map(replace_id: int = 0, is_save: bool = True):
     return {"control": "setSaveMap", "replaceMapId": int(replace_id), "isSave": 1 if is_save else 0}
 
 
+# ---------------- dividir/unir habitaciones ----------------
+def merge_rooms(map_id: int, room_ids):
+    """Une dos (o más) habitaciones en una (mergeRoom)."""
+    return {"control": "mergeRoom", "mapId": int(map_id),
+            "roomsId": [int(r) for r in room_ids]}
+
+
+def split_room(map_id: int, room_id: int, start, end):
+    """Separa una habitación con una línea de corte (splitRoom). start/end en METROS."""
+    return {"control": "splitRoom", "mapId": int(map_id), "roomId": int(room_id),
+            "startX": float(start[0]), "startY": float(start[1]),
+            "endX": float(end[0]), "endY": float(end[1])}
+
+
 # ---------------- zonas (coords en METROS del mapa) ----------------
 def _zone(points, ztype, name, zid, area_type=2):
     return {"PointList": [{"PointX": str(x), "PointY": str(y)} for x, y in points],
