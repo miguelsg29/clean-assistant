@@ -152,6 +152,19 @@ def delete_map(map_id: int):
     return select_map(map_id, 2)
 
 
+def edit_map_info(house_name: str, map_name: str, house_id: int | None = None, map_count: int = 10):
+    """Fija los nombres antes de mapear (setEditInfoBeforeHand). House_id nuevo = casa nueva."""
+    import time
+    return {"control": "setEditInfoBeforeHand", "house_name": house_name,
+            "House_id": int(house_id or time.time()), "current_map_name": map_name,
+            "map_count": map_count}
+
+
+def start_new_map():
+    """Inicia un mapeo nuevo: el robot recorre la casa y crea el mapa (set_mode type=7)."""
+    return {"control": "set_mode", "mapid": 0, "type": 7, "value": 1}
+
+
 # ---------------- zonas (coords en METROS del mapa) ----------------
 def _zone(points, ztype, name, zid, area_type=2):
     return {"PointList": [{"PointX": str(x), "PointY": str(y)} for x, y in points],

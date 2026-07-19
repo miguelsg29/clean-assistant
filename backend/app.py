@@ -301,8 +301,11 @@ async def lifespan(app: FastAPI):
         _m = getattr(robot, "map", None) or {}
         _aid = getattr(robot.state, "map_head_id", None)
         _house = _m.get("house") or {}
-        _name = next((mm.get("name") for mm in _house.get("maps", []) if mm.get("id") == _aid), None)
-        house_maps.record_active(_aid, _name or _m.get("name"), _house.get("name") or "")
+        _match = next((mm for mm in _house.get("maps", []) if mm.get("id") == _aid), None)
+        if _match:                 # campo 17 coherente con el mapa activo -> nombre y casa fiables
+            house_maps.record_active(_aid, _match.get("name"), _house.get("name") or "")
+        else:                      # dato de casa no fiable: registra solo id/nombre (campo 5)
+            house_maps.record_active(_aid, _m.get("name"))
         # reenvía siempre: al cambiar de mapa cambia el "activo" aunque la lista no cambie
         asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
         # al cambiar de mapa, los horarios visibles son los de ese mapa
@@ -349,7 +352,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.13.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.14.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -508,6 +511,17 @@ async def maps_rename(payload: dict):
     house_maps.rename(payload["id"], payload.get("name", ""))
     await broadcast_maps()
     return {"ok": True, **_maps_payload()}
+
+
+@app.post("/api/maps/create")
+async def maps_create(payload: dict):
+    """Crea un mapa nuevo: fija nombres (casa+mapa) y arranca el mapeo. El robot
+    recorrerá la casa para construirlo."""
+    name = (payload.get("name") or "Mapa nuevo").strip()
+    house = (payload.get("house") or name).strip()
+    robot.command(cmd.edit_map_info(house, name))
+    robot.command(cmd.start_new_map())
+    return {"ok": True}
 
 
 @app.post("/api/maps/delete")

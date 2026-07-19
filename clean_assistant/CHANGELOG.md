@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0
+- Crear mapa nuevo: botón en "Mapas de la casa" para poner nombre de mapa + casa y
+  que el robot empiece a mapear (recorre la casa). Con esto la gestión de mapas queda
+  completa: listar, cambiar, renombrar, borrar y crear.
+- La lista de mapas muestra el nombre de la casa junto al del mapa ("Interior · Casa").
+
 ## 0.13.0
 - Borrar mapas: botón para eliminar del robot un mapa que no sea el activo
   (selectMapPlan type=2).
