@@ -17,6 +17,31 @@ def _slug(name: str) -> str:
     return s or f"plan_{int(time.time())}"
 
 
+# escalas inversas (valor del robot -> nombre) para reconstruir un plan desde getOrder6090
+_FAN_REV = {v: k for k, v in cmd.FAN.items()}
+_WATER_REV = {v: k for k, v in cmd.WATER.items()}
+_MOP_REV = {v: k for k, v in cmd.MOP.items()}
+_WD_REV = [("dom", 1), ("lun", 2), ("mar", 4), ("mie", 8), ("jue", 16), ("vie", 32), ("sab", 64)]
+
+
+def plan_from_order(order: dict, mapid) -> dict:
+    """Convierte un horario del robot (getOrder6090) en un plan de Clean Assistant."""
+    mins = int(order.get("day_time", 0) or 0)
+    wd = int(order.get("weekday", 0) or 0)
+    rooms = []
+    for r in order.get("roomPer", []) or []:
+        rooms.append({"room": r.get("room_id"),
+                      "fan": _FAN_REV.get(r.get("windpower"), "Normal"),
+                      "water": _WATER_REV.get(r.get("waterlevel"), "Medio"),
+                      "mop": _MOP_REV.get(r.get("shake_shift"), "Estándar"),
+                      "twice": bool(r.get("twiceclean"))})
+    return {"name": order.get("order_name") or f"Horario {order.get('orderid')}",
+            "time": f"{(mins // 60) % 24:02d}:{mins % 60:02d}",
+            "days": [k for k, b in _WD_REV if wd & b], "rooms": rooms,
+            "enable": bool(order.get("enable", 1)), "mapid": mapid,
+            "orderid": order.get("orderid")}
+
+
 # Categoría de habitación = dos últimos dígitos del roomTypeId. El robot usa varias
 # familias (2001 y 2101 = dormitorio; 2006 y 2106 = salón), por eso miramos type % 100.
 CAT_BEDROOM, CAT_BATHROOM, CAT_LIVING = 1, 3, 6   # 1=dorm, 3=baño, 4=pasillo, 5=cocina, 6=salón

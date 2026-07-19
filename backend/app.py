@@ -21,7 +21,7 @@ from conga_core import map as cmap
 from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
-from backend.schedules import ScheduleStore, suggested_plans
+from backend.schedules import ScheduleStore, suggested_plans, plan_from_order
 from backend.maps import MapStore
 from backend.mqtt_bridge import MqttBridge
 
@@ -50,6 +50,8 @@ schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
 # seguimiento de un mapeo nuevo en curso: al volver a la base tras mapear -> setSaveMap
 _new_map = {"pending": False, "moved": False}
+# tras cambiar de mapa, cargar los horarios de ese mapa cuando el robot lo tenga activo
+_pending_orders = {"map": None}
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -305,6 +307,17 @@ async def lifespan(app: FastAPI):
                     print("[mapa] mapeo completado -> setSaveMap (guardar mapa nuevo)")
                 except Exception:
                     pass
+        # tras cambiar de mapa: cuando el robot ya lo tiene activo, cargar sus horarios
+        if _pending_orders["map"] and getattr(robot.state, "map_head_id", None) == _pending_orders["map"]:
+            mid = _pending_orders["map"]
+            _pending_orders["map"] = None
+            try:
+                for p in schedules.for_map(mid):
+                    robot.command(schedules.order_command(p, mid, _rooms_meta()))
+                robot.query_orders()
+                print(f"[mapa] cargados {len(schedules.for_map(mid))} horario(s) del mapa {mid}")
+            except Exception:
+                pass
 
     def on_map():
         _save_map()                # persiste el último mapa para verlo tras reiniciar
@@ -367,7 +380,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.15.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -513,10 +526,37 @@ def get_maps():
     return _maps_payload()
 
 
+def _import_robot_orders(mapid):
+    """Guarda en Clean Assistant los horarios que el robot tiene ahora (getOrder6090)
+    y que aún no tengamos (p. ej. creados en la app), asociados al mapa dado."""
+    have_ids = {str(p.get("orderid")) for p in schedules.plans if p.get("orderid")}
+    have_names = {(p.get("name") or "").lower() for p in schedules.for_map(mapid)}
+    for o in list(getattr(robot, "orders", []) or []):
+        oid = o.get("orderid")
+        if oid and str(oid) in have_ids:
+            continue
+        plan = plan_from_order(o, mapid)
+        if plan["name"].lower() in have_names:
+            continue
+        schedules.upsert(plan)
+
+
 @app.post("/api/maps/select")
 async def maps_select(payload: dict):
-    """Cambia el mapa activo (selectMapPlan). Llegará un mapa nuevo por el WS."""
-    robot.command(cmd.select_map(int(payload["id"])))
+    """Cambia el mapa activo. Antes de cambiar, guarda en Clean Assistant los horarios
+    del mapa actual (si no los tenemos) y los borra del robot; al cargar el mapa nuevo,
+    sube sus horarios. Así el robot solo tiene los del mapa activo."""
+    new_id = int(payload["id"])
+    old_id = _active_map()
+    if old_id and old_id != new_id:
+        _import_robot_orders(old_id)                      # 1) guardar los del robot que falten
+        for o in list(getattr(robot, "orders", []) or []):   # 2) borrarlos del robot
+            if o.get("orderid"):
+                robot.command(cmd.delete_order(o["orderid"]))
+        robot.orders = []
+    robot.command(cmd.select_map(new_id))                 # 3) cambiar de mapa
+    _pending_orders["map"] = new_id                       # 4) al activarse, cargar sus horarios
+    await broadcast_schedules()
     return {"ok": True}
 
 

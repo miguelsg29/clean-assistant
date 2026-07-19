@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.0
+- Sincronización de horarios al cambiar de mapa: antes de cambiar, Clean Assistant
+  guarda los horarios que el robot tiene del mapa actual (si no los tiene ya), los
+  borra del robot, cambia de mapa y carga los del mapa nuevo. Así el robot solo tiene
+  los horarios del mapa activo. Incluye conversor de horario del robot (getOrder6090)
+  a plan de Clean Assistant.
+
 ## 0.15.0
 - Unir y separar habitaciones (pestaña Zonas → "Editar habitaciones"): "Unir" (toca
   dos habitaciones en el mapa) y "Separar" (dibuja una línea de corte cruzando una
