@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.11.2
+- Rediseño del selector de tipo de habitación (pestaña Zonas): desplegable propio con
+  el estilo de la app (icono + nombre, acento teal) en vez del desplegable del sistema.
+- Emojis más grandes y alineados (ancho fijo y centrado) en el nombre de la habitación
+  y en el selector de tipo.
+
 ## 0.11.1
 - Las zonas creadas en la app de Cecotec aparecen ahora automáticamente en la lista de
   Clean Assistant (se adoptan del mapa del robot, sin duplicar las que ya tienes).

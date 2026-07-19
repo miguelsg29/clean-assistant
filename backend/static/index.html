@@ -147,6 +147,22 @@
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+  /* desplegable propio de tipo de habitación (mismo look que la app) */
+  .rtsel{position:relative}
+  /* icono de tipo: ancho fijo + centrado para que alinee bien (los emojis descuadran) */
+  .rtico{font-size:19px;line-height:1;width:24px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 24px}
+  .rtsel .cur{display:flex;align-items:center;gap:9px;width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:11px;background:var(--surface);color:var(--ink);font:540 13.5px var(--font);cursor:pointer;text-align:left}
+  .rtsel .cur .ic{font-size:19px;line-height:1;width:24px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 24px}
+  .rtsel .cur .lbl{flex:1}
+  .rtsel .cur .chev{color:var(--muted);font-size:10px;transition:transform .2s}
+  .rtsel.open .cur{border-color:var(--accent)}
+  .rtsel.open .cur .chev{transform:rotate(180deg)}
+  .rtmenu{position:absolute;top:calc(100% + 5px);left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-lg);padding:5px;display:none;grid-template-columns:1fr 1fr;gap:3px}
+  .rtsel.open .rtmenu{display:grid}
+  .rtopt{display:flex;align-items:center;gap:9px;padding:9px 9px;border-radius:9px;cursor:pointer;font-size:13px;color:var(--ink)}
+  .rtopt .ic{font-size:18px;line-height:1;width:22px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 22px}
+  .rtopt:hover{background:var(--inset)}
+  .rtopt.sel{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
   .field{margin-bottom:14px}
   .field>label{display:block;font-size:12.5px;font-weight:560;color:var(--muted);margin-bottom:7px}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;cursor:pointer;font:600 14.5px var(--font);padding:13px;border-radius:13px;background:var(--accent);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 34%,transparent)}
@@ -800,6 +816,8 @@
 
   // ---- tipo de suelo por habitación (setPlanData6090) ----
   var FLOORS=['Suave','Azulejos','Madera','Alfombra'];   // roomMaterialId 1..4
+  function closeAllRtsel(){ document.querySelectorAll('.rtsel.open').forEach(function(x){x.classList.remove('open');}); }
+  document.addEventListener('click',closeAllRtsel);   // cerrar el desplegable de tipo al pulsar fuera
   function renderFloors(){
     var el=document.getElementById('floorList'); if(!el)return; el.innerHTML='';
     var rooms=(MAP&&!MAP.sample?(MAP.rooms||[]):[]).filter(function(r){return r.named!==false;});
@@ -807,7 +825,7 @@
     rooms.forEach(function(r){
       var row=document.createElement('div'); row.className='frow'; row.style.cssText='display:flex;flex-direction:column;gap:7px;align-items:stretch';
       var nm=document.createElement('div'); nm.className='fn';
-      var ic=document.createElement('span'); ic.className='rtico'; ic.textContent=typeIcon(r.type); ic.style.marginRight='6px';
+      var ic=document.createElement('span'); ic.className='rtico'; ic.textContent=typeIcon(r.type);
       var nt=document.createElement('span'); nt.className='fnt'; nt.textContent=r.name;
       var ed=document.createElement('button'); ed.className='iconbtn fren'; ed.textContent='✎';
       ed.title='Renombrar habitación'; ed.setAttribute('aria-label','Renombrar habitación');
@@ -818,18 +836,26 @@
         });
       });
       nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
-      // selector de TIPO de habitación (desplegable con icono + nombre)
+      // selector de TIPO de habitación (desplegable propio, con el look de la app)
       var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent='Tipo'; row.appendChild(tlbl);
-      var tsel=document.createElement('select'); tsel.className='tinput typesel';
-      var ti=typeIndex(r.type);
+      var tsel=document.createElement('div'); tsel.className='rtsel';
+      var cur=document.createElement('button'); cur.type='button'; cur.className='cur';
+      var curHTML=function(id){ var i=typeIndex(id), t=(i>=0?ROOMTYPES[i]:{i:'🏠',n:'Sin tipo'}); return '<span class="ic">'+t.i+'</span><span class="lbl">'+t.n+'</span><span class="chev">▾</span>'; };
+      cur.innerHTML=curHTML(r.type);
+      var menu=document.createElement('div'); menu.className='rtmenu';
       ROOMTYPES.forEach(function(t,i){
-        var o=document.createElement('option'); o.value=t.id; o.textContent=t.i+'  '+t.n;
-        if(i===ti)o.selected=true; tsel.appendChild(o);
+        var o=document.createElement('div'); o.className='rtopt'+(i===typeIndex(r.type)?' sel':'');
+        o.innerHTML='<span class="ic">'+t.i+'</span>'+t.n;
+        o.addEventListener('click',function(e){ e.stopPropagation();
+          r.type=t.id; ic.textContent=t.i; cur.innerHTML=curHTML(t.id);
+          menu.querySelectorAll('.rtopt').forEach(function(x){x.classList.remove('sel');}); o.classList.add('sel');
+          tsel.classList.remove('open');
+          setRoomType(r.id,t.id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
+        });
+        menu.appendChild(o);
       });
-      tsel.addEventListener('change',function(){
-        var id=+tsel.value; r.type=id; ic.textContent=typeIcon(id);
-        setRoomType(r.id,id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
-      });
+      cur.addEventListener('click',function(e){ e.stopPropagation(); var open=tsel.classList.contains('open'); closeAllRtsel(); tsel.classList.toggle('open',!open); });
+      tsel.appendChild(cur); tsel.appendChild(menu);
       row.appendChild(tsel);
       // selector de SUELO
       var slbl=document.createElement('div'); slbl.className='rmlbl'; slbl.textContent='Suelo'; row.appendChild(slbl);
