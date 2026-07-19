@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.1
+- Crear mapa: ahora se GUARDA. Al terminar el mapeo (el robot vuelve solo a la base),
+  Clean Assistant envía `setSaveMap` para conservar el mapa nuevo. Antes faltaba ese
+  paso y el mapa se descartaba. Importante: deja que el mapeo termine (no mandes el
+  robot a la base a mano antes de tiempo).
+
 ## 0.14.0
 - Crear mapa nuevo: botón en "Mapas de la casa" para poner nombre de mapa + casa y
   que el robot empiece a mapear (recorre la casa). Con esto la gestión de mapas queda

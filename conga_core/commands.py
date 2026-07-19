@@ -165,6 +165,12 @@ def start_new_map():
     return {"control": "set_mode", "mapid": 0, "type": 7, "value": 1}
 
 
+def save_map(replace_id: int = 0, is_save: bool = True):
+    """Guarda el mapa recién creado tras completar el mapeo (setSaveMap).
+    isSave 1 = conservar, 0 = descartar; replaceMapId 0 = mapa nuevo (no reemplaza)."""
+    return {"control": "setSaveMap", "replaceMapId": int(replace_id), "isSave": 1 if is_save else 0}
+
+
 # ---------------- zonas (coords en METROS del mapa) ----------------
 def _zone(points, ztype, name, zid, area_type=2):
     return {"PointList": [{"PointX": str(x), "PointY": str(y)} for x, y in points],

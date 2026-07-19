@@ -48,6 +48,8 @@ clients: set[WebSocket] = set()
 zones = ZoneStore(_data("zones.json"))       # zonas de Clean Assistant (persistentes)
 schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
+# seguimiento de un mapeo nuevo en curso: al volver a la base tras mapear -> setSaveMap
+_new_map = {"pending": False, "moved": False}
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -290,6 +292,19 @@ async def lifespan(app: FastAPI):
     def on_update():
         asyncio.run_coroutine_threadsafe(broadcast(), loop)
         mqtt.publish_state()
+        # mapeo nuevo: cuando el robot sale a mapear y luego vuelve a la base, guardar el mapa
+        if _new_map["pending"]:
+            s = getattr(robot.state, "state", None)
+            if s not in ("docked", "idle", "charging", None):
+                _new_map["moved"] = True
+            elif _new_map["moved"]:
+                _new_map["pending"] = False
+                _new_map["moved"] = False
+                try:
+                    robot.command(cmd.save_map())     # setSaveMap: conserva el mapa recién creado
+                    print("[mapa] mapeo completado -> setSaveMap (guardar mapa nuevo)")
+                except Exception:
+                    pass
 
     def on_map():
         _save_map()                # persiste el último mapa para verlo tras reiniciar
@@ -352,7 +367,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.14.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.14.1", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -521,6 +536,8 @@ async def maps_create(payload: dict):
     house = (payload.get("house") or name).strip()
     robot.command(cmd.edit_map_info(house, name))
     robot.command(cmd.start_new_map())
+    _new_map["pending"] = True       # al completar el mapeo (volver a base) -> setSaveMap
+    _new_map["moved"] = False
     return {"ok": True}
 
 
