@@ -168,6 +168,17 @@
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;border:none;cursor:pointer;font:600 14.5px var(--font);padding:13px;border-radius:13px;background:var(--accent);color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 34%,transparent)}
   .btn:hover{filter:brightness(1.04)}
   .btn.ghost{background:var(--surface-2);color:var(--ink);box-shadow:none;font-weight:560;font-size:13.5px;padding:11px}
+  /* modal in-app: sustituye a los confirm/alert del navegador (mismo diseño que la app) */
+  .modal-ov{position:fixed;inset:0;background:rgba(10,20,17,.5);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:grid;place-items:center;z-index:200;padding:22px;animation:mfade .12s ease}
+  .modal-ov[hidden]{display:none}
+  @keyframes mfade{from{opacity:0}to{opacity:1}}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-lg);max-width:410px;width:100%;padding:20px 20px 18px}
+  .modal h3{margin:0 0 8px;font-size:16px;font-weight:650;color:var(--ink)}
+  .modal h3:empty{display:none}
+  .modal p{margin:0;font-size:13.5px;line-height:1.5;color:var(--muted);white-space:pre-wrap}
+  .modal .macts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+  .modal .macts .btn{width:auto;padding:9px 18px}
+  .modal .macts .btn[hidden]{display:none}
   .btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
   .btnrow{display:flex;flex-direction:column;gap:9px;margin-top:16px}
   .row{display:flex;align-items:center;gap:12px;padding:13px 0;border-top:1px solid var(--line)}
@@ -231,7 +242,7 @@
   <header class="bar">
     <div class="brand">
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3-7"/><path d="M20 20l-3-7"/><path d="M7 13h10l-1.2-4.5A2 2 0 0 0 13.9 7h-3.8a2 2 0 0 0-1.9 1.5L7 13z"/><path d="M12 7V3"/></svg></div>
-      <div><div class="name">Clean&nbsp;Assistant</div><div class="sub">Conga 8090 Ultra · <span id="hdrMap">control local</span></div></div>
+      <div><div class="name">Clean&nbsp;Assistant</div><div class="sub">Conga 8090 Ultra · control local</div></div>
     </div>
     <div class="status">
       <span class="pill state" id="statePill" data-s="offline"><span class="dot"></span><span id="stateTxt">Conectando…</span></span>
@@ -413,8 +424,46 @@
   <footer>Clean Assistant v0.16 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
 </div>
 
+<div class="modal-ov" id="modalOv" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalT">
+    <h3 id="modalT"></h3>
+    <p id="modalM"></p>
+    <div class="macts">
+      <button class="btn ghost" id="modalCancel">Cancelar</button>
+      <button class="btn" id="modalOk">Aceptar</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
+  // ---- modal in-app (reemplaza confirm/alert del navegador, con el diseño de la app) ----
+  var _mres=null,_mov,_mok,_mcancel;
+  function _modalInit(){
+    _mov=document.getElementById('modalOv');_mok=document.getElementById('modalOk');_mcancel=document.getElementById('modalCancel');
+    _mok.addEventListener('click',function(){_modalClose(true);});
+    _mcancel.addEventListener('click',function(){_modalClose(false);});
+    _mov.addEventListener('click',function(e){if(e.target===_mov)_modalClose(false);});
+    document.addEventListener('keydown',function(e){
+      if(_mov.hidden)return;
+      if(e.key==='Escape'){e.preventDefault();_modalClose(false);}
+      else if(e.key==='Enter'){e.preventDefault();_modalClose(true);}
+    });
+  }
+  function _modalClose(v){ if(_mov.hidden)return; _mov.hidden=true; var r=_mres; _mres=null; if(r)r(v); }
+  function uiModal(o){
+    return new Promise(function(res){
+      _mres=res;
+      document.getElementById('modalT').textContent=o.title||'';
+      document.getElementById('modalM').textContent=o.message||'';
+      _mok.textContent=o.okText||'Aceptar'; _mcancel.textContent=o.cancelText||'Cancelar';
+      _mcancel.hidden=!!o.alert;
+      _mov.hidden=false; setTimeout(function(){_mok.focus();},20);
+    });
+  }
+  function uiConfirm(message,title){ return uiModal({message:message,title:title}); }
+  function uiAlert(message,title){ return uiModal({message:message,title:title,alert:true}); }
+
   var KEY2ID={salon:15,cocina:13,pasillo:16,dorm_p:14,dorm:10,bano:12,bano_p:11};
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
@@ -549,8 +598,8 @@
       d.innerHTML='<span class="cn">'+m.n+'</span><span class="track"><i class="'+cls+'" style="width:'+barw+'%"></i></span>'+
         '<span class="pct '+(cls==='crit'?'crit':'')+'">'+(absurd?'⚠':pct+'%')+'</span>'+
         '<button class="iconbtn consreset" title="Restablecer al cambiar la pieza" aria-label="Restablecer">↺</button>';
-      d.querySelector('.consreset').addEventListener('click',function(){
-        if(confirm('¿Restablecer "'+m.n+'" a 0? Hazlo cuando cambies la pieza.'))
+      d.querySelector('.consreset').addEventListener('click',async function(){
+        if(await uiConfirm('¿Restablecer "'+m.n+'" a 0? Hazlo cuando cambies la pieza.'))
           fetch(BASE+'api/consumable/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})}).then(function(r){return r.json();});
       });
       el.appendChild(d);
@@ -571,6 +620,7 @@
 
   // segmentos con comando
   document.querySelectorAll('.seg').forEach(function(seg){
+    if(seg.id==='linkSeg')return;   // linkSeg tiene su propio manejador (con confirmación); no marcar aquí
     seg.addEventListener('click',function(e){
       var b=e.target.closest('button');if(!b)return;
       seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
@@ -916,7 +966,7 @@
       .then(function(r){return r.json();});
   }
   function enterDraw(kind,btn){
-    if(!MAP||MAP.sample){ alert('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).'); return; }
+    if(!MAP||MAP.sample){ uiAlert('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).'); return; }
     drawKind=kind;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.toggle('arming',b===btn);});
     var h=document.getElementById('zoneHint');
@@ -926,7 +976,7 @@
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
     var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; } }
   function enterMoveZone(z){
-    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
     moveZoneId=z.id; drawKind=z.kind; drawStart=null; drawRect=null;
     var h=document.getElementById('zoneHint'); if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja el nuevo rectángulo para "'+(z.name||ZK[z.kind].l)+'" sobre el mapa.'; }
   }
@@ -953,13 +1003,13 @@
     if(MAP&&!MAP.sample)renderRealMap();
   }
   document.getElementById('mergeBtn').addEventListener('click',function(){
-    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
     if(roomEdit==='merge'){ exitRoomEdit(); return; }
     exitDraw(); exitRoomEdit(); roomEdit='merge'; this.classList.add('arming');
     roomEditHint('Toca 2 habitaciones en el mapa para unirlas.');
   });
   document.getElementById('splitBtn').addEventListener('click',function(){
-    if(!MAP||MAP.sample){ alert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
     if(roomEdit==='split'){ exitRoomEdit(); return; }
     exitDraw(); exitRoomEdit(); roomEdit='split'; this.classList.add('arming');
     roomEditHint('Dibuja una línea de corte cruzando la habitación que quieras separar.');
@@ -1047,7 +1097,7 @@
       card.querySelector('.nm').textContent=p.name||p.id;
       card.querySelector('.sEn').addEventListener('click',function(){ var on=this.getAttribute('aria-pressed')!=='true'; this.setAttribute('aria-pressed',on); toggleSched(p.id,on); });
       card.querySelector('.sEd').addEventListener('click',function(){ openEditor(p); });
-      card.querySelector('.sDel').addEventListener('click',function(){ if(confirm('¿Borrar el horario "'+(p.name||p.id)+'"?')) delSched(p.id); });
+      card.querySelector('.sDel').addEventListener('click',async function(){ if(await uiConfirm('¿Borrar el horario "'+(p.name||p.id)+'"?')) delSched(p.id); });
       el.appendChild(card);
     });
   }
@@ -1170,8 +1220,8 @@
   document.getElementById('cancelSched').addEventListener('click',closeEditor);
   document.getElementById('saveSched').addEventListener('click',function(){
     var p=collectPlan();
-    if(!p.days.length){ alert('Elige al menos un día.'); return; }
-    if(!p.rooms.length){ alert('Elige al menos una habitación.'); return; }
+    if(!p.days.length){ uiAlert('Elige al menos un día.'); return; }
+    if(!p.rooms.length){ uiAlert('Elige al menos una habitación.'); return; }
     fetch(BASE+'api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:p})})
       .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); closeEditor(); });
   });
@@ -1192,8 +1242,8 @@
         '<div class="perroom"><span class="pr">Habitaciones: '+(rooms.join(', ')||'todas')+'</span></div>'+
         '<div class="actions"><button class="btn ghost odel">Borrar del robot</button></div>';
       card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">⚠ sábado</b>':'');
-      card.querySelector('.odel').addEventListener('click',function(){
-        if(confirm('¿Borrar del robot el horario "'+(o.order_name||o.orderid)+'"? (orderid '+o.orderid+')'))
+      card.querySelector('.odel').addEventListener('click',async function(){
+        if(await uiConfirm('¿Borrar del robot el horario "'+(o.order_name||o.orderid)+'"? (orderid '+o.orderid+')'))
           fetch(BASE+'api/robot/orders/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderid:o.orderid})}).then(function(r){return r.json();});
       });
       el.appendChild(card);
@@ -1212,9 +1262,11 @@
 
   // ---- modo de funcionamiento (Local / Cloud + Local) ----
   document.querySelectorAll('#linkSeg button').forEach(function(b){
-    b.addEventListener('click',function(){
+    b.addEventListener('click',async function(){
       var mode=b.dataset.v; if(mode===LINKMODE)return;
-      if(mode==='cloud' && !confirm('Cloud + Local: el robot pasará por la nube de Cecotec (la app oficial funcionará) y se reconectará. ¿Continuar?')){ applyLinkSeg(); return; }
+      if(mode==='cloud' && !(await uiConfirm('El robot pasará por la nube de Cecotec (la app oficial funcionará) y se reconectará. ¿Continuar?','Cloud + Local'))){
+        applyLinkSeg(); b.blur(); return;   // cancelado: no cambiar la selección
+      }
       LINKMODE=mode; applyLinkSeg();
       fetch(BASE+'api/link/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:mode})}).then(function(r){return r.json();});
     });
@@ -1231,8 +1283,7 @@
   var HOUSE_MAPS={maps:[],active:null};
   function renderMaps(){
     var ms=HOUSE_MAPS.maps||[];
-    var act=ms.filter(function(m){return m.active;})[0];   // nombre del mapa activo en la cabecera
-    var hdr=document.getElementById('hdrMap'); if(hdr)hdr.textContent=act?act.name:'control local';
+    var act=ms.filter(function(m){return m.active;})[0];   // nombre del mapa activo (en la esquina del mapa)
     var mt=document.getElementById('mapTitle'); if(mt)mt.textContent=act?act.name:'Sin mapa';
     var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
     if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.</p>'; return; }
@@ -1246,26 +1297,26 @@
         '<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=m.name;
       var sel=d.querySelector('.mSel');
-      if(sel) sel.addEventListener('click',function(){
-        if(confirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.')){
+      if(sel) sel.addEventListener('click',async function(){
+        if(await uiConfirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.')){
           HOUSE_MAPS.maps.forEach(function(x){x.active=(x.id===m.id);}); HOUSE_MAPS.active=m.id; renderMaps();   // feedback inmediato
           fetch(BASE+'api/maps/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})}).then(function(r){return r.json();});
         }
       });
       var del=d.querySelector('.mDel');
-      if(del) del.addEventListener('click',function(){
+      if(del) del.addEventListener('click',async function(){
         var last=(HOUSE_MAPS.maps||[]).length<=1;
         var msg=last
           ? '¿Borrar el último mapa "'+m.name+'"? El robot se quedará SIN mapa; tendrás que crear uno nuevo (remapear) para empezar de cero. No se puede deshacer.'
           : (m.active
             ? '¿Borrar el mapa activo "'+m.name+'"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.'
             : '¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.');
-        if(!confirm(msg))return;
+        if(!(await uiConfirm(msg)))return;
         del.disabled=true; del.textContent='…';
         fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})
           .then(function(r){return r.json();}).then(function(res){
             if(res.maps){HOUSE_MAPS={maps:res.maps,active:res.active};renderMaps();}
-            else{ if(res.error)alert(res.error); del.disabled=false; del.textContent='✕'; }
+            else{ if(res.error)uiAlert(res.error); del.disabled=false; del.textContent='✕'; }
           }).catch(function(){ del.disabled=false; del.textContent='✕'; });
       });
       d.querySelector('.mRen').addEventListener('click',function(){
@@ -1278,18 +1329,19 @@
     });
   }
   function loadMaps(){ fetch(BASE+'api/maps').then(function(r){return r.json();}).then(function(d){HOUSE_MAPS=d;renderMaps();}).catch(function(){}); }
+  _modalInit();
   loadMaps();
   document.getElementById('newMapBtn').addEventListener('click',function(){ var f=document.getElementById('newMapForm'); f.style.display=(f.style.display==='none'?'block':'none'); });
   document.getElementById('nmCancel').addEventListener('click',function(){ document.getElementById('newMapForm').style.display='none'; });
-  document.getElementById('nmCreate').addEventListener('click',function(){
+  document.getElementById('nmCreate').addEventListener('click',async function(){
     var name=document.getElementById('nmName').value.trim(), house=document.getElementById('nmHouse').value.trim();
-    if(!name){ alert('Ponle un nombre al mapa.'); return; }
-    if(!confirm('¿Crear el mapa "'+name+'"? El robot empezará a recorrer la casa para mapearla.')) return;
+    if(!name){ uiAlert('Ponle un nombre al mapa.'); return; }
+    if(!(await uiConfirm('¿Crear el mapa "'+name+'"? El robot empezará a recorrer la casa para mapearla.'))) return;
     fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:house})})
       .then(function(r){return r.json();}).then(function(){
         document.getElementById('newMapForm').style.display='none';
         document.getElementById('nmName').value=''; document.getElementById('nmHouse').value='';
-        alert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
+        uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
       });
   });
   function connect(){

@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.11
+- Ventanas de confirmación/aviso propias de la app (mismo diseño), en vez de las del
+  navegador ("192.168… dice"). Se cierran con Aceptar/Cancelar, Enter/Esc o tocando fuera.
+- Arreglado el selector Local / Cloud + Local: al cancelar la confirmación ya no se queda
+  marcado el botón (antes un manejador genérico lo marcaba igualmente).
+- El nombre del mapa activo ya no se repite arriba junto al logo (solo aparece en la
+  esquina del mapa).
+- Arreglado un fallo por el que, al borrar un mapa recién tras crear otro, se podía copiar
+  el nombre del mapa nuevo a otro mapa.
+
 ## 0.16.10
 - Al crear un mapa, se conserva el NOMBRE (y la casa) que eliges: antes el mapa nuevo
   podía quedarse con el nombre que reportaba el robot (no fiable) y salir con el nombre
