@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.16.6
+- Cabecera del mapa (esquina superior izquierda): muestra el nombre del MAPA ACTIVO (o
+  «Sin mapa»), el estado del robot, y los m² y el tiempo de la última limpieza (se
+  mantienen hasta la siguiente limpieza).
+- Zonas por mapa: en la pestaña Zonas y dibujadas sobre el mapa aparecen SOLO las zonas
+  del mapa activo. Cada zona queda asociada a su mapa (las que había antes se re-adoptan
+  del robot, que guarda las paredes virtuales por mapa).
+- «Horarios guardados en el robot»: ahora muestra solo los del mapa activo (el robot
+  guarda los de todos los mapas, pero solo ejecuta los del activo).
+- Cambio de mapa instantáneo en la interfaz: al cambiar de mapa, el selector, los
+  horarios y las zonas se actualizan al momento (antes había que esperar y refrescar).
+  Además se re-pide el mapa completo del nuevo mapa para traer sus zonas.
+- Diagnóstico: se registra el workMode del robot para identificar el estado durante el
+  mapeo/primera limpieza (que salía como «inactivo»).
+
 ## 0.16.5
 - Ahora SÍ se puede borrar el último mapa y dejar el robot sin ninguno, para empezar de
   cero (el robot admite quedarse sin mapa; la 0.16.4 lo bloqueaba por error).

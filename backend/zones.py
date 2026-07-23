@@ -49,16 +49,31 @@ class ZoneStore:
         except Exception:
             pass
 
-    def add(self, kind: str, points, name: str = "") -> dict:
+    def add(self, kind: str, points, name: str = "", mapid=None) -> dict:
         if kind not in KINDS:
             raise ValueError(f"tipo de zona desconocido: {kind}")
         z = {"id": int(time.time() * 1000) % 2_000_000_000,
              "kind": kind,
              "name": name or KIND_LABEL[kind],
+             "mapid": mapid,
              "points": [[round(float(x), 4), round(float(y), 4)] for x, y in points]}
         self.zones.append(z)
         self._save()
         return z
+
+    def for_map(self, mapid):
+        """Zonas del mapa dado. Las antiguas (sin mapid) se asignan al mapa activo la
+        primera vez que se consultan (antes las zonas no distinguían mapa)."""
+        if mapid is None:
+            return list(self.zones)
+        migrated = False
+        for z in self.zones:
+            if z.get("mapid") is None:
+                z["mapid"] = mapid
+                migrated = True
+        if migrated:
+            self._save()
+        return [z for z in self.zones if z.get("mapid") == mapid]
 
     def rename(self, zid: int, name: str) -> dict | None:
         z = next((x for x in self.zones if x["id"] == int(zid)), None)
@@ -86,10 +101,12 @@ class ZoneStore:
         return KINDS[kind][0]
 
     def build_command(self, group: str, map_head_id: int):
-        """Comando (set_virwall o set_area) con TODAS las zonas del grupo."""
+        """Comando (set_virwall o set_area) con las zonas del grupo DEL MAPA ACTIVO
+        (más las heredadas sin mapid, que pertenecen al único mapa de antes)."""
         zs = [{"points": z["points"], "type": KINDS[z["kind"]][1],
                "name": z["name"], "id": z["id"]}
-              for z in self.zones if KINDS[z["kind"]][0] == group]
+              for z in self.zones
+              if KINDS[z["kind"]][0] == group and z.get("mapid") in (map_head_id, None)]
         if group == "restricted":
             return cmd.set_virwall(zs, map_head_id)
         return cmd.set_area(zs, map_head_id)

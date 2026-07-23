@@ -243,7 +243,7 @@
 
   <div class="stage">
     <section class="card mapcard">
-      <div class="maphead"><span class="chiplbl">Interior</span><span class="chiplbl" id="mapNote"></span></div>
+      <div class="maphead"><span class="chiplbl" id="mapTitle">—</span><span class="chiplbl" id="mapState"></span><span class="chiplbl" id="mapStats"></span></div>
       <div class="mapctl">
         <button class="iconbtn" id="rotL" title="Girar 90° a la izquierda" aria-label="Girar izquierda">↺</button>
         <button class="iconbtn" id="rotR" title="Girar 90° a la derecha" aria-label="Girar derecha">↻</button>
@@ -484,6 +484,8 @@
   var _lastCroom=0,_lastRep=0;   // última habitación/pasada resaltada en el mapa
   var LABEL={docked:'En la base',cleaning:'Limpiando',paused:'En pausa',returning:'Volviendo a la base',idle:'Inactivo',error:'Error',offline:'Sin conexión',unknown:'—'};
   var POS={docked:[92,258],cleaning:[120,178],paused:[120,178],returning:[92,258],idle:[92,258]};
+  function fmtDur(min){ min=Math.round(min); if(min<60)return min+' min';
+    var h=Math.floor(min/60), m=min%60; return h+'h'+(m?(' '+m+'m'):''); }
   function render(){
     var s=st.state||'unknown';
     document.getElementById('statePill').dataset.s=(st.online===false?'offline':s);
@@ -500,8 +502,13 @@
     if(MAP&&!MAP.sample&&(croomNow!==_lastCroom||rep!==_lastRep)){ _lastCroom=croomNow; _lastRep=rep; renderRealMap(); }
     var p=POS[s]||POS.docked;
     document.getElementById('robot').setAttribute('transform','translate('+p[0]+','+p[1]+')');
-    var note=document.getElementById('mapNote');
-    note.textContent = s==='cleaning'? ('· '+(st.area?st.area+' m²':'limpiando')) : ('· '+(LABEL[s]||'').toLowerCase());
+    // cabecera del mapa: estado + m²/tiempo de la última limpieza (persisten hasta la siguiente)
+    var mState=document.getElementById('mapState');
+    if(mState) mState.textContent='· '+(LABEL[st.online===false?'offline':s]||s);
+    var mStats=document.getElementById('mapStats'), parts=[];
+    if(st.area!=null && st.area!=='' && +st.area>0) parts.push((+st.area)+' m²');
+    if(st.clean_time!=null && +st.clean_time>0) parts.push(fmtDur(+st.clean_time));
+    if(mStats) mStats.textContent = parts.length? ('· '+parts.join(' · ')) : '';
     // dock play/pause
     var PLAY='<path d="M8 5v14l11-7z"/>',PAUSE='<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
     var pi=document.getElementById('playIco'),pl=document.getElementById('playLbl');
@@ -1221,6 +1228,7 @@
     var ms=HOUSE_MAPS.maps||[];
     var act=ms.filter(function(m){return m.active;})[0];   // nombre del mapa activo en la cabecera
     var hdr=document.getElementById('hdrMap'); if(hdr)hdr.textContent=act?act.name:'control local';
+    var mt=document.getElementById('mapTitle'); if(mt)mt.textContent=act?act.name:'Sin mapa';
     var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
     if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.</p>'; return; }
     ms.forEach(function(m){

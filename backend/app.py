@@ -232,8 +232,12 @@ async def broadcast_pose():
             clients.discard(ws)
 
 
+def _zones_payload():
+    return zones.for_map(_active_map())   # solo las zonas del mapa activo
+
+
 async def broadcast_zones():
-    msg = json.dumps({"type": "zones", "zones": zones.zones})
+    msg = json.dumps({"type": "zones", "zones": _zones_payload()})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -259,8 +263,18 @@ async def broadcast_view():
             clients.discard(ws)
 
 
+def _robot_orders_payload():
+    """Horarios que el robot tiene DEL MAPA ACTIVO. El robot devuelve los de todos los
+    mapas (cada uno con su mapid); aquí se muestran solo los del mapa activo."""
+    active = _active_map()
+    orders = getattr(robot, "orders", []) or []
+    if active is None:
+        return orders
+    return [o for o in orders if o.get("mapid") == active]
+
+
 async def broadcast_orders():
-    msg = json.dumps({"type": "orders", "orders": getattr(robot, "orders", [])})
+    msg = json.dumps({"type": "orders", "orders": _robot_orders_payload()})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -399,7 +413,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.5", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.6", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -458,18 +472,19 @@ async def set_view(payload: dict):
 
 @app.get("/api/zones")
 def get_zones():
-    return {"zones": zones.zones}
+    return {"zones": _zones_payload()}
 
 
 @app.post("/api/zones/add")
 async def zone_add(payload: dict):
     try:
-        z = zones.add(payload["kind"], payload["points"], payload.get("name", ""))
+        z = zones.add(payload["kind"], payload["points"], payload.get("name", ""),
+                      mapid=_active_map())          # la zona pertenece al mapa activo
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
     _send_zone_group(zones.group_of(z["kind"]))
     await broadcast_zones()
-    return {"ok": True, "zone": z, "zones": zones.zones}
+    return {"ok": True, "zone": z, "zones": _zones_payload()}
 
 
 @app.post("/api/zones/delete")
@@ -480,7 +495,7 @@ async def zone_delete(payload: dict):
     if z:
         _send_zone_group(zones.group_of(z["kind"]))
     await broadcast_zones()
-    return {"ok": True, "zones": zones.zones}
+    return {"ok": True, "zones": _zones_payload()}
 
 
 @app.post("/api/zones/rename")
@@ -489,7 +504,7 @@ async def zone_rename(payload: dict):
     if z:
         _send_zone_group(zones.group_of(z["kind"]))   # el nombre viaja en el comando
     await broadcast_zones()
-    return {"ok": True, "zones": zones.zones}
+    return {"ok": True, "zones": _zones_payload()}
 
 
 @app.post("/api/zones/update")
@@ -499,7 +514,7 @@ async def zone_update(payload: dict):
     if z:
         _send_zone_group(zones.group_of(z["kind"]))
     await broadcast_zones()
-    return {"ok": True, "zones": zones.zones}
+    return {"ok": True, "zones": _zones_payload()}
 
 
 # ---- reconciliación: adopta las zonas del robot (mapa, campo 9) que no tengamos ya ----
@@ -527,11 +542,13 @@ async def _reconcile_robot_zones():
         pts = z.get("points_m") or []
         if kind not in ("nogo", "nomop", "clean") or not pts:
             continue
-        if any(zz.get("kind") == kind and _zones_match(pts, zz.get("points", []))
+        active = _active_map()
+        if any(zz.get("kind") == kind and zz.get("mapid") in (active, None)
+               and _zones_match(pts, zz.get("points", []))
                for zz in zones.zones):
-            continue                      # ya la tenemos
+            continue                      # ya la tenemos en este mapa
         try:
-            zones.add(kind, [(p[0], p[1]) for p in pts], z.get("name") or "")
+            zones.add(kind, [(p[0], p[1]) for p in pts], z.get("name") or "", mapid=active)
             changed = True
         except Exception:
             pass
@@ -587,14 +604,36 @@ def _reconcile_schedules() -> bool:
 async def maps_select(payload: dict):
     """Cambia el mapa activo (selectMapPlan). El robot aísla los horarios por mapa, así
     que al cargar el nuevo se re-consultan y se sincronizan (importar/subir)."""
-    robot.command(cmd.select_map(int(payload["id"])))
+    mid = int(payload["id"])
+    robot.command(cmd.select_map(mid))
+    # refleja el cambio YA en la interfaz (el robot lo confirma luego con su report + mapa)
+    robot.state.map_head_id = mid
+    m = next((x for x in house_maps.maps if x["id"] == mid), None)
+    if m:
+        robot.state.map_name = m.get("alias") or m.get("name")
     robot.orders = []                        # el nuevo mapa tiene sus propios horarios
     try:
         robot._diag["orders"] = 0            # forzar re-consulta de getOrder6090 al docked
     except Exception:
         pass
+    # difunde YA lo que depende del mapa activo -> la interfaz cambia al instante
+    await broadcast_maps()
     await broadcast_schedules()
-    return {"ok": True}
+    await broadcast_zones()
+    await broadcast_orders()
+    # pide el mapa COMPLETO del nuevo mapa (con sus zonas de field 9): el push automático
+    # tras cambiar trae solo la rejilla, no las paredes virtuales. Llega por WS al decodificar.
+    async def _fetch_full_map():
+        await asyncio.sleep(1.5)             # deja que el robot cargue el nuevo mapa
+        try:
+            uid = robot.cfg.userid
+            robot.command(cmd.lock_device(uid))
+            robot.command(cmd.get_map())
+            robot.command(cmd.get_map_all(mid))
+        except Exception:
+            pass
+    asyncio.create_task(_fetch_full_map())
+    return {"ok": True, **_maps_payload()}
 
 
 @app.post("/api/maps/rename")
@@ -757,7 +796,7 @@ async def schedule_delete(payload: dict):
 # ---- horarios REALES guardados en el robot (getOrder6090), incluidos los de la app Cecotec ----
 @app.get("/api/robot/orders")
 def get_robot_orders():
-    return {"orders": getattr(robot, "orders", [])}
+    return {"orders": _robot_orders_payload()}
 
 
 @app.post("/api/robot/orders/refresh")
@@ -855,14 +894,13 @@ async def websocket(ws: WebSocket):
     await ws.send_text(json.dumps({"type": "state", "state": robot.state.to_dict()}))
     await ws.send_text(json.dumps({"type": "view", "view": view_settings}))
     await ws.send_text(json.dumps({"type": "link", "mode": getattr(robot, "link", "local")}))
-    if robot.map:
-        await ws.send_text(json.dumps({"type": "map", "map": robot.map}))
-    if zones.zones:
-        await ws.send_text(json.dumps({"type": "zones", "zones": zones.zones}))
+    if robot.map or getattr(robot, "map_empty", False):
+        await ws.send_text(json.dumps({"type": "map", "map": _view_map()}))
+    await ws.send_text(json.dumps({"type": "zones", "zones": _zones_payload()}))
     if schedules.plans:
         await ws.send_text(json.dumps({"type": "schedules", "schedules": schedules.for_map(_active_map())}))
     if getattr(robot, "orders", None):
-        await ws.send_text(json.dumps({"type": "orders", "orders": robot.orders}))
+        await ws.send_text(json.dumps({"type": "orders", "orders": _robot_orders_payload()}))
     if house_maps.maps:
         await ws.send_text(json.dumps({"type": "maps", **_maps_payload()}))
     try:
