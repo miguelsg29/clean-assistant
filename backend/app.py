@@ -374,7 +374,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.2", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.3", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -595,13 +595,32 @@ async def maps_create(payload: dict):
 
 @app.post("/api/maps/delete")
 async def maps_delete(payload: dict):
-    """Borra un mapa del robot (selectMapPlan type=2). No se permite el activo."""
+    """Borra un mapa del robot (selectMapPlan type=2). Se puede borrar cualquiera:
+    si es el ACTIVO y hay otro mapa, primero cambia a ese otro (el robot siempre necesita
+    un mapa activo), espera a que el robot confirme el cambio y luego lo borra. Si es el
+    único mapa, se intenta el borrado directo."""
     mid = int(payload["id"])
-    if mid == getattr(robot.state, "map_head_id", None):
-        return {"ok": False, "error": "no se puede borrar el mapa activo; cambia a otro primero"}
+    active = getattr(robot.state, "map_head_id", None)
+    switched = False
+    if mid == active:
+        alt = next((m["id"] for m in house_maps.as_list(active) if m["id"] != mid), None)
+        if alt is not None:                       # cambia a otro mapa antes de borrar el activo
+            robot.command(cmd.select_map(alt))
+            for _ in range(20):                   # espera hasta ~10s a que el robot confirme
+                await asyncio.sleep(0.5)
+                if getattr(robot.state, "map_head_id", None) == alt:
+                    break
+            switched = True
+            robot.orders = []                     # el nuevo mapa tiene sus propios horarios
+            try:
+                robot._diag["orders"] = 0         # forzar re-consulta de getOrder6090
+            except Exception:
+                pass
     robot.command(cmd.delete_map(mid))
     house_maps.remove(mid)
     await broadcast_maps()
+    if switched:
+        await broadcast_schedules()
     return {"ok": True, **_maps_payload()}
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.3
+- Ahora se puede borrar CUALQUIER mapa, también el activo. Al borrar el mapa activo,
+  Clean Assistant cambia primero a otro mapa (el robot siempre necesita uno activo),
+  espera a que el robot confirme el cambio y luego lo borra. Si es el único mapa, se
+  intenta el borrado directo. La papelera (✕) aparece ya en todos los mapas y, si un
+  borrado falla, se muestra el aviso en vez de ignorarlo en silencio.
+
 ## 0.16.2
 - El nombre del mapa activo aparece ahora en la cabecera (arriba a la izquierda), junto
   a "Conga 8090 Ultra".

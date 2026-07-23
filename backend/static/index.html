@@ -1229,7 +1229,7 @@
         '<div class="zt"><div class="n"></div>'+(sub.length?'<div class="k">'+sub.join(' · ')+'</div>':'')+'</div>'+
         (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">Activar</button>')+
         '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>'+
-        (m.active?'':'<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>');
+        '<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>';
       d.querySelector('.n').textContent=m.name;
       var sel=d.querySelector('.mSel');
       if(sel) sel.addEventListener('click',function(){
@@ -1240,9 +1240,16 @@
       });
       var del=d.querySelector('.mDel');
       if(del) del.addEventListener('click',function(){
-        if(confirm('¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.'))
-          fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})
-            .then(function(r){return r.json();}).then(function(res){ if(res.maps){HOUSE_MAPS={maps:res.maps,active:res.active};renderMaps();} });
+        var msg=m.active
+          ? '¿Borrar el mapa activo "'+m.name+'"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.'
+          : '¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.';
+        if(!confirm(msg))return;
+        del.disabled=true; del.textContent='…';
+        fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})
+          .then(function(r){return r.json();}).then(function(res){
+            if(res.maps){HOUSE_MAPS={maps:res.maps,active:res.active};renderMaps();}
+            else{ if(res.error)alert(res.error); del.disabled=false; del.textContent='✕'; }
+          }).catch(function(){ del.disabled=false; del.textContent='✕'; });
       });
       d.querySelector('.mRen').addEventListener('click',function(){
         inlineEdit(d.querySelector('.n'), m.name, function(nv){
