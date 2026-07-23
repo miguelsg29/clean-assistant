@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.8
+- Estado del robot durante el mapa nuevo: antes salía «Inactivo» al mapear y en la
+  primera limpieza automática. El robot usa el mismo modo (workMode 45) para ambas fases;
+  ahora Clean Assistant muestra «Mapeando» mientras recorre la casa y «Limpiando» cuando
+  ya está limpiando habitaciones (se distingue por si está asignado a una habitación).
+
 ## 0.16.7
 - Al borrar un mapa se borran también SUS zonas y SUS horarios en Clean Assistant.
 - Borrar el mapa ACTIVO ahora es fiable: se cambia primero a otro mapa desactivado, se

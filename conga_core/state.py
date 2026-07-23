@@ -47,6 +47,10 @@ class RobotState:
             st = "returning"
         elif mode == 37:
             st = "paused"
+        elif mode == 45:
+            # modo automático de mapa nuevo: usa el MISMO workMode para mapear y para la
+            # primera limpieza. Si ya está sobre una habitación, está limpiando; si no, mapeando.
+            st = "cleaning" if data.get("cleaning_roomId", self.cleaning_room) else "mapping"
         elif mode in (36, 2):
             st = "cleaning"
         else:

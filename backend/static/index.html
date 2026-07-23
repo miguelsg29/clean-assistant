@@ -49,7 +49,7 @@
   .status{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
   .pill{display:inline-flex;align-items:center;gap:7px;height:32px;padding:0 13px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:520;box-shadow:var(--shadow)}
   .pill .dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
-  .pill.state[data-s="cleaning"] .dot,.pill.state[data-s="returning"] .dot{animation:blink 1.4s ease-in-out infinite}
+  .pill.state[data-s="cleaning"] .dot,.pill.state[data-s="returning"] .dot,.pill.state[data-s="mapping"] .dot{animation:blink 1.4s ease-in-out infinite}
   .pill.state[data-s="error"] .dot{background:var(--critical)}
   .pill.state[data-s="offline"] .dot{background:var(--faint)}
   .pill.local{color:var(--accent-ink);background:var(--accent-soft);border-color:transparent;font-weight:580}
@@ -482,8 +482,8 @@
 
   // ---- render de estado ----
   var _lastCroom=0,_lastRep=0;   // última habitación/pasada resaltada en el mapa
-  var LABEL={docked:'En la base',cleaning:'Limpiando',paused:'En pausa',returning:'Volviendo a la base',idle:'Inactivo',error:'Error',offline:'Sin conexión',unknown:'—'};
-  var POS={docked:[92,258],cleaning:[120,178],paused:[120,178],returning:[92,258],idle:[92,258]};
+  var LABEL={docked:'En la base',cleaning:'Limpiando',mapping:'Mapeando',paused:'En pausa',returning:'Volviendo a la base',idle:'Inactivo',error:'Error',offline:'Sin conexión',unknown:'—'};
+  var POS={docked:[92,258],cleaning:[120,178],mapping:[120,178],paused:[120,178],returning:[92,258],idle:[92,258]};
   function fmtDur(min){ min=Math.round(min); if(min<60)return min+' min';
     var h=Math.floor(min/60), m=min%60; return h+'h'+(m?(' '+m+'m'):''); }
   function render(){
