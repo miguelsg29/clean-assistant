@@ -1,5 +1,5 @@
 name: "Clean Assistant"
-version: "0.16.12"
+version: "0.16.13"
 slug: "clean_assistant"
 description: "Interfaz local (sin nube) para el Conga 8090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
 url: "https://github.com/miguelsg29/clean-assistant"

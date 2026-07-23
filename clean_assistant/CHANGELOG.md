@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.13
+- La casa del mapa se muestra sin el prefijo "Casa:" (solo el nombre).
+- La zona de limpieza pasa a ser de DOBLE PASADA: el botón «+ Limpieza x2» crea una zona
+  que el robot limpia dos veces (set_area Type 201). Verificado: el robot acepta el
+  comando; el protocolo lo documenta como 2 pasadas.
+
 ## 0.16.12
 - Editar mapa: ahora también puedes cambiar el nombre de la CASA (toca el nombre de la
   casa en la lista de mapas).

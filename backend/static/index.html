@@ -334,7 +334,7 @@
         <div class="zbtns">
           <button class="btn zadd" data-kind="nogo" style="background:var(--critical);box-shadow:none">+ Prohibida</button>
           <button class="btn zadd" data-kind="nomop" style="background:var(--water);box-shadow:none">+ Sin fregona</button>
-          <button class="btn zadd" data-kind="clean">+ Limpieza</button>
+          <button class="btn zadd" data-kind="clean2">+ Limpieza x2</button>
         </div>
 
         <div class="phead" style="margin-top:18px">Editar habitaciones</div>
@@ -1367,7 +1367,7 @@
     ms.forEach(function(m){
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+(m.active?'--accent':'--faint')+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k">Casa: <span class="mh" title="Toca para editar la casa" style="cursor:pointer;text-decoration:underline dotted"></span>'+(m.active?' · Activo':'')+'</div></div>'+
+        '<div class="zt"><div class="n"></div><div class="k"><span class="mh" title="Toca para editar la casa" style="cursor:pointer;text-decoration:underline dotted"></span>'+(m.active?' · Activo':'')+'</div></div>'+
         (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">Activar</button>')+
         '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>'+
         '<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>';
