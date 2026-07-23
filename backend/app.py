@@ -50,6 +50,7 @@ schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
 # seguimiento de un mapeo nuevo en curso: al volver a la base tras mapear -> setSaveMap
 _new_map = {"pending": False, "moved": False}
+_last_active_id = [None]   # último mapa activo difundido (para no reenviar en cada frame)
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -318,13 +319,14 @@ async def lifespan(app: FastAPI):
         _house = _m.get("house") or {}
         _match = next((mm for mm in _house.get("maps", []) if mm.get("id") == _aid), None)
         if _match:                 # campo 17 coherente con el mapa activo -> nombre y casa fiables
-            house_maps.record_active(_aid, _match.get("name"), _house.get("name") or "")
+            _chg = house_maps.record_active(_aid, _match.get("name"), _house.get("name") or "")
         else:                      # dato de casa no fiable: registra solo id/nombre (campo 5)
-            house_maps.record_active(_aid, _m.get("name"))
-        # reenvía siempre: al cambiar de mapa cambia el "activo" aunque la lista no cambie
-        asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
-        # al cambiar de mapa, los horarios visibles son los de ese mapa
-        asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)
+            _chg = house_maps.record_active(_aid, _m.get("name"))
+        # reenvía SOLO si cambió el mapa activo o la lista (evita parpadeo del "Activo")
+        if _aid != _last_active_id[0] or _chg:
+            _last_active_id[0] = _aid
+            asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
+            asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)   # horarios del nuevo mapa
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
 
     # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
@@ -372,7 +374,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.1", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.2", lifespan=lifespan)
 
 
 @app.get("/api/state")

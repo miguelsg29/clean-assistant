@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.2
+- El nombre del mapa activo aparece ahora en la cabecera (arriba a la izquierda), junto
+  a "Conga 8090 Ultra".
+- Arreglado el parpadeo al cambiar de mapa: la lista de mapas solo se reenvía a la
+  interfaz cuando cambia de verdad el mapa activo o la lista, no en cada fotograma del
+  mapa. Antes el indicador "Activo" hacía cosas raras durante la transición.
+
 ## 0.16.1
 - Arreglada la sincronización de horarios por mapa (la anterior hacía cosas raras).
   El robot devuelve TODOS los horarios con su mapid; ahora Clean Assistant los casa por

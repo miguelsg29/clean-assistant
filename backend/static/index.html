@@ -231,7 +231,7 @@
   <header class="bar">
     <div class="brand">
       <div class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l3-7"/><path d="M20 20l-3-7"/><path d="M7 13h10l-1.2-4.5A2 2 0 0 0 13.9 7h-3.8a2 2 0 0 0-1.9 1.5L7 13z"/><path d="M12 7V3"/></svg></div>
-      <div><div class="name">Clean&nbsp;Assistant</div><div class="sub">Conga 8090 Ultra · control local</div></div>
+      <div><div class="name">Clean&nbsp;Assistant</div><div class="sub">Conga 8090 Ultra · <span id="hdrMap">control local</span></div></div>
     </div>
     <div class="status">
       <span class="pill state" id="statePill" data-s="offline"><span class="dot"></span><span id="stateTxt">Conectando…</span></span>
@@ -1217,8 +1217,10 @@
   // ---- mapas de la casa (Clean Assistant los va recordando) ----
   var HOUSE_MAPS={maps:[],active:null};
   function renderMaps(){
-    var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
     var ms=HOUSE_MAPS.maps||[];
+    var act=ms.filter(function(m){return m.active;})[0];   // nombre del mapa activo en la cabecera
+    var hdr=document.getElementById('hdrMap'); if(hdr)hdr.textContent=act?act.name:'control local';
+    var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
     if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.</p>'; return; }
     ms.forEach(function(m){
       var d=document.createElement('div'); d.className='zrow';
