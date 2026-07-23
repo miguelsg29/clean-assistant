@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.16.12
+- Editar mapa: ahora también puedes cambiar el nombre de la CASA (toca el nombre de la
+  casa en la lista de mapas).
+- Zonas: selecciona una zona (botón de editar en la lista) y edítala directamente sobre
+  el mapa: arrástrala para MOVERLA, tira de las esquinas para cambiar el TAMAÑO, y usa el
+  círculo de arriba para ROTARLA. Toca fuera para terminar.
+- Separar habitación: la línea de corte ya puede empezar o acabar FUERA de la habitación;
+  se corta la habitación que la línea cruza (el robot recorta lo que sobra).
+
 ## 0.16.11
 - Ventanas de confirmación/aviso propias de la app (mismo diseño), en vez de las del
   navegador ("192.168… dice"). Se cierran con Aceptar/Cancelar, Enter/Esc o tocando fuera.

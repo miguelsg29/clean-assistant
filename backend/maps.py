@@ -95,6 +95,13 @@ class MapStore:
         """Permite volver a registrar un id borrado (p. ej. si se recrea un mapa)."""
         self.deleted.discard(int(mid))
 
+    def set_house(self, mid, house: str) -> dict | None:
+        m = next((x for x in self.maps if x["id"] == int(mid)), None)
+        if m is not None:
+            m["house"] = (house or "").strip()
+            self._save()
+        return m
+
     def rename(self, mid, alias: str) -> dict | None:
         m = next((x for x in self.maps if x["id"] == int(mid)), None)
         if m is not None:

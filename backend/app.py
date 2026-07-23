@@ -450,7 +450,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.11", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.12", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -654,8 +654,11 @@ async def maps_select(payload: dict):
 
 @app.post("/api/maps/rename")
 async def maps_rename(payload: dict):
-    """Renombra un mapa en Clean Assistant (alias local; no toca el nombre del robot)."""
-    house_maps.rename(payload["id"], payload.get("name", ""))
+    """Renombra un mapa y/o su casa en Clean Assistant (etiquetas locales)."""
+    if payload.get("name") is not None:
+        house_maps.rename(payload["id"], payload.get("name", ""))
+    if payload.get("house") is not None:
+        house_maps.set_house(payload["id"], payload.get("house", ""))
     await broadcast_maps()
     return {"ok": True, **_maps_payload()}
 
