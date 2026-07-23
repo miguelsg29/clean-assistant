@@ -50,8 +50,6 @@ schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
 # seguimiento de un mapeo nuevo en curso: al volver a la base tras mapear -> setSaveMap
 _new_map = {"pending": False, "moved": False}
-# tras cambiar de mapa, cargar los horarios de ese mapa cuando el robot lo tenga activo
-_pending_orders = {"map": None}
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -307,17 +305,6 @@ async def lifespan(app: FastAPI):
                     print("[mapa] mapeo completado -> setSaveMap (guardar mapa nuevo)")
                 except Exception:
                     pass
-        # tras cambiar de mapa: cuando el robot ya lo tiene activo, cargar sus horarios
-        if _pending_orders["map"] and getattr(robot.state, "map_head_id", None) == _pending_orders["map"]:
-            mid = _pending_orders["map"]
-            _pending_orders["map"] = None
-            try:
-                for p in schedules.for_map(mid):
-                    robot.command(schedules.order_command(p, mid, _rooms_meta()))
-                robot.query_orders()
-                print(f"[mapa] cargados {len(schedules.for_map(mid))} horario(s) del mapa {mid}")
-            except Exception:
-                pass
 
     def on_map():
         _save_map()                # persiste el último mapa para verlo tras reiniciar
@@ -366,7 +353,12 @@ async def lifespan(app: FastAPI):
     robot.on_update = on_update
     robot.on_map = on_map
     robot.on_pose = lambda: asyncio.run_coroutine_threadsafe(broadcast_pose(), loop)
-    robot.on_orders = lambda: asyncio.run_coroutine_threadsafe(broadcast_orders(), loop)
+    def on_orders():
+        asyncio.run_coroutine_threadsafe(broadcast_orders(), loop)
+        # sincroniza CA <-> robot (importa los del robot que falten, sube los de CA que falten)
+        if _reconcile_schedules():
+            asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)
+    robot.on_orders = on_orders
     robot.on_provision = on_provision
     try:
         robot.start()
@@ -380,7 +372,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.1", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -526,36 +518,54 @@ def get_maps():
     return _maps_payload()
 
 
-def _import_robot_orders(mapid):
-    """Guarda en Clean Assistant los horarios que el robot tiene ahora (getOrder6090)
-    y que aún no tengamos (p. ej. creados en la app), asociados al mapa dado."""
-    have_ids = {str(p.get("orderid")) for p in schedules.plans if p.get("orderid")}
-    have_names = {(p.get("name") or "").lower() for p in schedules.for_map(mapid)}
-    for o in list(getattr(robot, "orders", []) or []):
-        oid = o.get("orderid")
-        if oid and str(oid) in have_ids:
-            continue
-        plan = plan_from_order(o, mapid)
-        if plan["name"].lower() in have_names:
-            continue
-        schedules.upsert(plan)
+def _order_key(o):
+    return ((o.get("order_name") or "").strip().lower(), int(o.get("day_time", 0) or 0))
+
+
+def _plan_key(p):
+    try:
+        h, m = str(p.get("time", "0:00")).split(":")[:2]
+        mins = int(h) * 60 + int(m)
+    except Exception:
+        mins = 0
+    return ((p.get("name") or "").strip().lower(), mins)
+
+
+def _reconcile_schedules() -> bool:
+    """Sincroniza los horarios de Clean Assistant con los del robot (mapa activo, que el
+    robot aísla por mapa). Casa por nombre+hora: importa a CA los del robot que falten
+    (p. ej. creados en la app) y sube al robot los de CA que falten. Devuelve True si CA cambió."""
+    mid = _active_map()
+    if mid is None:
+        return False
+    # SOLO los horarios del robot de este mapa (traen su mapid): evita contaminar al
+    # cambiar de mapa si getOrder6090 llega con los del mapa anterior.
+    orders = [o for o in (getattr(robot, "orders", []) or [])
+              if int(o.get("mapid", 0) or 0) == mid]
+    plans = schedules.for_map(mid)
+    okeys = {_order_key(o) for o in orders}
+    pkeys = {_plan_key(p) for p in plans}
+    changed = False
+    for o in orders:                                  # robot -> CA (importar los que falten)
+        if _order_key(o) not in pkeys:
+            schedules.upsert(plan_from_order(o, mid))
+            changed = True
+    for p in plans:                                   # CA -> robot (subir los que falten)
+        if _plan_key(p) not in okeys:
+            robot.command(schedules.order_command(p, mid, _rooms_meta()))
+    return changed
 
 
 @app.post("/api/maps/select")
 async def maps_select(payload: dict):
-    """Cambia el mapa activo. Antes de cambiar, guarda en Clean Assistant los horarios
-    del mapa actual (si no los tenemos) y los borra del robot; al cargar el mapa nuevo,
-    sube sus horarios. Así el robot solo tiene los del mapa activo."""
-    new_id = int(payload["id"])
-    old_id = _active_map()
-    if old_id and old_id != new_id:
-        _import_robot_orders(old_id)                      # 1) guardar los del robot que falten
-        for o in list(getattr(robot, "orders", []) or []):   # 2) borrarlos del robot
-            if o.get("orderid"):
-                robot.command(cmd.delete_order(o["orderid"]))
-        robot.orders = []
-    robot.command(cmd.select_map(new_id))                 # 3) cambiar de mapa
-    _pending_orders["map"] = new_id                       # 4) al activarse, cargar sus horarios
+    """Cambia el mapa activo (selectMapPlan). El robot aísla los horarios por mapa, así
+    que al cargar el nuevo se re-consultan y se sincronizan (importar/subir)."""
+    robot.command(cmd.select_map(int(payload["id"])))
+    robot.orders = []                        # el nuevo mapa tiene sus propios horarios
+    try:
+        robot._diag["orders"] = 0            # forzar re-consulta de getOrder6090 al docked
+    except Exception:
+        pass
     await broadcast_schedules()
     return {"ok": True}
 

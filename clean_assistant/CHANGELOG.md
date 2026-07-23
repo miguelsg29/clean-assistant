@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.1
+- Arreglada la sincronización de horarios por mapa (la anterior hacía cosas raras).
+  El robot devuelve TODOS los horarios con su mapid; ahora Clean Assistant los casa por
+  nombre+hora y filtra por el mapa activo. Sincronización bidireccional: importa del
+  robot los que falten (incluidos los de la app) y sube los de Clean Assistant que
+  falten. Ids de horario únicos por mapa (un mismo nombre en dos mapas no colisiona).
+
 ## 0.16.0
 - Sincronización de horarios al cambiar de mapa: antes de cambiar, Clean Assistant
   guarda los horarios que el robot tiene del mapa actual (si no los tiene ya), los

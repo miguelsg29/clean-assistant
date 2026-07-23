@@ -132,7 +132,10 @@ class ScheduleStore:
             pass
 
     def upsert(self, plan: dict) -> dict:
-        plan["id"] = plan.get("id") or _slug(plan.get("name", ""))
+        if not plan.get("id"):
+            base = _slug(plan.get("name", ""))
+            # id único por mapa: un mismo nombre en dos mapas no colisiona
+            plan["id"] = f"{base}_{plan['mapid']}" if plan.get("mapid") else base
         plan.setdefault("enable", True)
         self.plans = [p for p in self.plans if p.get("id") != plan["id"]] + [plan]
         self._save()
