@@ -162,6 +162,14 @@ class ScheduleStore:
             self._save()
         return p
 
+    def remove_map(self, mapid) -> int:
+        """Borra todos los horarios de un mapa (al borrar el mapa). Devuelve cuántos quitó."""
+        n = len(self.plans)
+        self.plans = [x for x in self.plans if x.get("mapid") != mapid]
+        if len(self.plans) != n:
+            self._save()
+        return n - len(self.plans)
+
     def toggle(self, pid: str, enable: bool) -> dict | None:
         p = next((x for x in self.plans if x.get("id") == pid), None)
         if p:

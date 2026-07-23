@@ -14,20 +14,25 @@ class MapStore:
     def __init__(self, path: str = "maps.json"):
         self.path = path
         self.maps: list[dict] = []       # {id, name, house, alias}
+        self.deleted: set = set()        # ids borrados (para no re-adoptarlos durante transiciones)
         self._load()
 
     def _load(self):
         if os.path.exists(self.path):
             try:
                 with open(self.path, encoding="utf-8") as f:
-                    self.maps = json.load(f).get("maps", [])
+                    data = json.load(f)
+                self.maps = data.get("maps", [])
+                self.deleted = set(data.get("deleted", []))
             except Exception:
                 self.maps = []
+                self.deleted = set()
 
     def _save(self):
         try:
             with open(self.path, "w", encoding="utf-8") as f:
-                json.dump({"maps": self.maps}, f, ensure_ascii=False, indent=1)
+                json.dump({"maps": self.maps, "deleted": list(self.deleted)},
+                          f, ensure_ascii=False, indent=1)
         except Exception:
             pass
 
@@ -39,7 +44,7 @@ class MapStore:
         changed = False
         for m in house["maps"]:
             mid = m.get("id")
-            if mid is None:
+            if mid is None or mid in self.deleted:   # no re-adoptar un mapa borrado
                 continue
             ex = next((x for x in self.maps if x["id"] == mid), None)
             if ex is None:
@@ -59,7 +64,7 @@ class MapStore:
 
     def record_active(self, mid, name, house="") -> bool:
         """Registra el mapa ACTIVO (id fiable = map_head_id, nombre = campo 5)."""
-        if mid is None:
+        if mid is None or mid in self.deleted:   # no re-adoptar un mapa borrado
             return False
         ex = next((x for x in self.maps if x["id"] == mid), None)
         if ex is None:
@@ -79,12 +84,16 @@ class MapStore:
         return changed
 
     def remove(self, mid) -> bool:
+        mid = int(mid)
+        self.deleted.add(mid)              # tombstone: no volver a adoptarlo en transiciones
         n = len(self.maps)
-        self.maps = [x for x in self.maps if x["id"] != int(mid)]
-        if len(self.maps) != n:
-            self._save()
-            return True
-        return False
+        self.maps = [x for x in self.maps if x["id"] != mid]
+        self._save()
+        return len(self.maps) != n
+
+    def readd_allowed(self, mid):
+        """Permite volver a registrar un id borrado (p. ej. si se recrea un mapa)."""
+        self.deleted.discard(int(mid))
 
     def rename(self, mid, alias: str) -> dict | None:
         m = next((x for x in self.maps if x["id"] == int(mid)), None)

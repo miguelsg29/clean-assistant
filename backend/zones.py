@@ -97,6 +97,14 @@ class ZoneStore:
             return True
         return False
 
+    def remove_map(self, mapid) -> int:
+        """Borra todas las zonas de un mapa (al borrar el mapa). Devuelve cuántas quitó."""
+        n = len(self.zones)
+        self.zones = [z for z in self.zones if z.get("mapid") != mapid]
+        if len(self.zones) != n:
+            self._save()
+        return n - len(self.zones)
+
     def group_of(self, kind: str) -> str:
         return KINDS[kind][0]
 

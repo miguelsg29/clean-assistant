@@ -284,11 +284,36 @@ async def broadcast_orders():
 
 def _maps_payload() -> dict:
     aid = getattr(robot.state, "map_head_id", None)
-    # el robot SIEMPRE conserva un mapa activo: si CA no lo tiene en la lista (p. ej. tras
-    # borrar todos), lo re-adopta para que lista y vista no se descuadren del robot.
+    # si el robot tiene un mapa activo que CA no conoce (y no está borrado), lo re-adopta
+    # para que lista y vista no se descuadren del robot.
     if aid is not None and not any(m["id"] == aid for m in house_maps.maps):
         house_maps.record_active(aid, getattr(robot.state, "map_name", None))
     return {"maps": house_maps.as_list(aid), "active": aid}
+
+
+def _activate_local(mid):
+    """Refleja YA en Clean Assistant el mapa `mid` como activo y pide su mapa COMPLETO
+    (con zonas de field 9). El robot confirma el cambio después con su report + mapa."""
+    robot.state.map_head_id = mid
+    m = next((x for x in house_maps.maps if x["id"] == mid), None)
+    if m:
+        robot.state.map_name = m.get("alias") or m.get("name")
+    robot.orders = []                        # el nuevo mapa tiene sus propios horarios
+    try:
+        robot._diag["orders"] = 0            # forzar re-consulta de getOrder6090 al docked
+    except Exception:
+        pass
+
+    async def _fetch_full_map():
+        await asyncio.sleep(1.5)             # deja que el robot cargue el nuevo mapa
+        try:
+            uid = robot.cfg.userid
+            robot.command(cmd.lock_device(uid))
+            robot.command(cmd.get_map())
+            robot.command(cmd.get_map_all(mid))
+        except Exception:
+            pass
+    asyncio.create_task(_fetch_full_map())
 
 
 async def broadcast_maps():
@@ -413,7 +438,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.6", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.7", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -606,33 +631,12 @@ async def maps_select(payload: dict):
     que al cargar el nuevo se re-consultan y se sincronizan (importar/subir)."""
     mid = int(payload["id"])
     robot.command(cmd.select_map(mid))
-    # refleja el cambio YA en la interfaz (el robot lo confirma luego con su report + mapa)
-    robot.state.map_head_id = mid
-    m = next((x for x in house_maps.maps if x["id"] == mid), None)
-    if m:
-        robot.state.map_name = m.get("alias") or m.get("name")
-    robot.orders = []                        # el nuevo mapa tiene sus propios horarios
-    try:
-        robot._diag["orders"] = 0            # forzar re-consulta de getOrder6090 al docked
-    except Exception:
-        pass
+    _activate_local(mid)                     # refleja el cambio YA + re-pide el mapa completo
     # difunde YA lo que depende del mapa activo -> la interfaz cambia al instante
     await broadcast_maps()
     await broadcast_schedules()
     await broadcast_zones()
     await broadcast_orders()
-    # pide el mapa COMPLETO del nuevo mapa (con sus zonas de field 9): el push automático
-    # tras cambiar trae solo la rejilla, no las paredes virtuales. Llega por WS al decodificar.
-    async def _fetch_full_map():
-        await asyncio.sleep(1.5)             # deja que el robot cargue el nuevo mapa
-        try:
-            uid = robot.cfg.userid
-            robot.command(cmd.lock_device(uid))
-            robot.command(cmd.get_map())
-            robot.command(cmd.get_map_all(mid))
-        except Exception:
-            pass
-    asyncio.create_task(_fetch_full_map())
     return {"ok": True, **_maps_payload()}
 
 
@@ -659,34 +663,44 @@ async def maps_create(payload: dict):
 
 @app.post("/api/maps/delete")
 async def maps_delete(payload: dict):
-    """Borra un mapa del robot (selectMapPlan type=2). Se puede borrar CUALQUIERA:
-    - si es el ACTIVO y hay otro mapa, primero cambia a ese otro (para no borrar el que el
-      robot tiene cargado), espera a que confirme el cambio y luego lo borra;
-    - si es el ÚLTIMO mapa, se borra directo y el robot se queda sin mapa (empezar de nuevo)."""
+    """Borra un mapa (selectMapPlan type=2) y, en Clean Assistant, sus zonas y horarios.
+    - Si es el ACTIVO y hay otro mapa: cambia primero a ese otro (el robot NO auto-cambia al
+      borrar el activo; se quedaría sin mapa), lo borra y activa el otro cargando sus datos.
+    - Si es el ÚLTIMO mapa: se borra y el robot queda sin mapa (empezar de nuevo)."""
     mid = int(payload["id"])
     active = getattr(robot.state, "map_head_id", None)
-    # mapas que el robot dice tener (campo 17); si no hay, los que conoce CA
-    robot_maps = [m.get("id") for m in ((getattr(robot, "map", None) or {}).get("house") or {})
-                  .get("maps", []) if m.get("id") is not None]
-    known = robot_maps or [m["id"] for m in house_maps.maps]
-    others = [x for x in known if x != mid]
-    if mid == active and others:                  # cambia a otro mapa antes de borrar el activo
-        robot.command(cmd.select_map(others[0]))
-        for _ in range(20):                       # espera hasta ~10s a que el robot confirme
+    others = [m["id"] for m in house_maps.maps if m["id"] != mid]
+    target = others[0] if others else None
+
+    if mid == active and target is not None:
+        robot.command(cmd.select_map(target))     # 1) cambiar a otro mapa ANTES de borrar
+        switched = False
+        for _ in range(30):                       # espera hasta ~15s a que el robot confirme
             await asyncio.sleep(0.5)
-            if getattr(robot.state, "map_head_id", None) == others[0]:
+            if getattr(robot.state, "map_head_id", None) == target:
+                switched = True
                 break
-    if mid == active:                             # borrando el activo: sus horarios ya no aplican
-        robot.orders = []
-        try:
-            robot._diag["orders"] = 0             # forzar re-consulta de getOrder6090
-        except Exception:
-            pass
-    robot.command(cmd.delete_map(mid))
+        robot.command(cmd.delete_map(mid))        # 2) borrar el mapa (ya no activo)
+        if not switched:                          # por si el robot quedó sin mapa: re-activa target
+            await asyncio.sleep(1.0)
+            robot.command(cmd.select_map(target))
+        _activate_local(target)                   # 3) activa el otro mapa y carga sus datos
+    else:
+        robot.command(cmd.delete_map(mid))        # no activo, o el último (robot sin mapa)
+        if mid == active:
+            robot.state.map_head_id = None
+            robot.state.map_name = None
+            robot.orders = []
+
+    # borra en Clean Assistant el mapa y SUS zonas y horarios
     house_maps.remove(mid)
+    zones.remove_map(mid)
+    schedules.remove_map(mid)
+
     await broadcast_maps()
-    if mid == active:
-        await broadcast_schedules()
+    await broadcast_zones()
+    await broadcast_schedules()
+    await broadcast_orders()
     return {"ok": True, **_maps_payload()}
 
 

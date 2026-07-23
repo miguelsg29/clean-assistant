@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.7
+- Al borrar un mapa se borran también SUS zonas y SUS horarios en Clean Assistant.
+- Borrar el mapa ACTIVO ahora es fiable: se cambia primero a otro mapa desactivado, se
+  borra, y se activa ese otro cargando su mapa completo. Antes el robot podía quedarse
+  sin mapa y salía el mapa de ejemplo.
+- Un mapa borrado ya no reaparece en la lista: durante la transición el robot podía
+  reportarlo un instante y Clean Assistant lo re-adoptaba; ahora se recuerda como borrado.
+
 ## 0.16.6
 - Cabecera del mapa (esquina superior izquierda): muestra el nombre del MAPA ACTIVO (o
   «Sin mapa»), el estado del robot, y los m² y el tiempo de la última limpieza (se
