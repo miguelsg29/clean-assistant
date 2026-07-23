@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.10
+- Al crear un mapa, se conserva el NOMBRE (y la casa) que eliges: antes el mapa nuevo
+  podía quedarse con el nombre que reportaba el robot (no fiable) y salir con el nombre
+  de otro mapa. Ahora, al guardarse el mapa nuevo, se le pone el nombre que pusiste.
+
 ## 0.16.9
 - Durante la primera limpieza automática tras crear un mapa, el estado se muestra ahora
   como «Primera limpieza automática» (en vez de «Limpiando»), para dejar claro que es la

@@ -361,6 +361,9 @@ async def lifespan(app: FastAPI):
                 try:
                     robot.command(cmd.save_map())     # setSaveMap: conserva el mapa recién creado
                     print("[mapa] mapeo completado -> setSaveMap (guardar mapa nuevo)")
+                    # espera el id del mapa nuevo para ponerle el nombre que eligió el usuario
+                    _new_map["awaiting"] = True
+                    _new_map["prev_id"] = getattr(robot.state, "map_head_id", None)
                 except Exception:
                     pass
 
@@ -386,6 +389,16 @@ async def lifespan(app: FastAPI):
             _chg = house_maps.record_active(_aid, _match.get("name"), _house.get("name") or "")
         else:                      # dato de casa no fiable: registra solo id/nombre (campo 5)
             _chg = house_maps.record_active(_aid, _m.get("name"))
+        # mapa recién creado: cuando aparece su id (distinto del anterior), ponle el nombre
+        # que eligió el usuario (el nombre que reporta el robot no es fiable).
+        if _new_map.get("awaiting") and _aid and _aid != _new_map.get("prev_id"):
+            house_maps.rename(_aid, _new_map.get("name") or "")
+            if _new_map.get("house"):
+                _mm = next((x for x in house_maps.maps if x["id"] == _aid), None)
+                if _mm:
+                    _mm["house"] = _new_map["house"]; house_maps._save()
+            _new_map["awaiting"] = False
+            _chg = True
         # reenvía SOLO si cambió el mapa activo o la lista (evita parpadeo del "Activo")
         if _aid != _last_active_id[0] or _chg:
             _last_active_id[0] = _aid
@@ -438,7 +451,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.9", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.10", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -658,6 +671,9 @@ async def maps_create(payload: dict):
     robot.command(cmd.start_new_map())
     _new_map["pending"] = True       # al completar el mapeo (volver a base) -> setSaveMap
     _new_map["moved"] = False
+    _new_map["awaiting"] = False
+    _new_map["name"] = name          # nombre/casa elegidos: se aplican al mapa nuevo al guardarse
+    _new_map["house"] = house
     return {"ok": True}
 
 
