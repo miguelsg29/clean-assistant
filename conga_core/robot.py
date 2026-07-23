@@ -33,6 +33,7 @@ class RealRobot:
         self.cfg = cfg
         self.state = RobotState()
         self.map = None                # último mapa decodificado (dict del frontend)
+        self.map_empty = False         # el robot no tiene mapa (se han borrado todos)
         self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
         self.orders = []               # horarios REALES guardados en el robot (getOrder6090)
         self.on_update = None          # callback opcional (estado -> push)
@@ -228,6 +229,20 @@ class RealRobot:
                 try: s.close()
                 except Exception: pass
 
+    def _set_no_map(self):
+        """El robot ha devuelto un mapa vacío: no tiene mapa (se han borrado todos).
+        Limpia la vista para no seguir mostrando el mapa anterior."""
+        if self.map is None and self.map_empty:
+            return
+        self.map = None
+        self.pose = None
+        self.map_empty = True
+        self._got_map = True
+        self._last_cells = None
+        self._last_zones = None
+        self.log("  [robot] sin mapa (se han borrado todos)")
+        self._notify_map()
+
     def _observe(self, direction, payload):
         """En modo cloud: alimenta estado/mapa desde el tráfico y registra los
         comandos de la app (para depurar funciones aún no integradas)."""
@@ -235,6 +250,7 @@ class RealRobot:
             try:
                 m = cmap.decode_map(payload)
                 self.map = m
+                self.map_empty = False
                 self.pose = m.get("robot")
                 zsig = json.dumps(m.get("stored_zones", []), sort_keys=True)
                 if m.get("cells_b64") != self._last_cells or zsig != self._last_zones:
@@ -243,6 +259,9 @@ class RealRobot:
                     self._notify_map()
                 elif self.pose:
                     self._notify_pose()
+            except ValueError as e:
+                if "vac" in str(e).lower():         # robot sin mapa: limpia la vista
+                    self._set_no_map()
             except Exception:
                 pass
             return
@@ -405,12 +424,14 @@ class RealRobot:
         # pedir el mapa guardado al arrancar (la app hace lock_device + get_map + getMapAll)
         # para no depender de que el robot lo empuje al limpiar. map_head_id llega en report_data.
         # lock_device = "tomar el control": sin él el robot no envía el mapa estando en base.
-        if (not self._got_map and self._diag.get("map", 0) < 8
-                and self.state.map_head_id):
+        # Se pide aunque map_head_id sea 0/None: si el robot NO tiene mapa (borrados todos),
+        # map_head_id es 0 y aun así hay que pedirlo para recibir el "mapa vacío" y saberlo.
+        if not self._got_map and self._diag.get("map", 0) < 8:
             self._diag["map"] = self._diag.get("map", 0) + 1
             self.command(cmd.lock_device(uid))
             self.command(cmd.get_map())
-            self.command(cmd.get_map_all(self.state.map_head_id))
+            if self.state.map_head_id:
+                self.command(cmd.get_map_all(self.state.map_head_id))
 
     def _handle_msg(self, tls, payload: bytes):
         if payload.strip() == b"libuwsc":
@@ -422,6 +443,7 @@ class RealRobot:
             try:
                 m = cmap.decode_map(payload)
                 self.map = m
+                self.map_empty = False
                 self._got_map = True
                 self.pose = m.get("robot")
                 cells = m.get("cells_b64")
@@ -436,6 +458,11 @@ class RealRobot:
                 elif self.pose:
                     # misma rejilla y zonas, solo se movió el robot: push ligero de pose
                     self._notify_pose()
+            except ValueError as e:
+                if "vac" in str(e).lower():         # robot sin mapa (borrados todos): limpia
+                    self._set_no_map()
+                else:
+                    self.log(f"  [!] mapa no decodificado: {e}")
             except Exception as e:
                 self.log(f"  [!] mapa no decodificado: {e}")
             return

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.16.5
+- Ahora SÍ se puede borrar el último mapa y dejar el robot sin ninguno, para empezar de
+  cero (el robot admite quedarse sin mapa; la 0.16.4 lo bloqueaba por error).
+- Arreglado el mapa «fantasma»: al borrar todos los mapas, el robot devuelve un mapa
+  vacío y Clean Assistant ya no sigue mostrando el mapa anterior. El área del mapa pasa a
+  «sin mapa · crea uno nuevo» y se borra la caché para que no reaparezca al reiniciar.
+- Al borrar el último mapa, el aviso deja claro que el robot se quedará sin mapa.
+
+## 0.16.4
+- Borrado de mapas más coherente con el robot: el robot SIEMPRE conserva un mapa activo
+  (no admite quedarse con cero). Al intentar borrar el último, en vez de dejar la lista
+  vacía y descuadrada, se avisa y se guía a «Crear mapa nuevo» (remapea y reemplaza).
+- Arreglado el descuadre en el que, tras borrar mapas, la lista quedaba vacía pero el
+  robot seguía teniendo un mapa (y se veía en el área del mapa): Clean Assistant re-adopta
+  el mapa activo del robot para que lista y vista coincidan siempre con el robot.
+
 ## 0.16.3
 - Ahora se puede borrar CUALQUIER mapa, también el activo. Al borrar el mapa activo,
   Clean Assistant cambia primero a otro mapa (el robot siempre necesita uno activo),

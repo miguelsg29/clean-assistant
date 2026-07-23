@@ -383,7 +383,7 @@
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:6px 0 2px">Local: sin nube (la app de Cecotec no llega al robot). Cloud + Local: el robot pasa por la nube real, la app oficial funciona y se capturan sus comandos (útil para depurar).</p>
 
         <div class="phead">Mapas de la casa</div>
-        <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.)</p>
+        <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
         <div id="mapsList"></div>
         <div class="btnrow"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button></div>
         <div id="newMapForm" style="display:none">
@@ -620,11 +620,12 @@
 
   // ---- mapa: aplicar (ejemplo -> SVG de ejemplo; real -> canvas) ----
   function applyMap(m){
+    if(m.no_map){ m=Object.assign({},m,{rooms:[]}); }   // sin mapa: no mostrar habitaciones de ejemplo
     MAP=m; ROOMS=m.rooms||[];
     IDX={}; NAMED=new Set();
     ROOMS.forEach(function(r,i){ IDX[r.id]=i; if(r.named!==false)NAMED.add(r.id); });
     buildChips();
-    document.getElementById('modeTag').textContent=m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot';
+    document.getElementById('modeTag').textContent=m.no_map?'sin mapa · crea uno nuevo en Ajustes':(m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot');
     var svg=document.querySelector('svg.map'), wrap=document.getElementById('canvasWrap');
     if(m.sample){ svg.classList.remove('hidden'); wrap.classList.remove('show'); document.body.classList.remove('has-realmap'); }
     else{
@@ -1240,9 +1241,12 @@
       });
       var del=d.querySelector('.mDel');
       if(del) del.addEventListener('click',function(){
-        var msg=m.active
-          ? '¿Borrar el mapa activo "'+m.name+'"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.'
-          : '¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.';
+        var last=(HOUSE_MAPS.maps||[]).length<=1;
+        var msg=last
+          ? '¿Borrar el último mapa "'+m.name+'"? El robot se quedará SIN mapa; tendrás que crear uno nuevo (remapear) para empezar de cero. No se puede deshacer.'
+          : (m.active
+            ? '¿Borrar el mapa activo "'+m.name+'"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.'
+            : '¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.');
         if(!confirm(msg))return;
         del.disabled=true; del.textContent='…';
         fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})

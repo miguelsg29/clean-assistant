@@ -100,6 +100,19 @@ def _load_map():
         return None
 
 
+def _view_map():
+    """Mapa a mostrar: el real del robot; si el robot no tiene mapa (borrados todos),
+    un marcador 'sin mapa'; si aún no ha llegado ninguno, el de ejemplo."""
+    if robot.map:
+        return robot.map
+    m = cmap.sample_map()
+    if getattr(robot, "map_empty", False):
+        m["no_map"] = True
+        m["name"] = "Sin mapa"
+        m["rooms"] = []
+    return m
+
+
 # modo de enlace persistente: "local" (impersonador) o "cloud" (pasarela a la nube real)
 LINK_PATH = _data("link.json")
 
@@ -196,9 +209,10 @@ async def broadcast():
 
 
 async def broadcast_map():
-    if not robot.map:
+    # emite si hay mapa real o si el robot se ha quedado sin mapa (no en el arranque sin datos)
+    if not robot.map and not getattr(robot, "map_empty", False):
         return
-    msg = json.dumps({"type": "map", "map": robot.map})
+    msg = json.dumps({"type": "map", "map": _view_map()})
     for ws in list(clients):
         try:
             await ws.send_text(msg)
@@ -255,8 +269,12 @@ async def broadcast_orders():
 
 
 def _maps_payload() -> dict:
-    return {"maps": house_maps.as_list(getattr(robot.state, "map_head_id", None)),
-            "active": getattr(robot.state, "map_head_id", None)}
+    aid = getattr(robot.state, "map_head_id", None)
+    # el robot SIEMPRE conserva un mapa activo: si CA no lo tiene en la lista (p. ej. tras
+    # borrar todos), lo re-adopta para que lista y vista no se descuadren del robot.
+    if aid is not None and not any(m["id"] == aid for m in house_maps.maps):
+        house_maps.record_active(aid, getattr(robot.state, "map_name", None))
+    return {"maps": house_maps.as_list(aid), "active": aid}
 
 
 async def broadcast_maps():
@@ -308,10 +326,17 @@ async def lifespan(app: FastAPI):
                     pass
 
     def on_map():
-        _save_map()                # persiste el último mapa para verlo tras reiniciar
+        if getattr(robot, "map_empty", False):     # el robot se ha quedado sin mapa
+            try:
+                os.remove(MAP_CACHE)               # no recuperar el mapa viejo al reiniciar
+            except OSError:
+                pass
+        else:
+            _save_map()            # persiste el último mapa para verlo tras reiniciar
         asyncio.run_coroutine_threadsafe(broadcast_map(), loop)
         # adopta las zonas creadas en la app de Cecotec (campo 9 del mapa) que no tengamos
-        asyncio.run_coroutine_threadsafe(_reconcile_robot_zones(), loop)
+        if getattr(robot, "map", None):
+            asyncio.run_coroutine_threadsafe(_reconcile_robot_zones(), loop)
         # recuerda el mapa ACTIVO (id fiable = map_head_id). El nombre se toma del campo 17
         # SOLO si su id coincide con el activo (campo 17/5 sueltos no son fiables tras cambiar).
         _m = getattr(robot, "map", None) or {}
@@ -374,7 +399,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.3", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.5", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -384,7 +409,7 @@ def get_state():
 
 @app.get("/api/map")
 def get_map():
-    return robot.map or cmap.sample_map()
+    return _view_map()
 
 
 @app.post("/api/command")
@@ -595,31 +620,33 @@ async def maps_create(payload: dict):
 
 @app.post("/api/maps/delete")
 async def maps_delete(payload: dict):
-    """Borra un mapa del robot (selectMapPlan type=2). Se puede borrar cualquiera:
-    si es el ACTIVO y hay otro mapa, primero cambia a ese otro (el robot siempre necesita
-    un mapa activo), espera a que el robot confirme el cambio y luego lo borra. Si es el
-    único mapa, se intenta el borrado directo."""
+    """Borra un mapa del robot (selectMapPlan type=2). Se puede borrar CUALQUIERA:
+    - si es el ACTIVO y hay otro mapa, primero cambia a ese otro (para no borrar el que el
+      robot tiene cargado), espera a que confirme el cambio y luego lo borra;
+    - si es el ÚLTIMO mapa, se borra directo y el robot se queda sin mapa (empezar de nuevo)."""
     mid = int(payload["id"])
     active = getattr(robot.state, "map_head_id", None)
-    switched = False
-    if mid == active:
-        alt = next((m["id"] for m in house_maps.as_list(active) if m["id"] != mid), None)
-        if alt is not None:                       # cambia a otro mapa antes de borrar el activo
-            robot.command(cmd.select_map(alt))
-            for _ in range(20):                   # espera hasta ~10s a que el robot confirme
-                await asyncio.sleep(0.5)
-                if getattr(robot.state, "map_head_id", None) == alt:
-                    break
-            switched = True
-            robot.orders = []                     # el nuevo mapa tiene sus propios horarios
-            try:
-                robot._diag["orders"] = 0         # forzar re-consulta de getOrder6090
-            except Exception:
-                pass
+    # mapas que el robot dice tener (campo 17); si no hay, los que conoce CA
+    robot_maps = [m.get("id") for m in ((getattr(robot, "map", None) or {}).get("house") or {})
+                  .get("maps", []) if m.get("id") is not None]
+    known = robot_maps or [m["id"] for m in house_maps.maps]
+    others = [x for x in known if x != mid]
+    if mid == active and others:                  # cambia a otro mapa antes de borrar el activo
+        robot.command(cmd.select_map(others[0]))
+        for _ in range(20):                       # espera hasta ~10s a que el robot confirme
+            await asyncio.sleep(0.5)
+            if getattr(robot.state, "map_head_id", None) == others[0]:
+                break
+    if mid == active:                             # borrando el activo: sus horarios ya no aplican
+        robot.orders = []
+        try:
+            robot._diag["orders"] = 0             # forzar re-consulta de getOrder6090
+        except Exception:
+            pass
     robot.command(cmd.delete_map(mid))
     house_maps.remove(mid)
     await broadcast_maps()
-    if switched:
+    if mid == active:
         await broadcast_schedules()
     return {"ok": True, **_maps_payload()}
 
