@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.9
+- Durante la primera limpieza automática tras crear un mapa, el estado se muestra ahora
+  como «Primera limpieza automática» (en vez de «Limpiando»), para dejar claro que es la
+  pasada que hace el robot justo después de mapear. Mientras mapea sigue mostrando
+  «Mapeando».
+
 ## 0.16.8
 - Estado del robot durante el mapa nuevo: antes salía «Inactivo» al mapear y en la
   primera limpieza automática. El robot usa el mismo modo (workMode 45) para ambas fases;

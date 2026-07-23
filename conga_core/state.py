@@ -24,6 +24,7 @@ class RobotState:
     clean_time: int | None = None   # minutos
     cleaning_room: int | None = None
     repeat_clean: int | None = None   # repeatClean del report_data: 1 = segunda pasada
+    work_mode: int | None = None      # workMode crudo (45 = modo automático de mapa nuevo)
     map_head_id: int | None = None
     map_name: str | None = None
     # ajustes reflejados (lo que sabemos del robot)
@@ -40,6 +41,7 @@ class RobotState:
         fault = data.get("faultCode")
         self.charging = charge == 1
         self.fault = fault
+        self.work_mode = mode
 
         if charge == 1:
             st = "docked"
