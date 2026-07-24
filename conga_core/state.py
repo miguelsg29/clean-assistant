@@ -64,8 +64,10 @@ class RobotState:
         bat = data.get("battary")
         if isinstance(bat, int):
             self.battery = int(bat / 2)           # escala 0-200 -> 0-100
-        self.area = data.get("cleanSize", self.area)
-        self.clean_time = data.get("cleanTime", self.clean_time)
+        cs = data.get("cleanSize")                # cleanSize viene en centésimas de m² (1506 = 15,06 m²)
+        if cs is not None:
+            self.area = round(cs / 100.0, 2)
+        self.clean_time = data.get("cleanTime", self.clean_time)   # cleanTime ya está en minutos
         self.cleaning_room = data.get("cleaning_roomId", self.cleaning_room)
         self.repeat_clean = data.get("repeatClean", self.repeat_clean)
         if data.get("map_head_id"):
