@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.15
+- La cabecera del mapa conserva los m² y el tiempo de la ÚLTIMA LIMPIEZA (hasta la
+  siguiente). Solo cuenta limpiezas normales: durante el mapeo o la 1ª limpieza automática
+  el robot da un área absurda (p. ej. 158 m² en 1 min) que ya no se muestra.
+- Zonas: se quita la ROTACIÓN. Las zonas prohibidas/sin fregona del robot son rectángulos
+  alineados; una zona girada no la puede dibujar la app oficial (parecía desaparecer). Se
+  mantienen mover y redimensionar. (Si tenías una zona girada, se re-alinea al editarla.)
+
 ## 0.16.14
 - Muestra los metros cuadrados: de cada habitación (en las fichas de Limpieza y en la
   lista de suelos), el total de la casa (suma de habitaciones), y los m² limpiados en la

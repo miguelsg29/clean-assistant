@@ -554,6 +554,7 @@
   var POS={docked:[92,258],cleaning:[120,178],mapping:[120,178],paused:[120,178],returning:[92,258],idle:[92,258]};
   function fmtDur(min){ min=Math.round(min); if(min<60)return min+' min';
     var h=Math.floor(min/60), m=min%60; return h+'h'+(m?(' '+m+'m'):''); }
+  var lastClean=(function(){ try{ return JSON.parse(localStorage.getItem('ca_lastClean'))||{area:0,time:0}; }catch(e){ return {area:0,time:0}; } })();
   function stLabel(s){                       // etiqueta del estado (con caso especial de mapa nuevo)
     if(st.online===false) return LABEL.offline;
     if(s==='cleaning' && st.work_mode===45) return 'Primera limpieza automática';
@@ -575,12 +576,19 @@
     if(MAP&&!MAP.sample&&(croomNow!==_lastCroom||rep!==_lastRep)){ _lastCroom=croomNow; _lastRep=rep; renderRealMap(); }
     var p=POS[s]||POS.docked;
     document.getElementById('robot').setAttribute('transform','translate('+p[0]+','+p[1]+')');
-    // cabecera del mapa: estado + m²/tiempo de la última limpieza (persisten hasta la siguiente)
+    // cabecera del mapa: estado + m²/tiempo de la ÚLTIMA LIMPIEZA (se conservan hasta la
+    // siguiente). Solo se registra durante una limpieza NORMAL: durante el mapeo o la 1ª
+    // limpieza automática el cleanSize del robot no es fiable (da valores absurdos).
     var mState=document.getElementById('mapState');
     if(mState) mState.textContent='· '+stLabel(s);
+    if(s==='cleaning'||s==='paused'){
+      if(+st.area>0) lastClean.area=+st.area;
+      if(+st.clean_time>0) lastClean.time=+st.clean_time;
+      try{ localStorage.setItem('ca_lastClean', JSON.stringify(lastClean)); }catch(e){}
+    }
     var mStats=document.getElementById('mapStats'), parts=[];
-    if(st.area!=null && st.area!=='' && +st.area>0) parts.push((+st.area)+' m²');
-    if(st.clean_time!=null && +st.clean_time>0) parts.push(fmtDur(+st.clean_time));
+    if(lastClean.area>0) parts.push(fmtM2(lastClean.area));
+    if(lastClean.time>0) parts.push(fmtDur(lastClean.time));
     if(mStats) mStats.textContent = parts.length? ('· '+parts.join(' · ')) : '';
     // dock play/pause
     var PLAY='<path d="M8 5v14l11-7z"/>',PAUSE='<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
@@ -795,9 +803,7 @@
       var ec=editZone._cells, acc=cssVar('--accent');
       ctx.beginPath(); ec.forEach(function(c,i){ var vp=s2v(c[0],c[1]); i?ctx.lineTo(vp[0]*scale,vp[1]*scale):ctx.moveTo(vp[0]*scale,vp[1]*scale); });
       ctx.closePath(); ctx.strokeStyle=acc; ctx.lineWidth=Math.max(2,scale*0.9); ctx.setLineDash([]); ctx.stroke();
-      var rh=_rotHandle(ec), rmid=[(ec[0][0]+ec[1][0])/2,(ec[0][1]+ec[1][1])/2], rv=s2v(rh[0],rh[1]), mv=s2v(rmid[0],rmid[1]), hr=Math.max(5,scale*1.7);
-      ctx.beginPath(); ctx.moveTo(mv[0]*scale,mv[1]*scale); ctx.lineTo(rv[0]*scale,rv[1]*scale); ctx.stroke();
-      ctx.beginPath(); ctx.arc(rv[0]*scale,rv[1]*scale,hr,0,6.29); ctx.fillStyle=acc; ctx.fill();
+      var hr=Math.max(5,scale*1.7);      // solo tiradores de esquina (mover/redimensionar); sin rotación
       ec.forEach(function(c){ var vp=s2v(c[0],c[1]); ctx.beginPath(); ctx.arc(vp[0]*scale,vp[1]*scale,hr,0,6.29); ctx.fillStyle=cssVar('--surface'); ctx.fill(); ctx.strokeStyle=acc; ctx.lineWidth=Math.max(1.5,scale*0.6); ctx.stroke(); });
     }
     // etiquetas de habitación: halo (contorno del color de fondo) para leerse sobre cualquier zona
@@ -902,14 +908,14 @@
       if(((yi>p[1])!=(yj>p[1])) && (p[0] < (xj-xi)*(p[1]-yi)/(yj-yi)+xi)) inside=!inside; }
     return inside; }
   function _hitEdit(pc){ if(!editZone||!editZone._cells)return null; var c=editZone._cells, tol=Math.max(6,13/(SCALE||4));
-    if(_dist(pc,_rotHandle(c))<=tol) return {mode:'rotate'};
+    // sin rotar: las zonas del robot son rectángulos alineados a ejes (la app no admite girarlas)
     for(var i=0;i<4;i++) if(_dist(pc,c[i])<=tol) return {mode:'resize',corner:i};
     if(_pointInQuad(pc,c)) return {mode:'move'};
     return null; }
   function _zoneCells(z){ return z.points.map(function(p){return worldToCell(p[0],p[1]);}); }
   function selectZone(z){ editZone=z; z._cells=_zoneCells(z);
     exitDraw(); if(typeof exitRoomEdit==='function')exitRoomEdit();
-    var h=document.getElementById('zoneHint'); if(h)h.textContent='Arrastra la zona para moverla, las esquinas para el tamaño, el círculo de arriba para rotar. Toca fuera para terminar.';
+    var h=document.getElementById('zoneHint'); if(h)h.textContent='Arrastra la zona para moverla y las esquinas para cambiar el tamaño. Toca fuera para terminar.';
     renderZones(); if(MAP&&!MAP.sample)renderRealMap(); }
   function deselectZone(){ if(!editZone)return; editZone=null;
     var h=document.getElementById('zoneHint'); if(h)h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.';
