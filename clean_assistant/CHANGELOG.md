@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.14
+- Muestra los metros cuadrados: de cada habitación (en las fichas de Limpieza y en la
+  lista de suelos), el total de la casa (suma de habitaciones), y los m² limpiados en la
+  última limpieza (ya en la cabecera del mapa). El área se calcula desde la rejilla del
+  mapa con la escala verificada (res 0.05 m/celda).
+
 ## 0.16.13
 - La casa del mapa se muestra sin el prefijo "Casa:" (solo el nombre).
 - La zona de limpieza pasa a ser de DOBLE PASADA: el botón «+ Limpieza x2» crea una zona

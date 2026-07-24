@@ -121,6 +121,7 @@
   .rooms{display:flex;flex-wrap:wrap;gap:8px}
   .rchip{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;cursor:pointer;background:var(--surface);border:1px solid var(--line);font-size:13px;font-weight:520;color:var(--ink)}
   .rchip .sw{width:9px;height:9px;border-radius:3px}
+  .rm2{font-size:10.5px;color:var(--faint);font-weight:500;white-space:nowrap}
   .rchip.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
   .rchip.sel .check{color:var(--accent)}
   .check{display:none;width:14px;height:14px}
@@ -313,6 +314,7 @@
       <div class="tabpane active" data-pane="limpieza">
         <p class="hint">Toca una habitación (aquí o en el mapa) y pulsa limpiar.</p>
         <div class="rooms" id="roomChips"></div>
+        <p class="hint" id="houseSum" style="opacity:.75;font-size:12px;margin:2px 0 4px;font-weight:560"></p>
         <div class="phead">Modo</div>
         <div class="seg" data-cmd="mode"><button aria-pressed="true">Auto</button><button>Fregado</button><button>Bordes</button><button>Espiral</button></div>
         <div class="phead">Succión</div>
@@ -499,7 +501,20 @@
   // ---- room chips (construidos desde /api/map) ----
   var ROOMS=[], NAMED=new Set();   // NAMED: ids de habitaciones reales (con nombre)
   function roomToken(r,i){ return r.color ? ('--'+r.color) : ROOM_TOKENS[i%ROOM_TOKENS.length]; }
+  // ---- áreas (m²) por habitación y de la casa, desde la rejilla del mapa ----
+  var AREAS={byRoom:{},total:0};
+  function computeAreas(){
+    AREAS={byRoom:{},total:0};
+    if(!MAP||MAP.sample||!CELLS)return AREAS;
+    var res=(MAP.world&&MAP.world.res)||0.05, cell=res*res, cnt={};
+    for(var i=0;i<CELLS.length;i++){ var v=CELLS[i]; if(v>1&&v!==255) cnt[v]=(cnt[v]||0)+1; }
+    (MAP.rooms||[]).forEach(function(r){ if(r.named===false)return;
+      var a=(cnt[r.id]||0)*cell; AREAS.byRoom[r.id]=a; AREAS.total+=a; });
+    return AREAS;
+  }
+  function fmtM2(a){ if(a==null)return ''; return (a>=100?a.toFixed(0):a.toFixed(1))+' m²'; }
   function buildChips(){
+    computeAreas();
     var wrap=document.getElementById('roomChips');
     wrap.innerHTML='';
     ROOMS.forEach(function(r){
@@ -507,10 +522,13 @@
       var b=document.createElement('button');
       b.className='rchip';b.dataset.id=r.id;
       b.innerHTML='<span class="sw" style="background:var('+roomToken(r,(IDX[r.id]!=null?IDX[r.id]:0))+')"></span>'+r.name+
-        '<span class="ord"></span>';
+        '<span class="rm2">'+fmtM2(AREAS.byRoom[r.id])+'</span><span class="ord"></span>';
       b.addEventListener('click',function(){toggleRoom(r.id);});
       wrap.appendChild(b);
     });
+    var hs=document.getElementById('houseSum');   // total de la casa
+    if(hs){ var n=Object.keys(AREAS.byRoom).length;
+      hs.textContent = n ? ('Casa: '+fmtM2(AREAS.total)+' · '+n+' habitacion'+(n===1?'':'es')) : ''; }
   }
   function toggleRoom(id){ if(NAMED.size&&!NAMED.has(id))return;   // no seleccionar segmentos temporales
     selected.has(id)?selected.delete(id):selected.add(id); syncSel(); }
@@ -695,6 +713,7 @@
       var bin=atob(m.cells_b64); CELLS=new Uint8Array(bin.length);
       for(var i=0;i<bin.length;i++)CELLS[i]=bin.charCodeAt(i);
       svg.classList.add('hidden'); wrap.classList.add('show'); document.body.classList.add('has-realmap');
+      buildChips();          // ya con CELLS: recalcula los m² por habitación y el total de la casa
       renderRealMap();
       var bb=(m.bbox||[]).join(',');       // salto solo si cambia la caja; si no, desliza
       setRobotTarget(m.robot, bb!==LAST_BBOX); LAST_BBOX=bb;
@@ -978,6 +997,7 @@
     var el=document.getElementById('floorList'); if(!el)return; el.innerHTML='';
     var rooms=(MAP&&!MAP.sample?(MAP.rooms||[]):[]).filter(function(r){return r.named!==false;});
     if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Necesita el mapa real del robot.</p>'; return; }
+    computeAreas();
     rooms.forEach(function(r){
       var row=document.createElement('div'); row.className='frow'; row.style.cssText='display:flex;flex-direction:column;gap:7px;align-items:stretch';
       var nm=document.createElement('div'); nm.className='fn';
@@ -991,7 +1011,8 @@
           renderFloors(); buildChips(); if(MAP&&!MAP.sample)renderRealMap();   // refleja el nombre en mapa y chips
         });
       });
-      nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(ed); row.appendChild(nm);
+      var am=document.createElement('span'); am.className='rm2'; am.style.marginLeft='auto'; am.textContent=fmtM2(AREAS.byRoom[r.id]);
+      nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(am); nm.appendChild(ed); row.appendChild(nm);
       // selector de TIPO de habitación (desplegable propio, con el look de la app)
       var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent='Tipo'; row.appendChild(tlbl);
       var tsel=document.createElement('div'); tsel.className='rtsel';
