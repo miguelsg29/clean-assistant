@@ -242,6 +242,7 @@ def build(action: str, p: dict):
     if action == "carpet_turbo": return cmd.carpet_turbo(p["value"])
     if action == "base_type":    return cmd.base_type(p["value"])
     if action == "dust":         return cmd.dust_action()
+    if action == "dust_freq":    return cmd.dust_freq(p["value"])
     if action == "voice":        return cmd.set_voice(p["on"], p["volume"])
     if action == "ota":          return cmd.set_upgrade(p["value"])
     if action == "quiet":        return cmd.set_quiet(p["is_open"], p["begin"], p["end"])
@@ -258,6 +259,8 @@ def _optimistic_state(action: str, p: dict):
                    "volume": int(vol if vol is not None else (s.voice or {}).get("volume", 10))}
     elif action == "ota":
         s.auto_upgrade = 1 if p.get("value") else 0
+    elif action == "dust_freq":
+        s.collect_freq = int(p.get("value"))
     elif action == "quiet":
         s.quiet = {"is_open": 1 if p.get("is_open") else 0,
                    "begin_time": int(p.get("begin", 1320)), "end_time": int(p.get("end", 420))}
@@ -525,7 +528,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.17", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.18", lifespan=lifespan)
 
 
 @app.get("/api/state")

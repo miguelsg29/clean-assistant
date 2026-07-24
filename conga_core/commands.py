@@ -89,6 +89,10 @@ def base_type(name): return set_pref(17, _lvl(BASE_TYPES, name))
 
 # ---------------- autovaciado / voz / OTA / no molestar ----------------
 def dust_action():  return {"control": "set_dust_action", "action": 1}
+# frecuencia de autovaciado (set_preference ctrltype 16): -1=Nunca, 0=Después de cada
+# limpieza, 30/60/90/120 = cada N minutos. Capturado de la app oficial.
+def dust_freq(value): return set_pref(16, int(value))
+def get_pref(ctrltype): return {"control": "get_preference", "ctrltype": int(ctrltype), "value": 0}
 
 
 # reset de consumibles (set_consumables). resetType capturado de la app oficial:

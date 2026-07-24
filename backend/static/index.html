@@ -435,6 +435,15 @@
         <div class="row"><div class="rt"><div class="t">Actualizaciones automáticas</div><div class="d">Recomendado desactivar en local</div></div><button class="toggle" id="otaTog"></button></div>
         <div class="phead">Base</div>
         <div class="field"><label>Tipo de base</label><div class="seg" data-cmd="base_type"><button>Base de carga</button><button aria-pressed="true">Colector automático</button></div></div>
+        <div class="field"><label>Frecuencia de vaciado</label>
+          <select id="dustFreq" class="tinput">
+            <option value="-1">Nunca</option>
+            <option value="0">Después de cada limpieza</option>
+            <option value="30">Cada 30 minutos</option>
+            <option value="60">Cada 60 minutos</option>
+            <option value="90">Cada 90 minutos</option>
+            <option value="120">Cada 2 horas</option>
+          </select></div>
         <div class="btnrow" style="margin-top:6px"><button class="btn ghost" id="dustBtn">Vaciar base ahora</button></div>
         <div class="phead">Consumibles</div>
         <div id="consList"></div>
@@ -622,6 +631,8 @@
       var qb=document.getElementById('quietBegin'),qe=document.getElementById('quietEnd');
       if(document.activeElement!==qb)qb.value=hhmm(q.begin_time);
       if(document.activeElement!==qe)qe.value=hhmm(q.end_time);}
+    if(st.collect_freq!=null){var df=document.getElementById('dustFreq');   // frecuencia de vaciado
+      if(df&&document.activeElement!==df)df.value=String(st.collect_freq);}
     if(st.voice){document.getElementById('voiceTog').setAttribute('aria-pressed',!!st.voice.voiceMode);
       var vol=document.getElementById('vol');vol.classList.toggle('on',!!st.voice.voiceMode);
       if(document.activeElement!==vol){vol.value=st.voice.volume;document.getElementById('volv').textContent=st.voice.volume;}
@@ -664,6 +675,7 @@
   });
   document.getElementById('cleanAll').addEventListener('click',function(){api('clean_all');});
   document.getElementById('dustBtn').addEventListener('click',function(){api('dust');});
+  document.getElementById('dustFreq').addEventListener('change',function(){api('dust_freq',{value:+this.value});});
 
   // segmentos con comando
   document.querySelectorAll('.seg').forEach(function(seg){

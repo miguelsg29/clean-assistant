@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.18
+- Frecuencia de vaciado del colector (Ajustes → Base): Nunca, Después de cada limpieza,
+  Cada 30/60/90 minutos, Cada 2 horas. Capturado de la app oficial (set_preference
+  ctrltype 16; -1=Nunca, 0=tras cada limpieza, N=minutos). El selector refleja el valor
+  actual del robot.
+
 ## 0.16.17
 - Aviso de «Depósito de agua bajo» (faultCode 525) en la cabecera del mapa. Se irán
   añadiendo más avisos/errores a medida que se capturen.

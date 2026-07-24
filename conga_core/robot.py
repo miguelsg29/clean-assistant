@@ -294,9 +294,9 @@ class RealRobot:
         if not self._provisioned and isinstance(d, dict):
             self._capture({"did": d.get("did"), "userid": d.get("userid")})
         if ctrl in ("get_quiet", "get_consumables", "get_upgrade_config",
-                    "get_voice", "getOrder6090"):
+                    "get_voice", "getOrder6090", "get_preference", "set_preference"):
             try:
-                self._parse_ack(d)   # aprovecha para leer no molestar/consumibles/voz/horarios
+                self._parse_ack(d)   # no molestar/consumibles/voz/horarios/frecuencia autovaciado
             except Exception:
                 pass
         if ctrl and ctrl not in self._NOISE:
@@ -411,11 +411,13 @@ class RealRobot:
             self._diag["quiet"] += 1
             self.command(cmd.query("get_quiet", uid))
         if self._diag["info"] < 4 and (self.state.consumables is None
-                                       or self.state.auto_upgrade is None):
+                                       or self.state.auto_upgrade is None
+                                       or self.state.collect_freq is None):
             self._diag["info"] += 1
             self.command(cmd.query("get_consumables", uid))
             self.command(cmd.query("get_upgrade_config", uid))
             self.command(cmd.query("get_voice", uid))
+            self.command(cmd.get_pref(16))          # frecuencia de autovaciado
         # el robot solo responde a getOrder6090 en reposo -> consultarlo al estar en base
         if (not self.orders and self._diag.get("orders", 0) < 4
                 and self.state.state in ("docked", "idle")):
@@ -556,6 +558,9 @@ class RealRobot:
         elif ctrl == "get_voice":
             self.state.voice = {"voiceMode": data.get("voiceMode", 1),
                                 "volume": data.get("volume", 10)}
+            changed = True
+        elif ctrl in ("get_preference", "set_preference") and data.get("ctrltype") == 16:
+            self.state.collect_freq = data.get("value")   # frecuencia de autovaciado
             changed = True
         if changed:
             self._notify()

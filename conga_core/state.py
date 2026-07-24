@@ -45,6 +45,7 @@ class RobotState:
     voice: dict | None = None       # {voiceMode, volume}
     consumables: dict | None = None
     auto_upgrade: int | None = None
+    collect_freq: int | None = None   # frecuencia autovaciado: -1=Nunca, 0=tras cada limpieza, N=min
 
     def update_from_report(self, data: dict[str, Any]) -> "RobotState":
         """Actualiza desde el `data` de un report_data."""
