@@ -147,6 +147,12 @@ class MqttBridge:
             if dclass:
                 cfg["device_class"] = dclass
             self._disc("sensor", f"{uid}_{sid}", cfg)
+        # aviso de falta de agua (faultCode 525) como binary_sensor
+        self._disc("binary_sensor", f"{uid}_low_water", {
+            "name": "Conga Falta agua", "unique_id": f"{uid}_low_water",
+            "state_topic": self.t_state, "value_template": "{{ value_json.low_water }}",
+            "payload_on": "ON", "payload_off": "OFF",
+            "device_class": "problem", "icon": "mdi:water-alert"})
         for key, name, icon in (("main_brush", "Cepillo central", "mdi:broom"),
                                 ("side_brush", "Cepillo lateral", "mdi:broom"),
                                 ("filter", "Filtro", "mdi:air-filter"),
@@ -235,7 +241,7 @@ class MqttBridge:
         actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
                 ("sensor", f"{uid}_time"), ("number", f"{uid}_volume"),
-                ("button", f"{uid}_dust")]
+                ("button", f"{uid}_dust"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
             objs.append(("sensor", f"{uid}_cons_{key}"))
         for rid in (self._rooms() or {}):
@@ -287,6 +293,11 @@ class MqttBridge:
         payload = {"state": state}
         if s.battery is not None:
             payload["battery_level"] = s.battery
+        try:
+            low_water = int(s.fault or 0) == 525
+        except (TypeError, ValueError):
+            low_water = False
+        payload["low_water"] = "ON" if low_water else "OFF"
         self._pub(self.t_state, json.dumps(payload))
         if s.area is not None:
             self._pub(f"conga/{self.node}/area", s.area)

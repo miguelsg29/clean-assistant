@@ -57,6 +57,7 @@ _new_map = {"pending": False, "moved": False}
 _last_active_id = [None]   # último mapa activo difundido (para no reenviar en cada frame)
 _session = [None]          # sesión de limpieza en curso (para el historial)
 _clean_trigger = {"ts": 0.0, "rooms": []}   # última orden de limpieza lanzada desde CA
+_last_fault = [None]       # último faultCode registrado en el historial (para no repetir)
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -205,12 +206,39 @@ def _finish_session(ss):
     days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     meta = _rooms_meta()
     rooms = sorted(ss["rooms"])
-    entry = {"id": int(ss["start"] * 1000), "type": ss["type"], "sched": ss.get("sched"),
+    entry = {"id": int(ss["start"] * 1000), "kind": "clean",
+             "type": ss["type"], "sched": ss.get("sched"),
              "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
              "day": days[dt.weekday()],
              "rooms": [(meta.get(r) or {}).get("name") or f"Hab {r}" for r in rooms],
              "room_ids": rooms, "area": round(ss["area"] or 0, 2), "duration": dur,
              "map_id": ss.get("map_id"), "map_name": ss.get("map_name")}
+    return history.add(entry)
+
+
+def _track_faults():
+    """Registra en el historial un aviso/error nuevo del robot. Devuelve la entrada si
+    acaba de aparecer uno. Ignora los avisos de estación (21xx, normales al cargar)."""
+    from conga_core.state import _warn_message
+    code = robot.state.fault or 0
+    try:
+        code = int(code)
+    except (TypeError, ValueError):
+        code = 0
+    notable = code and not (2100 <= code <= 2199)     # 5xx consumibles / otros = error
+    cur = code if notable else None
+    if cur == _last_fault[0]:
+        return None
+    _last_fault[0] = cur
+    if not cur:
+        return None
+    dt = datetime.datetime.now()
+    days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    msg = _warn_message(cur)
+    entry = {"id": int(time.time() * 1000), "kind": "fault", "code": cur,
+             "message": msg, "is_error": not (500 <= cur <= 599),
+             "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
+             "day": days[dt.weekday()]}
     return history.add(entry)
 
 
@@ -426,7 +454,9 @@ async def lifespan(app: FastAPI):
     def on_update():
         asyncio.run_coroutine_threadsafe(broadcast(), loop)
         mqtt.publish_state()
-        if _track_session():                  # ¿acaba de terminar una limpieza? -> historial
+        _ended = _track_session()             # limpieza terminada
+        _fault = _track_faults()              # aviso/error nuevo
+        if _ended or _fault:
             asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
         # mapeo nuevo: cuando el robot sale a mapear y luego vuelve a la base, guardar el mapa
         if _new_map["pending"]:
@@ -528,7 +558,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.18", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.19", lifespan=lifespan)
 
 
 @app.get("/api/state")

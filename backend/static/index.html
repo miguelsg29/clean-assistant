@@ -132,6 +132,11 @@
   .hbadge{font-size:10.5px;font-weight:650;padding:2px 8px;border-radius:999px}
   .hbadge.man{background:var(--accent-soft);color:var(--accent-ink)}
   .hbadge.sched{background:var(--water-soft);color:var(--water)}
+  .hbadge.warn{background:color-mix(in srgb,var(--amber) 18%,transparent);color:var(--amber)}
+  .hbadge.err{background:var(--critical-soft);color:var(--critical)}
+  .hrow.fault{border-left:3px solid var(--amber)}
+  .hrow.fault.err{border-left-color:var(--critical)}
+  .hrow.fault .hmid{color:var(--muted);font-weight:500}
   .rchip.sel{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
   .rchip.sel .check{color:var(--accent)}
   .check{display:none;width:14px;height:14px}
@@ -891,11 +896,23 @@
     var ctx=o.getContext('2d'); ctx.clearRect(0,0,o.width,o.height);
     if(!MAP||MAP.sample)return;
     var acc=cssVar('--accent'), surf=cssVar('--surface');
-    // base de carga (campo 7): pequeña diana
-    if(MAP.charger){ var vc=s2v(MAP.charger.x,MAP.charger.y),bx=vc[0]*SCALE,by=vc[1]*SCALE,br=Math.max(4,SCALE*2);
-      ctx.strokeStyle=cssVar('--muted'); ctx.lineWidth=Math.max(1.5,SCALE*0.6);
-      ctx.beginPath(); ctx.arc(bx,by,br,0,6.2832); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(bx-br,by); ctx.lineTo(bx+br,by); ctx.moveTo(bx,by-br); ctx.lineTo(bx,by+br); ctx.stroke(); }
+    // base de carga (campo 7): icono de casa/base
+    if(MAP.charger){ var vc=s2v(MAP.charger.x,MAP.charger.y),bx=vc[0]*SCALE,by=vc[1]*SCALE,r=Math.max(5,SCALE*2.6);
+      ctx.save();
+      ctx.fillStyle=surf; ctx.beginPath(); ctx.arc(bx,by,r*1.35,0,6.2832); ctx.fill();   // fondo para separarla del suelo
+      ctx.fillStyle=cssVar('--accent-soft'); ctx.strokeStyle=acc;
+      ctx.lineWidth=Math.max(1.5,SCALE*0.75); ctx.lineJoin='round'; ctx.lineCap='round';
+      ctx.beginPath();                       // casa: cuerpo + tejado
+      ctx.moveTo(bx-r, by+r);
+      ctx.lineTo(bx-r, by-r*0.1);
+      ctx.lineTo(bx, by-r);
+      ctx.lineTo(bx+r, by-r*0.1);
+      ctx.lineTo(bx+r, by+r);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle=acc; ctx.lineWidth=Math.max(1,SCALE*0.5);   // rayo de carga
+      ctx.beginPath(); ctx.moveTo(bx+r*0.28, by-r*0.35); ctx.lineTo(bx-r*0.12, by+r*0.15);
+      ctx.lineTo(bx+r*0.12, by+r*0.15); ctx.lineTo(bx-r*0.28, by+r*0.6); ctx.stroke();
+      ctx.restore(); }
     if(!RBT)return;
     var vp=s2v(RBT.x,RBT.y), x=vp[0]*SCALE, y=vp[1]*SCALE, r=Math.max(7,SCALE*3.2),
         cleaning=document.body.classList.contains('cleaning');
@@ -1204,7 +1221,7 @@
   var ROBOT_ORDERS=[];   // horarios REALES leídos del robot (getOrder6090)
   var LINKMODE='local';  // modo de enlace: local | cloud
   function applyLinkSeg(){ document.querySelectorAll('#linkSeg button').forEach(function(b){b.setAttribute('aria-pressed',b.dataset.v===LINKMODE);}); }
-  var WD=[[1,'D'],[2,'L'],[4,'M'],[8,'X'],[16,'J'],[32,'V'],[64,'S']];   // bit -> dia
+  var WD=[[2,'L'],[4,'M'],[8,'X'],[16,'J'],[32,'V'],[64,'S'],[1,'D']];   // bit -> día (L..D)
   var MODE_OPTS={fan:['Eco','Normal','Turbo'],water:['Off','Bajo','Medio','Alto'],mop:['Off','Estándar','Fuerte','Potente']};
   var MODE_LBL={fan:'Succión',water:'Agua',mop:'Mopa'};
   var MODE_DEF={fan:'Normal',water:'Medio',mop:'Estándar',twice:false};
@@ -1422,6 +1439,14 @@
     if(!HISTORY.length){ el.innerHTML='<p class="hint" style="opacity:.6;margin:2px 0 12px">Aún no hay limpiezas registradas.</p>'; return; }
     HISTORY.forEach(function(h){
       var d=document.createElement('div'); d.className='hrow';
+      if(h.kind==='fault'){                           // aviso/error del robot
+        d.className='hrow fault'+(h.is_error?' err':'');
+        var txt=h.message?h.message:((h.is_error?'Error':'Aviso')+' (código '+h.code+')');
+        d.innerHTML='<div class="htop"><span class="hbadge '+(h.is_error?'err':'warn')+'">'+(h.is_error?'Error':'Aviso')+'</span>'+
+          '<span class="hwhen">'+h.day+' '+h.date+' · '+h.time_hm+'</span></div>'+
+          '<div class="hmid">⚠ '+txt+'</div>';
+        el.appendChild(d); return;
+      }
       var badge=h.type==='programada'?('<span class="hbadge sched">Programada'+(h.sched?(' · '+h.sched):'')+'</span>'):'<span class="hbadge man">Manual</span>';
       var rooms=(h.rooms&&h.rooms.length)?h.rooms.join(', '):'Toda la casa';
       d.innerHTML='<div class="htop">'+badge+'<span class="hwhen">'+h.day+' '+h.date+' · '+h.time_hm+'</span></div>'+

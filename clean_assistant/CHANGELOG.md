@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.19
+- Los días de la semana en «Horarios guardados en el robot» empiezan por L (lunes) y
+  acaban en D (domingo).
+- Símbolo de la base en el mapa más bonito (icono de casa con rayo de carga).
+- El registro de Actividad guarda también los avisos/errores del robot: el de agua con su
+  mensaje, y el resto con el código de error (para investigarlos cuando pasen). Se ignoran
+  los avisos normales de estación (21xx).
+- Home Assistant: nuevo sensor binario «Falta agua» (device_class problem) que se activa
+  con el aviso de depósito de agua bajo (faultCode 525).
+
 ## 0.16.18
 - Frecuencia de vaciado del colector (Ajustes → Base): Nunca, Después de cada limpieza,
   Cada 30/60/90 minutos, Cada 2 horas. Capturado de la app oficial (set_preference
