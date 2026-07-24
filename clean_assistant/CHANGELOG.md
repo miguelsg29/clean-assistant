@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.16.16
+- Arreglada la ESCALA de los m² limpiados: el robot manda el área en centésimas de m²
+  (cleanSize 1506 = 15,06 m²); antes se mostraba tal cual (números absurdos como 158 o 222
+  que subían al limpiar). Ahora se divide entre 100 y se ve el valor real.
+
 ## 0.16.15
 - La cabecera del mapa conserva los m² y el tiempo de la ÚLTIMA LIMPIEZA (hasta la
   siguiente). Solo cuenta limpiezas normales: durante el mapeo o la 1ª limpieza automática

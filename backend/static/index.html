@@ -554,7 +554,7 @@
   var POS={docked:[92,258],cleaning:[120,178],mapping:[120,178],paused:[120,178],returning:[92,258],idle:[92,258]};
   function fmtDur(min){ min=Math.round(min); if(min<60)return min+' min';
     var h=Math.floor(min/60), m=min%60; return h+'h'+(m?(' '+m+'m'):''); }
-  var lastClean=(function(){ try{ return JSON.parse(localStorage.getItem('ca_lastClean'))||{area:0,time:0}; }catch(e){ return {area:0,time:0}; } })();
+  var lastClean=(function(){ try{ return JSON.parse(localStorage.getItem('ca_lastClean_v2'))||{area:0,time:0}; }catch(e){ return {area:0,time:0}; } })();
   function stLabel(s){                       // etiqueta del estado (con caso especial de mapa nuevo)
     if(st.online===false) return LABEL.offline;
     if(s==='cleaning' && st.work_mode===45) return 'Primera limpieza automática';
@@ -584,7 +584,7 @@
     if(s==='cleaning'||s==='paused'){
       if(+st.area>0) lastClean.area=+st.area;
       if(+st.clean_time>0) lastClean.time=+st.clean_time;
-      try{ localStorage.setItem('ca_lastClean', JSON.stringify(lastClean)); }catch(e){}
+      try{ localStorage.setItem('ca_lastClean_v2', JSON.stringify(lastClean)); }catch(e){}
     }
     var mStats=document.getElementById('mapStats'), parts=[];
     if(lastClean.area>0) parts.push(fmtM2(lastClean.area));
