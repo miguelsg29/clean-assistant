@@ -558,7 +558,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.19", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.20", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -714,6 +714,16 @@ async def _reconcile_robot_zones():
             pass
     if changed:
         await broadcast_zones()
+    # tras (re)conectar el robot: re-enviar las zonas de CA al robot (las paredes virtuales
+    # se pierden al reiniciarlo). Se hace DESPUÉS de adoptar las del robot, para no perder
+    # ninguna. Solo si CA tiene zonas para el mapa activo.
+    if getattr(robot, "reconnected", False):
+        robot.reconnected = False
+        active = _active_map()
+        if any(z.get("mapid") == active for z in zones.zones):
+            _send_zone_group("restricted")
+            _send_zone_group("cleaning")
+            print("[zonas] re-enviadas al robot tras reconectar")
 
 
 # ---- mapas de la casa: listar / cambiar / renombrar (Clean Assistant los va recordando) ----

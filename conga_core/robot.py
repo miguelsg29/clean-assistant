@@ -34,6 +34,7 @@ class RealRobot:
         self.state = RobotState()
         self.map = None                # último mapa decodificado (dict del frontend)
         self.map_empty = False         # el robot no tiene mapa (se han borrado todos)
+        self.reconnected = False       # acaba de (re)conectar -> re-enviar zonas al cargar mapa
         self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
         self.orders = []               # horarios REALES guardados en el robot (getOrder6090)
         self.on_update = None          # callback opcional (estado -> push)
@@ -124,6 +125,7 @@ class RealRobot:
             self._diag = {"quiet": 0, "info": 0}
             self._got_map = False
             self._last_zones = None
+            self.reconnected = True   # tras (re)conectar, CA re-envía las zonas (se pierden al reiniciar)
             if self.link == "cloud":
                 cloud = None
                 try:

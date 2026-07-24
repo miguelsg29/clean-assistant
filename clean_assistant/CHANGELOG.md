@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.20
+- Arreglado que el robot no respetaba las zonas prohibidas: al reiniciar el robot pierde
+  las paredes virtuales (set_virwall) y Clean Assistant no las reponía. Ahora, cuando el
+  robot (re)conecta, CA vuelve a enviarle las zonas del mapa activo automáticamente (tras
+  adoptar las que ya tuviera, para no perder ninguna).
+
 ## 0.16.19
 - Los días de la semana en «Horarios guardados en el robot» empiezan por L (lunes) y
   acaban en D (domingo).
