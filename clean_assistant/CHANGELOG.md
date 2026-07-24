@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.16.17
+- Aviso de «Depósito de agua bajo» (faultCode 525) en la cabecera del mapa. Se irán
+  añadiendo más avisos/errores a medida que se capturen.
+- Nueva pestaña «Actividad»: registro de cada limpieza (tipo manual/programada, con el
+  nombre del horario si aplica; habitaciones; m²; duración; día y hora). Se guarda en
+  Clean Assistant (history.json). Botón para vaciar el registro.
+
 ## 0.16.16
 - Arreglada la ESCALA de los m² limpiados: el robot manda el área en centésimas de m²
   (cleanSize 1506 = 15,06 m²); antes se mostraba tal cual (números absurdos como 158 o 222

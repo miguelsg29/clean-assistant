@@ -8,8 +8,10 @@ Arrancar:  uvicorn backend.app:app --reload
 """
 from __future__ import annotations
 import asyncio
+import datetime
 import json
 import os
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -23,6 +25,7 @@ from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore, suggested_plans, plan_from_order
 from backend.maps import MapStore
+from backend.history import HistoryStore
 from backend.mqtt_bridge import MqttBridge
 
 STATIC = Path(__file__).parent / "static"
@@ -48,9 +51,12 @@ clients: set[WebSocket] = set()
 zones = ZoneStore(_data("zones.json"))       # zonas de Clean Assistant (persistentes)
 schedules = ScheduleStore(_data("schedules.json"))   # horarios (persistentes)
 house_maps = MapStore(_data("maps.json"))    # mapas de la casa vistos (para listar/cambiar)
+history = HistoryStore(_data("history.json"))   # registro de actividad (historial de limpiezas)
 # seguimiento de un mapeo nuevo en curso: al volver a la base tras mapear -> setSaveMap
 _new_map = {"pending": False, "moved": False}
 _last_active_id = [None]   # último mapa activo difundido (para no reenviar en cada frame)
+_session = [None]          # sesión de limpieza en curso (para el historial)
+_clean_trigger = {"ts": 0.0, "rooms": []}   # última orden de limpieza lanzada desde CA
 
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
@@ -148,6 +154,64 @@ def _rooms_meta() -> dict:
         # solo habitaciones reales (con nombre); descarta segmentos temporales
         return {r["id"]: {"name": r["name"]} for r in m["rooms"] if r.get("named", True)}
     return {}
+
+
+# ------- registro de actividad (historial de limpiezas) -------
+def _match_schedule(ts):
+    """Nombre del horario del robot que cuadra con este momento (día+hora ±20 min), o None."""
+    dt = datetime.datetime.fromtimestamp(ts)
+    wd_bit = {0: 2, 1: 4, 2: 8, 3: 16, 4: 32, 5: 64, 6: 1}[dt.weekday()]   # bits del robot
+    mins = dt.hour * 60 + dt.minute
+    for o in getattr(robot, "orders", []) or []:
+        if not o.get("enable"):
+            continue
+        if not (int(o.get("weekday", 0) or 0) & wd_bit):
+            continue
+        if abs(int(o.get("day_time", 0) or 0) - mins) <= 20:
+            return o.get("order_name") or "Horario"
+    return None
+
+
+def _track_session():
+    """Sigue la sesión de limpieza en curso. Devuelve la entrada si acaba de TERMINAR."""
+    s = robot.state
+    if s.state in ("cleaning", "paused"):
+        if _session[0] is None:                       # empieza una limpieza
+            ts = time.time()
+            sched = None if (ts - _clean_trigger["ts"] < 90) else _match_schedule(ts)
+            _session[0] = {"start": ts, "rooms": set(), "area": 0.0, "time": 0,
+                           "type": "programada" if sched else "manual", "sched": sched,
+                           "map_id": s.map_head_id, "map_name": s.map_name}
+        ss = _session[0]
+        if s.cleaning_room:
+            ss["rooms"].add(int(s.cleaning_room))
+        if s.area and s.area > ss["area"]:
+            ss["area"] = s.area
+        if s.clean_time and s.clean_time > ss["time"]:
+            ss["time"] = s.clean_time
+        return None
+    if _session[0] is not None:                       # terminó
+        entry = _finish_session(_session[0])
+        _session[0] = None
+        return entry
+    return None
+
+
+def _finish_session(ss):
+    dur = ss["time"] or max(0, round((time.time() - ss["start"]) / 60))
+    if (ss["area"] or 0) < 0.3 and dur < 1:
+        return None                                   # sin datos útiles (aborto): no registrar
+    dt = datetime.datetime.fromtimestamp(ss["start"])
+    days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    meta = _rooms_meta()
+    rooms = sorted(ss["rooms"])
+    entry = {"id": int(ss["start"] * 1000), "type": ss["type"], "sched": ss.get("sched"),
+             "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
+             "day": days[dt.weekday()],
+             "rooms": [(meta.get(r) or {}).get("name") or f"Hab {r}" for r in rooms],
+             "room_ids": rooms, "area": round(ss["area"] or 0, 2), "duration": dur,
+             "map_id": ss.get("map_id"), "map_name": ss.get("map_name")}
+    return history.add(entry)
 
 
 # Puente MQTT opcional para Home Assistant (montado sobre el mismo robot). Solo se
@@ -282,6 +346,15 @@ async def broadcast_orders():
             clients.discard(ws)
 
 
+async def broadcast_history():
+    msg = json.dumps({"type": "history", "history": history.list()})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
 def _maps_payload() -> dict:
     aid = getattr(robot.state, "map_head_id", None)
     # si el robot tiene un mapa activo que CA no conoce (y no está borrado), lo re-adopta
@@ -350,6 +423,8 @@ async def lifespan(app: FastAPI):
     def on_update():
         asyncio.run_coroutine_threadsafe(broadcast(), loop)
         mqtt.publish_state()
+        if _track_session():                  # ¿acaba de terminar una limpieza? -> historial
+            asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
         # mapeo nuevo: cuando el robot sale a mapear y luego vuelve a la base, guardar el mapa
         if _new_map["pending"]:
             s = getattr(robot.state, "state", None)
@@ -450,7 +525,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.16", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.17", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -471,10 +546,25 @@ async def post_command(payload: dict):
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
     result = robot.command(control)
+    if action in ("start", "clean_rooms", "clean_all"):   # limpieza lanzada desde CA -> "manual"
+        _clean_trigger["ts"] = time.time()
+        _clean_trigger["rooms"] = payload.get("rooms", [])
     _optimistic_state(action, payload)
     mqtt.note_web_command(action, payload)
     await broadcast()
     return {"ok": True, "sent": control, "result": result}
+
+
+@app.get("/api/history")
+def get_history():
+    return {"history": history.list()}
+
+
+@app.post("/api/history/clear")
+async def clear_history():
+    history.clear()
+    await broadcast_history()
+    return {"ok": True, "history": []}
 
 
 @app.get("/api/link")
@@ -936,6 +1026,8 @@ async def websocket(ws: WebSocket):
         await ws.send_text(json.dumps({"type": "orders", "orders": _robot_orders_payload()}))
     if house_maps.maps:
         await ws.send_text(json.dumps({"type": "maps", **_maps_payload()}))
+    if history.entries:
+        await ws.send_text(json.dumps({"type": "history", "history": history.list()}))
     try:
         while True:
             await ws.receive_text()   # el cliente no envía; solo mantenemos abierto

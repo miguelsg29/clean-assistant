@@ -13,6 +13,18 @@ def _is_error_fault(fault) -> bool:
     return f != 0 and not (2100 <= f <= 2199) and not (500 <= f <= 599)
 
 
+# avisos (no errores) con mensaje entendible. De momento solo el de agua; se irán añadiendo
+# a medida que capturemos más códigos de la app.
+WARN_MESSAGES = {525: "Depósito de agua bajo"}
+
+
+def _warn_message(fault):
+    try:
+        return WARN_MESSAGES.get(int(fault))
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class RobotState:
     online: bool = False
@@ -20,6 +32,7 @@ class RobotState:
     battery: int | None = None      # 0-100 (%)
     charging: bool = False
     fault: int | None = None
+    warning: str | None = None      # aviso entendible (p. ej. "Depósito de agua bajo"), o None
     area: float | None = None       # m² limpiados
     clean_time: int | None = None   # minutos
     cleaning_room: int | None = None
@@ -41,6 +54,7 @@ class RobotState:
         fault = data.get("faultCode")
         self.charging = charge == 1
         self.fault = fault
+        self.warning = _warn_message(fault)
         self.work_mode = mode
 
         if charge == 1:
