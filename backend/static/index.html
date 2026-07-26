@@ -614,7 +614,7 @@
     // siguiente). Solo se registra durante una limpieza NORMAL: durante el mapeo o la 1ª
     // limpieza automática el cleanSize del robot no es fiable (da valores absurdos).
     var mState=document.getElementById('mapState');
-    if(mState) mState.textContent='· '+stLabel(s);
+    if(mState) mState.textContent=stLabel(s);
     if(s==='cleaning'||s==='paused'){
       if(+st.area>0) lastClean.area=+st.area;
       if(+st.clean_time>0) lastClean.time=+st.clean_time;
@@ -623,7 +623,7 @@
     var mStats=document.getElementById('mapStats'), parts=[];
     if(lastClean.area>0) parts.push(fmtM2(lastClean.area));
     if(lastClean.time>0) parts.push(fmtDur(lastClean.time));
-    if(mStats) mStats.textContent = parts.length? ('· '+parts.join(' · ')) : '';
+    if(mStats) mStats.textContent = parts.length? parts.join(' · ') : '';
     var mWarn=document.getElementById('mapWarn');   // aviso del robot (p. ej. agua baja)
     if(mWarn) mWarn.textContent = (st.online!==false && st.warning) ? ('⚠ '+st.warning) : '';
     // dock play/pause

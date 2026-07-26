@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.16.22
+- Detalle de la cabecera del mapa: al ir el estado en su propia línea, se quita el «·»
+  que llevaba delante (p. ej. «EN LA BASE» en vez de «· EN LA BASE»).
+
 ## 0.16.21
 - Actividad: una limpieza larga con cortes (p. ej. si el robot no llega a la base y sale
   y vuelve) ya NO genera muchas entradas; se registra como UNA sola. También usa el nombre
