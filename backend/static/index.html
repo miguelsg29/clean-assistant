@@ -66,7 +66,9 @@
   @media(max-width:880px){.stage{grid-template-columns:1fr}}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
   .mapcard{position:relative;overflow:hidden;padding:0}
-  .maphead{position:absolute;top:14px;left:16px;z-index:3;display:flex;gap:8px;align-items:center;pointer-events:none}
+  .maphead{position:absolute;top:14px;left:16px;z-index:3;display:flex;flex-direction:column;gap:3px;align-items:flex-start;pointer-events:none;max-width:calc(100% - 132px)}
+  .maphead .mtitle{font-size:12.5px;color:var(--ink);font-weight:700;letter-spacing:.02em;text-transform:none}
+  .mapsub{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .chiplbl{font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--faint)}
   .chiplbl.warn{color:var(--amber);background:color-mix(in srgb,var(--amber) 16%,transparent);padding:2px 7px;border-radius:999px;text-transform:none;letter-spacing:0}
   .chiplbl.warn:empty{display:none}
@@ -271,7 +273,7 @@
 
   <div class="stage">
     <section class="card mapcard">
-      <div class="maphead"><span class="chiplbl" id="mapTitle">—</span><span class="chiplbl" id="mapState"></span><span class="chiplbl" id="mapStats"></span><span class="chiplbl warn" id="mapWarn"></span></div>
+      <div class="maphead"><span class="chiplbl mtitle" id="mapTitle">—</span><span class="mapsub"><span class="chiplbl" id="mapState"></span><span class="chiplbl" id="mapStats"></span><span class="chiplbl warn" id="mapWarn"></span></span></div>
       <div class="mapctl">
         <button class="iconbtn" id="rotL" title="Girar 90° a la izquierda" aria-label="Girar izquierda">↺</button>
         <button class="iconbtn" id="rotR" title="Girar 90° a la derecha" aria-label="Girar derecha">↻</button>
@@ -1386,7 +1388,7 @@
     var el=document.getElementById('robotOrdersList'); if(!el)return; el.innerHTML='';
     if(!ROBOT_ORDERS.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin datos. Pulsa «Consultar».</p>'; return; }
     ROBOT_ORDERS.forEach(function(o){
-      var mask=o.weekday||0, sat=(mask&64), rooms=(o.roomPer||[]).map(function(r){return r.room_id;});
+      var mask=o.weekday||0, sat=(mask&64), rooms=(o.roomPer||[]).map(function(r){return roomName(r.room_id);});
       var days=WD.map(function(d){return '<span class="day'+((mask&d[0])?' on':'')+'">'+d[1]+'</span>';}).join('');
       var card=document.createElement('div'); card.className='sched';
       card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+hhmm(o.day_time||0)+'</span>'+

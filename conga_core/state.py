@@ -15,7 +15,7 @@ def _is_error_fault(fault) -> bool:
 
 # avisos (no errores) con mensaje entendible. De momento solo el de agua; se irán añadiendo
 # a medida que capturemos más códigos de la app.
-WARN_MESSAGES = {525: "Depósito de agua bajo"}
+WARN_MESSAGES = {525: "Depósito de agua bajo", 512: "Error al volver a la base"}
 
 
 def _warn_message(fault):

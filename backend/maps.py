@@ -96,9 +96,10 @@ class MapStore:
         self.deleted.discard(int(mid))
 
     def set_house(self, mid, house: str) -> dict | None:
+        # alias local de la casa: el robot (field 17) NO lo pisa al recargar el mapa
         m = next((x for x in self.maps if x["id"] == int(mid)), None)
         if m is not None:
-            m["house"] = (house or "").strip()
+            m["house_alias"] = (house or "").strip()
             self._save()
         return m
 
@@ -111,5 +112,5 @@ class MapStore:
 
     def as_list(self, active_id=None) -> list[dict]:
         return [{"id": m["id"], "name": m.get("alias") or m.get("name") or f"Mapa {m['id']}",
-                 "house": m.get("house", ""), "active": (m["id"] == active_id)}
+                 "house": m.get("house_alias") or m.get("house", ""), "active": (m["id"] == active_id)}
                 for m in self.maps]

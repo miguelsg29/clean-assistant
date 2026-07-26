@@ -174,16 +174,22 @@ def _match_schedule(ts):
 
 
 def _track_session():
-    """Sigue la sesión de limpieza en curso. Devuelve la entrada si acaba de TERMINAR."""
+    """Sigue la sesión de limpieza en curso. Devuelve la entrada si acaba de TERMINAR.
+    'volviendo a base' cuenta como activa, y solo se cierra al llegar a la base o tras
+    3 min sin actividad -> una limpieza larga con cortes NO genera varias entradas."""
     s = robot.state
-    if s.state in ("cleaning", "paused"):
-        if _session[0] is None:                       # empieza una limpieza
+    active = s.state in ("cleaning", "paused", "returning")
+    if active:
+        if _session[0] is None:
+            if s.state == "returning":                # no iniciar sesión solo por "volviendo"
+                return None
             ts = time.time()
             sched = None if (ts - _clean_trigger["ts"] < 90) else _match_schedule(ts)
             _session[0] = {"start": ts, "rooms": set(), "area": 0.0, "time": 0,
                            "type": "programada" if sched else "manual", "sched": sched,
-                           "map_id": s.map_head_id, "map_name": s.map_name}
+                           "map_id": s.map_head_id, "last_active": ts}
         ss = _session[0]
+        ss["last_active"] = time.time()
         if s.cleaning_room:
             ss["rooms"].add(int(s.cleaning_room))
         if s.area and s.area > ss["area"]:
@@ -191,10 +197,12 @@ def _track_session():
         if s.clean_time and s.clean_time > ss["time"]:
             ss["time"] = s.clean_time
         return None
-    if _session[0] is not None:                       # terminó
-        entry = _finish_session(_session[0])
-        _session[0] = None
-        return entry
+    if _session[0] is not None:                       # sin actividad: cerrar con debounce
+        idle_for = time.time() - _session[0].get("last_active", _session[0]["start"])
+        if s.state == "docked" or idle_for > 180:
+            entry = _finish_session(_session[0])
+            _session[0] = None
+            return entry
     return None
 
 
@@ -206,13 +214,15 @@ def _finish_session(ss):
     days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     meta = _rooms_meta()
     rooms = sorted(ss["rooms"])
+    mid = ss.get("map_id")
+    map_name = next((m["name"] for m in house_maps.as_list(mid) if m["id"] == mid), None)  # nombre de CA
     entry = {"id": int(ss["start"] * 1000), "kind": "clean",
              "type": ss["type"], "sched": ss.get("sched"),
              "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
              "day": days[dt.weekday()],
              "rooms": [(meta.get(r) or {}).get("name") or f"Hab {r}" for r in rooms],
              "room_ids": rooms, "area": round(ss["area"] or 0, 2), "duration": dur,
-             "map_id": ss.get("map_id"), "map_name": ss.get("map_name")}
+             "map_id": mid, "map_name": map_name}
     return history.add(entry)
 
 
@@ -558,7 +568,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.20", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.21", lifespan=lifespan)
 
 
 @app.get("/api/state")

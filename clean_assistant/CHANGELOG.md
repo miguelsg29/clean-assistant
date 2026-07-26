@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.21
+- Actividad: una limpieza larga con cortes (p. ej. si el robot no llega a la base y sale
+  y vuelve) ya NO genera muchas entradas; se registra como UNA sola. También usa el nombre
+  del mapa de Clean Assistant (no el poco fiable del robot).
+- Nombre de la casa: al editarlo ya no se revierte al cambiar de mapa (antes el robot lo
+  pisaba); se guarda como alias local.
+- «Horarios guardados en el robot»: muestra los NOMBRES de las habitaciones en vez de sus
+  IDs.
+- Error 512 reconocido como «Error al volver a la base».
+- Vista móvil: en la cabecera del mapa, el nombre va en su línea y el estado/m²/tiempo
+  debajo (antes se cortaban y los tapaban los botones de girar).
+
 ## 0.16.20
 - Arreglado que el robot no respetaba las zonas prohibidas: al reiniciar el robot pierde
   las paredes virtuales (set_virwall) y Clean Assistant no las reponía. Ahora, cuando el
