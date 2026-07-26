@@ -214,6 +214,12 @@
   .wizdns code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 8px;-webkit-user-select:all;user-select:all;cursor:pointer;word-break:break-all}
   .wizconn{margin-top:8px;font-size:12.5px;font-weight:600;padding:7px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
   .wizconn.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+  .netcfg{margin:2px 0 4px;border:1px solid var(--line);border-radius:10px;padding:2px 12px;background:var(--bg)}
+  .netcfg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--ink);padding:9px 0;list-style:none}
+  .netcfg summary::-webkit-details-marker{display:none}
+  .netcfg summary::before{content:'▸ ';color:var(--muted)}
+  .netcfg[open] summary::before{content:'▾ '}
+  .netcfg .wizdns{margin-top:0}
   .zrow.zsel{outline:2px solid var(--accent);outline-offset:-1px;border-radius:11px;background:var(--accent-soft)}
   .btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
   .btnrow{display:flex;flex-direction:column;gap:9px;margin-top:16px}
@@ -423,14 +429,12 @@
           </div>
         </div>
 
-        <div id="robotOrdersWrap">
-          <div class="phead" style="margin-top:18px;display:flex;align-items:center;gap:8px">
-            <span>Horarios guardados en el robot</span>
-            <button class="btn ghost" id="refreshOrders" style="margin-left:auto;padding:6px 12px;font-size:12px">Consultar</button>
-          </div>
-          <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Incluye los creados en la app de Cecotec. Pulsa «Consultar» para leerlos del robot.</p>
+        <details id="robotOrdersWrap" class="netcfg" style="margin-top:14px">
+          <summary>Horarios guardados en el robot (diagnóstico)</summary>
+          <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Clean Assistant mantiene estos horarios sincronizados con los de arriba automáticamente, así que normalmente coinciden. Esta lista es solo para comprobar lo que el robot tiene guardado (incluye los creados en la app de Cecotec).</p>
+          <div class="btnrow" style="margin:0 0 8px"><button class="btn ghost" id="refreshOrders" style="width:auto;padding:6px 12px;font-size:12px">Consultar al robot</button></div>
           <div id="robotOrdersList"></div>
-        </div>
+        </details>
       </div>
 
       <div class="tabpane" data-pane="actividad">
@@ -444,6 +448,16 @@
         <div class="phead">Modo de funcionamiento</div>
         <div class="seg" id="linkSeg"><button data-v="local" aria-pressed="true">Local</button><button data-v="cloud">Cloud + Local</button></div>
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:6px 0 2px">Local: sin nube (la app de Cecotec no llega al robot). Cloud + Local: el robot pasa por la nube real, la app oficial funciona y se capturan sus comandos (útil para depurar).</p>
+
+        <details class="netcfg" id="netCfg">
+          <summary>Configuración de red (DNS del robot)</summary>
+          <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Para que el robot hable con Clean Assistant, su tráfico a la nube de Cecotec debe redirigirse a este servidor. Crea una reescritura de DNS en AdGuard Home / Pi-hole / router:</p>
+          <div class="wizdns">
+            <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="netHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
+            <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="netIP" title="Toca para copiar">…</code></div>
+          </div>
+          <div class="wizconn" id="netConn" style="margin-top:8px">…</div>
+        </details>
 
         <div class="phead">Mapas de la casa</div>
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
@@ -1240,7 +1254,7 @@
 
   var cvEl=document.getElementById('mapCanvas');
   // gestos: _ptrs (punteros activos, para pinch), _pinch (2 dedos), _pan (arrastre 1 dedo con zoom)
-  var _ptrs={}, _pinch=null, _pan=null, _panMoved=false;
+  var _ptrs={}, _pinch=null, _pan=null, _panMoved=false, _tapTimer=null, _tapXY=null;
   function _wrapXY(e){ var w=document.getElementById('canvasWrap').getBoundingClientRect(); return [e.clientX-w.left, e.clientY-w.top]; }
   cvEl.addEventListener('pointerdown',function(e){
     if(!MAP||MAP.sample||!CELLS)return;
@@ -1324,9 +1338,15 @@
     if(wasPan) return;                   // fue un desplazamiento, no un toque
     if(editZone){ deselectZone(); return; }   // zona seleccionada y toque fuera -> terminar edición
     var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];
-    if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x];
-      if(v>1&&v!==255){ if(roomEdit==='merge'){ mergeTap(v); } else { toggleRoom(v); } }
-    }
+    var v=(x>=0&&y>=0&&x<w&&y<MAP.bbox[3])?CELLS[y*w+x]:0;
+    if(roomEdit==='merge'){ if(v>1&&v!==255)mergeTap(v); return; }
+    // sin modo: doble toque = zoom; toque simple (diferido 240ms) = seleccionar habitación
+    var tapC=_wrapXY(e);
+    if(_tapTimer){ clearTimeout(_tapTimer); _tapTimer=null;
+      if(_tapXY && (Math.abs(tapC[0]-_tapXY[0])+Math.abs(tapC[1]-_tapXY[1]))<40){
+        if(ZOOM.s>1.2) zoomReset(); else zoomAt(tapC[0],tapC[1],2.4); return; } }
+    _tapXY=tapC;
+    _tapTimer=setTimeout(function(){ _tapTimer=null; if(v>1&&v!==255) toggleRoom(v); },240);
   });
   // rueda del ratón (escritorio): zoom hacia el cursor
   document.getElementById('canvasWrap').addEventListener('wheel',function(e){
@@ -1705,11 +1725,34 @@
         }).catch(function(){ b.disabled=false; b.textContent='Crear y mapear'; });
     });
   })();
+  // ---- configuración de red (DNS) en Ajustes (misma info que el asistente) ----
+  function updateNetConn(){
+    var el=document.getElementById('netConn'); if(!el)return;
+    if(st && st.online){ el.textContent='✓ Robot conectado — el DNS apunta aquí'; el.classList.add('ok'); }
+    else{ el.textContent='⏳ El robot no está conectado (revisa el DNS y reinicia el robot)'; el.classList.remove('ok'); }
+  }
+  (function initNetCfg(){
+    var h=document.getElementById('netHost'), ip=document.getElementById('netIP');
+    if(!h||!ip)return;
+    fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
+      if(d.dns_host)h.textContent=d.dns_host; ip.textContent=d.server_ip||'(IP no detectada)';
+    }).catch(function(){});
+    _copyOnClick(h); _copyOnClick(ip); updateNetConn();
+  })();
+  // avisos puntuales del backend (p. ej. cambio de mapa fallido -> mapa fantasma)
+  async function onNotice(m){
+    if(m.suggest_remove!=null){
+      if(await uiConfirm(m.text, 'Aviso')){
+        fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.suggest_remove})})
+          .then(function(r){return r.json();}).then(function(res){ if(res.maps){HOUSE_MAPS={maps:res.maps,active:res.active};renderMaps();} });
+      }
+    } else { uiAlert(m.text, 'Aviso'); }
+  }
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
-      if(m.type==='state'){st=m.state;render();if(!document.getElementById('wizOv').hidden)updateWizConn();}
+      if(m.type==='state'){st=m.state;render();if(!document.getElementById('wizOv').hidden)updateWizConn();updateNetConn();}
       else if(m.type==='map'){applyMap(m.map);}
       else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
       else if(m.type==='view'){ VIEW=m.view||{rot:0,flip:0}; applyViewBtns(); if(MAP&&!MAP.sample)renderRealMap(); }
@@ -1718,6 +1761,7 @@
       else if(m.type==='orders'){ROBOT_ORDERS=m.orders||[];renderRobotOrders();}
       else if(m.type==='history'){HISTORY=m.history||[];renderHistory();}
       else if(m.type==='maps'){HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();}
+      else if(m.type==='notice'){ onNotice(m); }
       else if(m.type==='link'){LINKMODE=m.mode||'local';applyLinkSeg();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.16.25
+- Mapas fantasma: al activar un mapa que el robot ya no tiene, Clean Assistant lo detecta
+  (el mapa cargado no cambia), vuelve al mapa anterior y avisa ofreciendo quitarlo de la
+  lista. Antes lo marcaba como activo aunque el robot siguiera en otro mapa.
+- Configuración de red (DNS) también en Ajustes: sección desplegable con el dominio a
+  reescribir, la IP de este servidor y si el robot conecta (la misma info del asistente,
+  como referencia por si cambias de red).
+- Mapa: doble toque/doble clic para acercar (hacia el punto tocado) y volver a ajustar.
+- Los «Horarios guardados en el robot» pasan a ser una sección de diagnóstico plegable:
+  Clean Assistant ya los mantiene sincronizados con los de arriba, así que normalmente
+  coinciden; la lista queda solo para comprobar lo que el robot tiene guardado.
+- Zonas y varios servidores: las paredes virtuales solo se reenvían al robot si este las
+  ha PERDIDO (reinicio), no en cada reconexión. Así, si controlas el robot desde dos
+  servidores (p. ej. este equipo y el add-on de Home Assistant), las zonas no se acumulan.
+
 ## 0.16.24
 - Asistente de primer arranque ampliado: ahora explica cómo redirigir el DNS del robot a
   este servidor (AdGuard Home, Pi-hole o el router), mostrando el dominio a reescribir y la

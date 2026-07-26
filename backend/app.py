@@ -640,7 +640,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.24", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.25", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -819,16 +819,25 @@ async def _reconcile_robot_zones():
             pass
     if changed:
         await broadcast_zones()
-    # tras (re)conectar el robot: re-enviar las zonas de CA al robot (las paredes virtuales
-    # se pierden al reiniciarlo). Se hace DESPUÉS de adoptar las del robot, para no perder
-    # ninguna. Solo si CA tiene zonas para el mapa activo.
+    # tras (re)conectar el robot: re-enviar las zonas de CA al robot. Se hace DESPUÉS de
+    # adoptar las del robot. Las paredes virtuales (nogo/nomop) el robot SÍ las devuelve
+    # (campo 9): solo se re-envían si el robot las PERDIÓ (reinicio) y CA las tiene, así al
+    # alternar entre servidores no se acumulan. Las zonas de limpieza (set_area) son
+    # write-only (el robot no las devuelve) -> se re-envían siempre que CA tenga alguna.
     if getattr(robot, "reconnected", False):
         robot.reconnected = False
         active = _active_map()
-        if any(z.get("mapid") == active for z in zones.zones):
+        ca_restricted = any(z.get("mapid") == active and z.get("kind") in ("nogo", "nomop")
+                            for z in zones.zones)
+        ca_cleaning = any(z.get("mapid") == active and z.get("kind") == "clean"
+                          for z in zones.zones)
+        robot_restricted = any(z.get("kind") in ("nogo", "nomop")
+                               for z in m.get("stored_zones", []))
+        if ca_restricted and not robot_restricted:
             _send_zone_group("restricted")
+            print("[zonas] paredes virtuales re-enviadas (el robot las había perdido)")
+        if ca_cleaning:
             _send_zone_group("cleaning")
-            print("[zonas] re-enviadas al robot tras reconectar")
 
 
 # ---- mapas de la casa: listar / cambiar / renombrar (Clean Assistant los va recordando) ----
@@ -873,11 +882,48 @@ def _reconcile_schedules() -> bool:
     return changed
 
 
+async def _notice(level: str, text: str, **extra):
+    """Envía un aviso puntual a la interfaz (banner/modal)."""
+    msg = json.dumps({"type": "notice", "level": level, "text": text, **extra})
+    for ws in list(clients):
+        try:
+            await ws.send_text(msg)
+        except Exception:
+            clients.discard(ws)
+
+
+async def _verify_switch(mid, prev_bbox, prev_active):
+    """Comprueba que el robot cambió de verdad de mapa. El robot no lista sus mapas de forma
+    fiable, así que si tras el cambio el mapa cargado es IDÉNTICO al anterior, el mapa no
+    existe en el robot (fantasma): se revierte al anterior y se avisa para poder quitarlo."""
+    await asyncio.sleep(10)
+    if getattr(robot.state, "map_head_id", None) != mid:
+        return                                   # ya cambió por otra vía; nada que hacer
+    cur = (getattr(robot, "map", None) or {}).get("bbox")
+    if not (prev_bbox and cur and list(cur) == list(prev_bbox)):
+        return                                   # el mapa cambió -> el cambio funcionó
+    name = next((x["name"] for x in house_maps.as_list() if x["id"] == mid), str(mid))
+    if prev_active is not None and prev_active != mid:   # revertir al mapa anterior
+        robot.state.map_head_id = prev_active
+        pm = next((x for x in house_maps.maps if x["id"] == prev_active), None)
+        if pm:
+            robot.state.map_name = pm.get("alias") or pm.get("name")
+        robot.command(cmd.select_map(prev_active))
+        await broadcast_maps()
+        await broadcast_schedules()
+        await broadcast_zones()
+        await broadcast_orders()
+    await _notice("warn", f"No se pudo cambiar al mapa «{name}»: el robot ya no lo tiene "
+                          f"(mapa fantasma). ¿Quitarlo de la lista?", suggest_remove=mid)
+
+
 @app.post("/api/maps/select")
 async def maps_select(payload: dict):
     """Cambia el mapa activo (selectMapPlan). El robot aísla los horarios por mapa, así
     que al cargar el nuevo se re-consultan y se sincronizan (importar/subir)."""
     mid = int(payload["id"])
+    prev_active = getattr(robot.state, "map_head_id", None)
+    prev_bbox = (getattr(robot, "map", None) or {}).get("bbox")
     robot.command(cmd.select_map(mid))
     _activate_local(mid)                     # refleja el cambio YA + re-pide el mapa completo
     # difunde YA lo que depende del mapa activo -> la interfaz cambia al instante
@@ -885,6 +931,8 @@ async def maps_select(payload: dict):
     await broadcast_schedules()
     await broadcast_zones()
     await broadcast_orders()
+    if prev_active is not None and prev_active != mid:   # verifica que el cambio de verdad ocurrió
+        asyncio.create_task(_verify_switch(mid, prev_bbox, prev_active))
     return {"ok": True, **_maps_payload()}
 
 
