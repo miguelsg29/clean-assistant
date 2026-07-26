@@ -25,9 +25,10 @@ _WD_REV = [("dom", 1), ("lun", 2), ("mar", 4), ("mie", 8), ("jue", 16), ("vie", 
 
 
 def plan_from_order(order: dict, mapid) -> dict:
-    """Convierte un horario del robot (getOrder6090) en un plan de Clean Assistant."""
-    mins = int(order.get("day_time", 0) or 0)
-    wd = int(order.get("weekday", 0) or 0)
+    """Convierte un horario del robot (getOrder6090) en un plan de Clean Assistant.
+    El robot guarda la hora en UTC; se pasa a local para mostrarla/guardarla en CA."""
+    mins, wd = cmd.robot_to_local(int(order.get("day_time", 0) or 0),
+                                  int(order.get("weekday", 0) or 0))
     rooms = []
     for r in order.get("roomPer", []) or []:
         rooms.append({"room": r.get("room_id"),

@@ -409,6 +409,11 @@ class RealRobot:
     def _query_startup(self):
         """Pide no molestar / consumibles / OTA / voz (con reintentos)."""
         uid = self.cfg.userid
+        # ajusta el reloj del robot una vez por conexión (los horarios se guardan en UTC y
+        # disparan según el reloj del robot; sin esto podían dispararse a destiempo).
+        if not self._diag.get("time"):
+            self._diag["time"] = 1
+            self.command(cmd.set_time())
         if self.state.quiet is None and self._diag["quiet"] < 6:
             self._diag["quiet"] += 1
             self.command(cmd.query("get_quiet", uid))

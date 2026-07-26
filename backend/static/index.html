@@ -472,6 +472,19 @@
   </div>
 </div>
 
+<div class="modal-ov" id="wizOv" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wizT">
+    <h3 id="wizT">¡Bienvenido a Clean Assistant!</h3>
+    <p>Para empezar, el robot necesita un mapa de tu casa. Puedo crear uno ahora: el robot recorrerá toda la casa para mapearla (tarda un rato).</p>
+    <div class="field"><label>Nombre del mapa</label><input type="text" id="wizName" class="tinput" value="Mi casa"/></div>
+    <p class="hint" style="font-size:11.5px;color:var(--critical);margin:2px 0 0">⚠ Al crear el mapa se borrarán los mapas, zonas y horarios que el robot tenga ahora, para empezar de cero con uno solo.</p>
+    <div class="macts">
+      <button class="btn ghost" id="wizSkip">Ahora no</button>
+      <button class="btn" id="wizCreate">Crear y mapear</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   // ---- modal in-app (reemplaza confirm/alert del navegador, con el diseño de la app) ----
@@ -1520,12 +1533,17 @@
   function loadMaps(){ fetch(BASE+'api/maps').then(function(r){return r.json();}).then(function(d){HOUSE_MAPS=d;renderMaps();}).catch(function(){}); }
   _modalInit();
   loadMaps();
+  setTimeout(maybeWizard, 3000);   // tras dar tiempo a que lleguen los mapas del robot (WS)
   document.getElementById('newMapBtn').addEventListener('click',function(){ var f=document.getElementById('newMapForm'); f.style.display=(f.style.display==='none'?'block':'none'); });
   document.getElementById('nmCancel').addEventListener('click',function(){ document.getElementById('newMapForm').style.display='none'; });
   document.getElementById('nmCreate').addEventListener('click',async function(){
     var name=document.getElementById('nmName').value.trim(), house=document.getElementById('nmHouse').value.trim();
     if(!name){ uiAlert('Ponle un nombre al mapa.'); return; }
-    if(!(await uiConfirm('¿Crear el mapa "'+name+'"? El robot empezará a recorrer la casa para mapearla.'))) return;
+    var wipe=((HOUSE_MAPS.maps||[]).length===0);   // primer mapa: se borran los previos del robot
+    var msg=wipe
+      ? '¿Crear el mapa "'+name+'"? Se borrarán los mapas, zonas y horarios que el robot tenga ahora y empezará a mapear la casa de cero.'
+      : '¿Crear el mapa "'+name+'"? El robot empezará a recorrer la casa para mapearla (se añadirá a los mapas que ya tienes).';
+    if(!(await uiConfirm(msg))) return;
     fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:house})})
       .then(function(r){return r.json();}).then(function(){
         document.getElementById('newMapForm').style.display='none';
@@ -1533,6 +1551,31 @@
         uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
       });
   });
+
+  // ---- asistente de primer arranque: si CA no tiene ningún mapa, ofrece crear uno ----
+  var _wizShown=false;
+  function maybeWizard(){
+    if(_wizShown) return;
+    if(localStorage.getItem('ca_wizard_dismissed')==='1') return;
+    if((HOUSE_MAPS.maps||[]).length>0) return;   // ya hay mapa -> no molestar
+    var ov=document.getElementById('wizOv'); if(!ov) return;
+    _wizShown=true; ov.hidden=false;
+  }
+  (function initWizard(){
+    var ov=document.getElementById('wizOv'); if(!ov) return;
+    document.getElementById('wizSkip').addEventListener('click',function(){
+      localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true;
+    });
+    document.getElementById('wizCreate').addEventListener('click',function(){
+      var name=(document.getElementById('wizName').value||'Mi casa').trim()||'Mi casa';
+      var b=this; b.disabled=true; b.textContent='Iniciando…';
+      fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:name,wipe:true})})
+        .then(function(r){return r.json();}).then(function(){
+          localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true; b.disabled=false; b.textContent='Crear y mapear';
+          uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
+        }).catch(function(){ b.disabled=false; b.textContent='Crear y mapear'; });
+    });
+  })();
   function connect(){
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');

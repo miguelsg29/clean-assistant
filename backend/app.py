@@ -59,6 +59,62 @@ _session = [None]          # sesión de limpieza en curso (para el historial)
 _clean_trigger = {"ts": 0.0, "rooms": []}   # última orden de limpieza lanzada desde CA
 _last_fault = [None]       # último faultCode registrado en el historial (para no repetir)
 
+# ------- valores por defecto de PRIMER ARRANQUE (solo instalación nueva) -------
+# En una instalación nueva se aplican una vez: actualizaciones automáticas (OTA) desactivadas
+# y vaciado del colector "después de cada limpieza". En una instalación EXISTENTE (al
+# actualizar) NO se tocan los ajustes del usuario: se marca como hecho sin aplicar nada.
+FIRSTRUN_PATH = _data("firstrun.json")
+_STATE_FILES = ("link.json", "maps.json", "schedules.json", "zones.json",
+                "identity.json", "map_cache.json", "history.json", "view.json")
+
+
+def _is_fresh_install() -> bool:
+    """True si no hay NINGÚN dato previo de Clean Assistant (instalación desde cero)."""
+    return not any(os.path.exists(_data(n)) for n in _STATE_FILES)
+
+
+# [aplicado, hacer(=aplicar defaults al conectar)]: se resuelve en el arranque (lifespan)
+_first_run = {"done": os.path.exists(FIRSTRUN_PATH), "apply": False}
+
+
+def _mark_first_run_done():
+    _first_run["done"] = True
+    _first_run["apply"] = False
+    try:
+        with open(FIRSTRUN_PATH, "w", encoding="utf-8") as f:
+            json.dump({"done": True, "ts": time.time()}, f)
+    except Exception:
+        pass
+
+
+def _apply_first_run_defaults():
+    """Aplica los defaults de primer arranque cuando el robot está conectado en local."""
+    if _first_run["done"] or not _first_run["apply"]:
+        return
+    if getattr(robot, "link", "local") == "cloud":
+        return                                   # en cloud manda la nube; se aplica en local
+    if not getattr(robot.state, "online", False):
+        return                                   # aún sin robot: se reintenta al conectar
+    try:
+        robot.command(cmd.set_upgrade(False))    # OTA desactivada
+        robot.state.auto_upgrade = 0
+        robot.command(cmd.dust_freq(0))          # vaciar tras cada limpieza
+        robot.state.collect_freq = 0
+        print("[firstrun] defaults aplicados: OTA off + vaciado tras cada limpieza")
+    except Exception:
+        pass
+    _mark_first_run_done()
+
+
+# resuelve el primer arranque al importar (antes de que el robot cree ficheros de estado):
+# instalación NUEVA -> aplicar defaults al conectar; instalación EXISTENTE -> no tocar nada.
+if not _first_run["done"]:
+    if _is_fresh_install():
+        _first_run["apply"] = True
+        print("[firstrun] instalación nueva: se aplicarán OTA off + vaciado tras cada limpieza")
+    else:
+        _mark_first_run_done()
+
 # orientación del mapa (giro 0-3 x90° + espejo), persistente en view.json
 VIEW_PATH = _data("view.json")
 
@@ -166,9 +222,12 @@ def _match_schedule(ts):
     for o in getattr(robot, "orders", []) or []:
         if not o.get("enable"):
             continue
-        if not (int(o.get("weekday", 0) or 0) & wd_bit):
+        # el robot guarda la hora/días en UTC -> pasar a local para comparar con `mins`
+        odt, owd = cmd.robot_to_local(int(o.get("day_time", 0) or 0),
+                                      int(o.get("weekday", 0) or 0))
+        if not (owd & wd_bit):
             continue
-        if abs(int(o.get("day_time", 0) or 0) - mins) <= 20:
+        if abs(odt - mins) <= 20:
             return o.get("order_name") or "Horario"
     return None
 
@@ -368,14 +427,25 @@ async def broadcast_view():
             clients.discard(ws)
 
 
+def _order_to_local(o: dict) -> dict:
+    """Copia del horario del robot con la hora/días pasados de UTC a local (para mostrar)."""
+    dt, wd = cmd.robot_to_local(int(o.get("day_time", 0) or 0),
+                                int(o.get("weekday", 0) or 0))
+    oo = dict(o)
+    oo["day_time"] = dt
+    oo["weekday"] = wd
+    return oo
+
+
 def _robot_orders_payload():
     """Horarios que el robot tiene DEL MAPA ACTIVO. El robot devuelve los de todos los
-    mapas (cada uno con su mapid); aquí se muestran solo los del mapa activo."""
+    mapas (cada uno con su mapid); aquí se muestran solo los del mapa activo, con la hora
+    ya convertida a local (el robot la guarda en UTC)."""
     active = _active_map()
     orders = getattr(robot, "orders", []) or []
-    if active is None:
-        return orders
-    return [o for o in orders if o.get("mapid") == active]
+    if active is not None:
+        orders = [o for o in orders if o.get("mapid") == active]
+    return [_order_to_local(o) for o in orders]
 
 
 async def broadcast_orders():
@@ -464,6 +534,7 @@ async def lifespan(app: FastAPI):
     def on_update():
         asyncio.run_coroutine_threadsafe(broadcast(), loop)
         mqtt.publish_state()
+        _apply_first_run_defaults()           # instalación nueva: OTA off + vaciado tras limpieza
         _ended = _track_session()             # limpieza terminada
         _fault = _track_faults()              # aviso/error nuevo
         if _ended or _fault:
@@ -568,7 +639,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.22", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.23", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -743,22 +814,20 @@ def get_maps():
 
 
 def _order_key(o):
-    return ((o.get("order_name") or "").strip().lower(), int(o.get("day_time", 0) or 0))
+    # se casa por NOMBRE (por mapa): la hora no entra en la clave para no re-importar/
+    # re-empujar el mismo horario si su hora difiere entre robot (UTC) y plan (local).
+    return (o.get("order_name") or "").strip().lower()
 
 
 def _plan_key(p):
-    try:
-        h, m = str(p.get("time", "0:00")).split(":")[:2]
-        mins = int(h) * 60 + int(m)
-    except Exception:
-        mins = 0
-    return ((p.get("name") or "").strip().lower(), mins)
+    return (p.get("name") or "").strip().lower()
 
 
 def _reconcile_schedules() -> bool:
-    """Sincroniza los horarios de Clean Assistant con los del robot (mapa activo, que el
-    robot aísla por mapa). Casa por nombre+hora: importa a CA los del robot que falten
-    (p. ej. creados en la app) y sube al robot los de CA que falten. Devuelve True si CA cambió."""
+    """Descubre horarios nuevos entre Clean Assistant y el robot (mapa activo, que el robot
+    aísla por mapa). Casa por NOMBRE: importa a CA los del robot que falten (p. ej. creados
+    en la app) y sube al robot los de CA que falten. NO reescribe los que ya existen en
+    ambos lados (para no pelear por la hora ni entrar en bucle). Devuelve True si CA cambió."""
     mid = _active_map()
     if mid is None:
         return False
@@ -806,12 +875,48 @@ async def maps_rename(payload: dict):
     return {"ok": True, **_maps_payload()}
 
 
+def _robot_known_map_ids() -> set:
+    """Todos los ids de mapa que conocemos del robot: los recordados por CA, los del
+    campo 17 del último mapa, y el mapa activo."""
+    ids = {m["id"] for m in house_maps.maps}
+    rm = getattr(robot, "map", None) or {}
+    for mm in ((rm.get("house") or {}).get("maps") or []):
+        if mm.get("id"):
+            ids.add(mm["id"])
+    aid = getattr(robot.state, "map_head_id", None)
+    if aid:
+        ids.add(aid)
+    return ids
+
+
 @app.post("/api/maps/create")
 async def maps_create(payload: dict):
     """Crea un mapa nuevo: fija nombres (casa+mapa) y arranca el mapeo. El robot
-    recorrerá la casa para construirlo."""
+    recorrerá la casa para construirlo.
+    Si `wipe` (o es el PRIMER mapa: CA no tiene ninguno), borra antes TODOS los mapas del
+    robot para que quede solo el nuevo (evita acumular mapas duplicados)."""
     name = (payload.get("name") or "Mapa nuevo").strip()
     house = (payload.get("house") or name).strip()
+    wipe = payload.get("wipe")
+    if wipe is None:
+        wipe = not house_maps.maps          # por defecto, solo al crear el primer mapa
+    if wipe:
+        ids = _robot_known_map_ids()
+        for mid in ids:
+            try:
+                robot.command(cmd.delete_map(mid))
+            except Exception:
+                pass
+            house_maps.remove(mid)          # tombstone + quita de la lista de CA
+            zones.remove_map(mid)
+            schedules.remove_map(mid)
+        if ids:
+            robot.state.map_head_id = None
+            robot.state.map_name = None
+            robot.orders = []
+            print(f"[mapa] limpieza previa: borrados {len(ids)} mapa(s) antes de mapear")
+            await asyncio.sleep(1.0)         # deja que el robot procese los borrados
+
     robot.command(cmd.edit_map_info(house, name))
     robot.command(cmd.start_new_map())
     _new_map["pending"] = True       # al completar el mapeo (volver a base) -> setSaveMap
@@ -820,7 +925,12 @@ async def maps_create(payload: dict):
     _new_map["name"] = name          # nombre/casa elegidos: se aplican al mapa nuevo al guardarse
     _new_map["house"] = house
     _new_map["known"] = [m["id"] for m in house_maps.maps]   # ids EXISTENTES: el nuevo será otro
-    return {"ok": True}
+    if wipe:
+        await broadcast_maps()
+        await broadcast_zones()
+        await broadcast_schedules()
+        await broadcast_orders()
+    return {"ok": True, "wiped": bool(wipe)}
 
 
 @app.post("/api/maps/delete")

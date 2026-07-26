@@ -5,7 +5,9 @@ Cada función devuelve el objeto `control` que viaja hacia el robot dentro de
 La especificación completa está en el repo de documentación (Conga8090_Protocolo.md).
 """
 from __future__ import annotations
+import datetime
 import hashlib
+import time as _time
 
 # ---------------- escalas (nombre visible -> valor del robot) ----------------
 FAN = {"Off": 0, "Eco": 1, "Normal": 2, "Turbo": 3}
@@ -24,6 +26,54 @@ AREA_ONE, AREA_TWICE = 200, 201          # set_area: 1 pasada / doble pasada
 def _lvl(table, v):
     """Acepta nombre ('Turbo') o valor numérico directo."""
     return table.get(v, v)
+
+
+# ---------------- zona horaria de los horarios ----------------
+# El robot guarda/compara la hora de los horarios (day_time) en UTC, igual que la nube
+# de Cecotec: la app oficial convierte a la hora local al mostrarla. Clean Assistant hace
+# lo mismo para que la hora que ve/pone el usuario coincida con la app y el robot dispare
+# a la hora correcta. day_time = minutos desde medianoche; weekday = máscara de bits de
+# días (dom=1, lun=2, mar=4, mie=8, jue=16, vie=32, sab=64, consecutivos).
+def tz_offset_min() -> int:
+    """Minutos que hay que SUMAR a UTC para obtener la hora local (maneja el horario de
+    verano/invierno automáticamente)."""
+    try:
+        off = datetime.datetime.now().astimezone().utcoffset()
+        return int(off.total_seconds() // 60) if off else 0
+    except Exception:
+        return 0
+
+
+def _rot_weekday(mask: int, delta: int) -> int:
+    """Rota la máscara de días `delta` días (rotación de 7 bits). +1 = día siguiente."""
+    m = int(mask or 0) & 0x7F
+    if not m:
+        return m
+    delta %= 7
+    return ((m << delta) | (m >> (7 - delta))) & 0x7F
+
+
+def _shift_daytime(day_min: int, weekday: int, delta_min: int):
+    """Aplica un desfase en minutos a (hora, días); si cruza medianoche, mueve los días."""
+    t = int(day_min) + int(delta_min)
+    day_delta = 0
+    while t < 0:
+        t += 1440
+        day_delta -= 1
+    while t >= 1440:
+        t -= 1440
+        day_delta += 1
+    return t, _rot_weekday(weekday, day_delta)
+
+
+def local_to_robot(day_min: int, weekday: int):
+    """Hora local (min) + días -> hora UTC + días que guarda/compara el robot."""
+    return _shift_daytime(day_min, weekday, -tz_offset_min())
+
+
+def robot_to_local(day_min: int, weekday: int):
+    """Hora UTC + días del robot -> hora local + días para mostrar/guardar en CA."""
+    return _shift_daytime(day_min, weekday, tz_offset_min())
 
 
 # ---------------- config sugerida según el tipo de suelo (roomMaterialId) ----------------
@@ -112,6 +162,16 @@ def set_voice(voice_on: bool, volume: int):
 
 def voice_type(n: int):  return {"control": "setVoiceType", "Voice": int(n)}
 def set_upgrade(auto):   return {"control": "set_upgrade_config", "auto_upgrade": 1 if auto else 0}
+
+
+def set_time(epoch: int | None = None, tz_offset_sec: int | None = None):
+    """Ajusta el reloj del robot (set_time). time = epoch UTC; timezone = offset local en
+    segundos. Con el reloj correcto, los horarios (day_time en UTC) disparan a su hora."""
+    if epoch is None:
+        epoch = int(_time.time())
+    if tz_offset_sec is None:
+        tz_offset_sec = tz_offset_min() * 60
+    return {"control": "set_time", "timezone": int(tz_offset_sec), "time": int(epoch)}
 
 
 def set_quiet(is_open: bool, begin_min: int, end_min: int):
@@ -253,11 +313,14 @@ def build_order(plan, map_head_id, rooms_meta=None, enable=None):
             "cleanmode": 0, "room_type": meta.get("type", 0),
         })
     en = plan.get("enable", True) if enable is None else enable
+    # la hora/días del plan están en LOCAL; el robot los guarda en UTC (como la nube)
+    day_time, weekday = local_to_robot(_daytime(plan.get("time", "0:00")),
+                                       _weekday(plan.get("days", [])))
     return {"control": "setOrder6090", "order": {
         "orderid": _order_id(plan), "order_name": plan.get("name", "Plan"),
         "enable": 1 if en else 0, "repeat": 1,
-        "weekday": _weekday(plan.get("days", [])),
-        "day_time": _daytime(plan.get("time", "0:00")),
+        "weekday": weekday,
+        "day_time": day_time,
         "mapid": int(map_head_id), "mapName": "Interior",
         "is_global": 0, "clean_type": 0, "arealist": [], "virwallList": [],
         "roomPer": room_per}}

@@ -24,6 +24,10 @@ maps.json
 history.json
 link.json
 identity.json
+firstrun.json
+
+# ===== Capturas de pantalla de la app (muestran tu casamapadatos) =====
+Capturasdepantallaclean
 
 # Docker (volumen de datos local)
 data/

@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.16.23
+- Horarios: arreglado el desfase de 2 horas. El robot (como la nube de Cecotec) guarda la
+  hora de los horarios en UTC y la app oficial la muestra en local; Clean Assistant hacía
+  la conversión al revés y mostraba 2 h menos (p. ej. las 13:00 salían como 11:00). Ahora
+  CA convierte UTC↔local en ambos sentidos (con horario de verano/invierno), así la hora
+  coincide con la app y el robot dispara a la hora correcta. Maneja también el cambio de
+  día si el horario cae de madrugada.
+- El robot pone su reloj en hora al conectar (set_time con la zona horaria local), para
+  que los horarios se disparen a tiempo aunque el robot lleve tiempo sin nube.
+- La sincronización de horarios CA↔robot ahora casa por NOMBRE (antes por nombre+hora):
+  así un horario que existe en ambos lados ya no se re-importa/re-empuja en bucle si su
+  hora difiere (lo que podía reescribir la hora del robot).
+- Primer arranque (solo instalación nueva): las actualizaciones automáticas (OTA) quedan
+  DESACTIVADAS y el vaciado del colector en «después de cada limpieza». En una instalación
+  existente NO se tocan tus ajustes.
+- Asistente de bienvenida: si Clean Assistant no tiene ningún mapa, ofrece crear uno
+  (avisando de que se borrarán los mapas/zonas/horarios que el robot tenga). Se puede
+  saltar («Ahora no»).
+- Al crear el PRIMER mapa se borran antes todos los mapas del robot, para que quede solo
+  el nuevo. Esto evita el problema de los MAPAS DUPLICADOS: el Conga admite varios mapas y
+  guardaba cada mapeo como uno nuevo sin borrar los anteriores; si un mapeo se quedaba a
+  medias (p. ej. el robot no llegaba a la base por una silla) y se repetía, se acumulaban
+  mapas («Interior», «Planta», «Mapa1»…). (Crear un mapa ADICIONAL teniendo ya otros sigue
+  sin borrarlos.)
+
 ## 0.16.22
 - Detalle de la cabecera del mapa: al ir el estado en su propia línea, se quita el «·»
   que llevaba delante (p. ej. «EN LA BASE» en vez de «· EN LA BASE»).
