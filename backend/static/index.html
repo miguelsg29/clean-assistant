@@ -79,7 +79,11 @@
   svg.map{width:100%;height:auto;display:block;border-radius:12px}
   svg.map.hidden{display:none}
   canvas.realmap{display:block;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
-  .canvaswrap{display:none;position:relative}
+  .canvaswrap{display:none;position:relative;overflow:hidden;border-radius:12px;touch-action:none}
+  .mapzoom{position:relative;width:100%;transform-origin:0 0;will-change:transform}
+  .zoomctl{position:absolute;bottom:112px;right:12px;z-index:4;display:none;flex-direction:column;gap:6px}
+  body.has-realmap .zoomctl{display:flex}
+  .zoomctl .iconbtn{font-size:18px;font-weight:600;line-height:1}
   .canvaswrap.show{display:block}
   canvas.realmap.overlay{position:absolute;inset:0;width:100%;height:100%;image-rendering:auto;cursor:default;pointer-events:none;border-radius:12px}
   .room{cursor:pointer}
@@ -197,6 +201,19 @@
   .modal .macts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
   .modal .macts .btn{width:auto;padding:9px 18px}
   .modal .macts .btn[hidden]{display:none}
+  /* asistente de primer arranque (más ancho, con pasos y bloque DNS) */
+  .wizmodal{max-width:520px;max-height:88vh;overflow:auto}
+  .wizintro{margin-bottom:6px !important}
+  .wizstep{border:1px solid var(--line);border-radius:12px;padding:12px 13px;margin-top:12px;background:var(--bg)}
+  .wizstep-h{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:650;color:var(--ink);margin-bottom:6px}
+  .wiznum{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12.5px;font-weight:700;flex:0 0 auto}
+  .wizstep .hint{font-size:12px;line-height:1.5;color:var(--muted);margin:4px 0}
+  .wizdns{display:flex;flex-direction:column;gap:6px;margin:8px 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
+  .wizdns-row{display:flex;align-items:center;gap:10px}
+  .wizdns-k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);width:66px;flex:0 0 auto}
+  .wizdns code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:3px 8px;-webkit-user-select:all;user-select:all;cursor:pointer;word-break:break-all}
+  .wizconn{margin-top:8px;font-size:12.5px;font-weight:600;padding:7px 10px;border-radius:8px;background:var(--bg);border:1px solid var(--line);color:var(--muted)}
+  .wizconn.ok{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
   .zrow.zsel{outline:2px solid var(--accent);outline-offset:-1px;border-radius:11px;background:var(--accent-soft)}
   .btn[disabled]{opacity:.45;cursor:not-allowed;filter:none}
   .btnrow{display:flex;flex-direction:column;gap:9px;margin-top:16px}
@@ -279,6 +296,11 @@
         <button class="iconbtn" id="rotR" title="Girar 90° a la derecha" aria-label="Girar derecha">↻</button>
         <button class="iconbtn" id="flipB" title="Voltear en espejo" aria-label="Espejo">⇌</button>
       </div>
+      <div class="zoomctl" id="zoomCtl">
+        <button class="iconbtn" id="zoomIn" title="Acercar" aria-label="Acercar">+</button>
+        <button class="iconbtn" id="zoomOut" title="Alejar" aria-label="Alejar">−</button>
+        <button class="iconbtn" id="zoomReset" title="Ajustar" aria-label="Ajustar">⤢</button>
+      </div>
       <div class="mapwrap">
         <svg class="map" viewBox="0 0 400 300" role="img" aria-label="Mapa de la vivienda">
           <g>
@@ -309,8 +331,10 @@
           <g class="robot" id="robot" transform="translate(92,258)"><circle class="ping" cx="0" cy="0" r="9"/><circle class="halo" cx="0" cy="0" r="13"/><circle class="body" cx="0" cy="0" r="8"/></g>
         </svg>
         <div class="canvaswrap" id="canvasWrap">
-          <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
-          <canvas class="realmap overlay" id="robotCanvas" aria-hidden="true"></canvas>
+          <div class="mapzoom" id="mapZoom">
+            <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
+            <canvas class="realmap overlay" id="robotCanvas" aria-hidden="true"></canvas>
+          </div>
         </div>
       </div>
       <div class="dockbar" role="group" aria-label="Controles del robot">
@@ -473,11 +497,27 @@
 </div>
 
 <div class="modal-ov" id="wizOv" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="wizT">
+  <div class="modal wizmodal" role="dialog" aria-modal="true" aria-labelledby="wizT">
     <h3 id="wizT">¡Bienvenido a Clean Assistant!</h3>
-    <p>Para empezar, el robot necesita un mapa de tu casa. Puedo crear uno ahora: el robot recorrerá toda la casa para mapearla (tarda un rato).</p>
-    <div class="field"><label>Nombre del mapa</label><input type="text" id="wizName" class="tinput" value="Mi casa"/></div>
-    <p class="hint" style="font-size:11.5px;color:var(--critical);margin:2px 0 0">⚠ Al crear el mapa se borrarán los mapas, zonas y horarios que el robot tenga ahora, para empezar de cero con uno solo.</p>
+    <p class="wizintro">Controla tu Conga 100% en local, sin la nube de Cecotec. Solo hay que hacer dos cosas:</p>
+
+    <div class="wizstep">
+      <div class="wizstep-h"><span class="wiznum">1</span> Redirige el DNS del robot a este servidor</div>
+      <p class="hint">El robot busca la nube de Cecotec en un dominio fijo. Para que hable con Clean Assistant, redirige ese dominio a la IP de este servidor con tu bloqueador de DNS (AdGuard Home, Pi-hole) o el router:</p>
+      <div class="wizdns">
+        <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="wizHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
+        <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="wizIP" title="Toca para copiar">…</code></div>
+      </div>
+      <p class="hint"><b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP de arriba). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.</p>
+      <div class="wizconn" id="wizConn">⏳ Esperando a que el robot conecte…</div>
+    </div>
+
+    <div class="wizstep">
+      <div class="wizstep-h"><span class="wiznum">2</span> Crea el mapa de tu casa</div>
+      <div class="field"><label>Nombre del mapa</label><input type="text" id="wizName" class="tinput" value="Mi casa"/></div>
+      <p class="hint" style="color:var(--critical)">⚠ Al crear el mapa se borrarán los mapas, zonas y horarios que el robot tenga ahora, para empezar de cero con uno solo. El robot recorrerá toda la casa (tarda un rato).</p>
+    </div>
+
     <div class="macts">
       <button class="btn ghost" id="wizSkip">Ahora no</button>
       <button class="btn" id="wizCreate">Crear y mapear</button>
@@ -523,6 +563,28 @@
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
   // orientación de la VISTA del mapa (no afecta a las coords que van al robot)
   var VIEW={rot:0,flip:0}, LAST_BBOX=null;
+  // zoom/desplazamiento del mapa (transform CSS del wrapper; evtCell lo compensa vía getBoundingClientRect)
+  var ZOOM={s:1,tx:0,ty:0};
+  function _clampPan(){
+    var wrap=document.getElementById('canvasWrap'); if(!wrap)return;
+    var W=wrap.clientWidth, H=wrap.clientHeight;      // límites: no dejar hueco fuera del contenido
+    var minx=W-W*ZOOM.s, miny=H-H*ZOOM.s;
+    ZOOM.tx=Math.min(0,Math.max(minx,ZOOM.tx)); ZOOM.ty=Math.min(0,Math.max(miny,ZOOM.ty));
+    if(ZOOM.s<=1){ ZOOM.tx=0; ZOOM.ty=0; }
+  }
+  function applyZoom(){
+    var z=document.getElementById('mapZoom'); if(!z)return;
+    _clampPan();
+    z.style.transform='translate('+ZOOM.tx+'px,'+ZOOM.ty+'px) scale('+ZOOM.s+')';
+    var b=document.getElementById('mapCanvas'); if(b) b.style.cursor=ZOOM.s>1?'grab':'pointer';
+  }
+  function zoomAt(cx,cy,ns){    // zoom manteniendo fijo el punto (cx,cy) en coords del wrapper
+    ns=Math.min(6,Math.max(1,ns));
+    if(ns===ZOOM.s)return;
+    ZOOM.tx=cx-(cx-ZOOM.tx)*(ns/ZOOM.s); ZOOM.ty=cy-(cy-ZOOM.ty)*(ns/ZOOM.s);
+    ZOOM.s=ns; applyZoom();
+  }
+  function zoomReset(){ ZOOM.s=1; ZOOM.tx=0; ZOOM.ty=0; applyZoom(); }
   function vdims(){ var W=MAP.bbox[2],H=MAP.bbox[3]; return (VIEW.rot%2)?{w:H,h:W}:{w:W,h:H}; }
   function s2v(cx,cy){ var W=MAP.bbox[2],H=MAP.bbox[3],x=VIEW.flip?(W-cx):cx,y=cy;
     switch(VIEW.rot){case 1:return[H-y,x];case 2:return[W-x,H-y];case 3:return[y,W-x];default:return[x,y];} }
@@ -532,6 +594,7 @@
   function applyViewBtns(){ var f=document.getElementById('flipB'); if(f)f.setAttribute('aria-pressed',VIEW.flip?'true':'false'); }
   function setView(patch){ Object.assign(VIEW,patch); applyViewBtns();
     fetch(BASE+'api/view/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(VIEW)});
+    if(typeof zoomReset==='function')zoomReset();   // el giro cambia dimensiones: vuelve a encajar
     if(MAP&&!MAP.sample)renderRealMap(); }
   function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim();}
   var ROOM_TOKENS=['--r1','--r2','--r3','--r4','--r5','--r6','--r7','--r8'];
@@ -1176,23 +1239,57 @@
   });
 
   var cvEl=document.getElementById('mapCanvas');
+  // gestos: _ptrs (punteros activos, para pinch), _pinch (2 dedos), _pan (arrastre 1 dedo con zoom)
+  var _ptrs={}, _pinch=null, _pan=null, _panMoved=false;
+  function _wrapXY(e){ var w=document.getElementById('canvasWrap').getBoundingClientRect(); return [e.clientX-w.left, e.clientY-w.top]; }
   cvEl.addEventListener('pointerdown',function(e){
     if(!MAP||MAP.sample||!CELLS)return;
-    if(editZone&&!drawKind&&!roomEdit){                 // editar la zona seleccionada (mover/tamaño/rotar)
+    _ptrs[e.pointerId]=_wrapXY(e);
+    if(Object.keys(_ptrs).length>=2){                   // dos dedos -> pinch + desplazamiento
+      drawStart=null; splitStart=null; drawRect=null; editDrag=null; _pan=null;
+      var k=Object.keys(_ptrs), a=_ptrs[k[0]], b=_ptrs[k[1]];
+      _pinch={d0:Math.hypot(a[0]-b[0],a[1]-b[1])||1, s0:ZOOM.s, mx:(a[0]+b[0])/2, my:(a[1]+b[1])/2, tx0:ZOOM.tx, ty0:ZOOM.ty};
+      try{cvEl.setPointerCapture(e.pointerId);}catch(_){}
+      e.preventDefault(); return;
+    }
+    if(editZone&&!drawKind&&!roomEdit){                 // editar la zona seleccionada (mover/tamaño)
       var hit=_hitEdit(evtCell(e));
       if(hit){ cvEl.setPointerCapture(e.pointerId); editDrag={mode:hit.mode,corner:hit.corner,start:evtCell(e),orig:editZone._cells.map(function(c){return c.slice();})}; e.preventDefault(); return; }
     }
     if(roomEdit==='split'){ cvEl.setPointerCapture(e.pointerId); splitStart=evtCell(e); drawRect=[splitStart,splitStart]; e.preventDefault(); return; }
-    if(!drawKind)return;
-    cvEl.setPointerCapture(e.pointerId); drawStart=evtCell(e); drawRect=[drawStart,drawStart]; e.preventDefault();
+    if(drawKind){ cvEl.setPointerCapture(e.pointerId); drawStart=evtCell(e); drawRect=[drawStart,drawStart]; e.preventDefault(); return; }
+    // sin modo activo: posible desplazamiento (si hay zoom) o toque (seleccionar habitación)
+    _pan={x0:_wrapXY(e)[0], y0:_wrapXY(e)[1], tx0:ZOOM.tx, ty0:ZOOM.ty}; _panMoved=false;
+    try{cvEl.setPointerCapture(e.pointerId);}catch(_){}
   });
   cvEl.addEventListener('pointermove',function(e){
+    if(e.pointerId in _ptrs) _ptrs[e.pointerId]=_wrapXY(e);
+    if(_pinch){
+      var k=Object.keys(_ptrs); if(k.length<2)return;
+      var a=_ptrs[k[0]], b=_ptrs[k[1]], d=Math.hypot(a[0]-b[0],a[1]-b[1])||1, mx=(a[0]+b[0])/2, my=(a[1]+b[1])/2;
+      var ns=Math.min(6,Math.max(1,_pinch.s0*d/_pinch.d0));
+      ZOOM.s=ns;                                        // zoom hacia el punto medio + arrastre del punto medio
+      ZOOM.tx=mx-(_pinch.mx-_pinch.tx0)*(ns/_pinch.s0);
+      ZOOM.ty=my-(_pinch.my-_pinch.ty0)*(ns/_pinch.s0);
+      applyZoom(); e.preventDefault(); return;
+    }
     if(editDrag){ _applyDrag(evtCell(e)); return; }
-    if(drawKind&&drawStart){ drawRect=[drawStart,evtCell(e)]; renderRealMap(); }
-    else if(roomEdit==='split'&&splitStart){ drawRect=[splitStart,evtCell(e)]; renderRealMap(); }
+    if(drawKind&&drawStart){ drawRect=[drawStart,evtCell(e)]; renderRealMap(); return; }
+    if(roomEdit==='split'&&splitStart){ drawRect=[splitStart,evtCell(e)]; renderRealMap(); return; }
+    if(_pan){
+      var p=_wrapXY(e), dx=p[0]-_pan.x0, dy=p[1]-_pan.y0;
+      if(!_panMoved && (dx*dx+dy*dy)<25) return;        // umbral 5px: distinguir toque de arrastre
+      if(ZOOM.s<=1){ _pan=null; return; }               // sin zoom no hay nada que desplazar
+      _panMoved=true; ZOOM.tx=_pan.tx0+dx; ZOOM.ty=_pan.ty0+dy; applyZoom(); e.preventDefault();
+    }
   });
+  function _ptrClear(e){ delete _ptrs[e.pointerId]; }
+  cvEl.addEventListener('pointercancel',_ptrClear);
   cvEl.addEventListener('pointerup',function(e){
-    if(!MAP||MAP.sample||!CELLS)return;
+    var wasPinch=!!_pinch, wasPan=(_pan&&_panMoved);
+    delete _ptrs[e.pointerId];
+    if(!MAP||MAP.sample||!CELLS){ _pinch=null; _pan=null; return; }
+    if(wasPinch){ if(Object.keys(_ptrs).length<2)_pinch=null; _pan=null; return; }   // fin de gesto 2 dedos: no es toque
     if(editDrag){ editDrag=null; commitZoneEdit(); return; }
     if(roomEdit==='split'&&splitStart){
       var s=splitStart, end=evtCell(e); splitStart=null; drawRect=null;
@@ -1221,15 +1318,28 @@
             .then(function(r){return r.json();}).then(function(res){ if(res.zones){ZONES=res.zones;renderZones();} renderRealMap(); });
         }
       } else { exitDraw(); renderRealMap(); }
-    } else if(editZone){                 // zona seleccionada y toque fuera de ella -> terminar edición
-      deselectZone();
-    } else {
-      var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];
-      if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x];
-        if(v>1&&v!==255){ if(roomEdit==='merge'){ mergeTap(v); } else { toggleRoom(v); } }
-      }
+      return;
+    }
+    _pan=null;
+    if(wasPan) return;                   // fue un desplazamiento, no un toque
+    if(editZone){ deselectZone(); return; }   // zona seleccionada y toque fuera -> terminar edición
+    var c=evtCell(e), x=Math.floor(c[0]), y=Math.floor(c[1]), w=MAP.bbox[2];
+    if(x>=0&&y>=0&&x<w&&y<MAP.bbox[3]){ var v=CELLS[y*w+x];
+      if(v>1&&v!==255){ if(roomEdit==='merge'){ mergeTap(v); } else { toggleRoom(v); } }
     }
   });
+  // rueda del ratón (escritorio): zoom hacia el cursor
+  document.getElementById('canvasWrap').addEventListener('wheel',function(e){
+    if(!MAP||MAP.sample)return;
+    e.preventDefault();
+    var w=this.getBoundingClientRect();
+    zoomAt(e.clientX-w.left, e.clientY-w.top, ZOOM.s*(e.deltaY<0?1.15:1/1.15));
+  },{passive:false});
+  // botones de zoom (+/−/ajustar)
+  function _zc(){ var w=document.getElementById('canvasWrap'); return [w.clientWidth/2, w.clientHeight/2]; }
+  document.getElementById('zoomIn').addEventListener('click',function(){ var c=_zc(); zoomAt(c[0],c[1],ZOOM.s*1.4); });
+  document.getElementById('zoomOut').addEventListener('click',function(){ var c=_zc(); zoomAt(c[0],c[1],ZOOM.s/1.4); });
+  document.getElementById('zoomReset').addEventListener('click',zoomReset);
 
   // ---- horarios (setOrder6090) ----
   var SCHEDULES=[], editingId=null, editorModes={}, editorSel=[];   // editorModes: modo {id:{...}}; editorSel: orden de limpieza
@@ -1554,15 +1664,34 @@
 
   // ---- asistente de primer arranque: si CA no tiene ningún mapa, ofrece crear uno ----
   var _wizShown=false;
+  function updateWizConn(){
+    var el=document.getElementById('wizConn'); if(!el)return;
+    if(st && st.online){ el.textContent='✓ Robot conectado — el DNS ya apunta aquí'; el.classList.add('ok'); }
+    else{ el.textContent='⏳ Esperando a que el robot conecte… (revisa el DNS y reinicia el robot)'; el.classList.remove('ok'); }
+  }
+  function _copyOnClick(el){
+    if(!el)return;
+    el.addEventListener('click',function(){
+      var t=el.textContent||'';
+      if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function(){});
+      var old=el.textContent; el.textContent='¡copiado!'; setTimeout(function(){el.textContent=old;},900);
+    });
+  }
   function maybeWizard(){
     if(_wizShown) return;
     if(localStorage.getItem('ca_wizard_dismissed')==='1') return;
     if((HOUSE_MAPS.maps||[]).length>0) return;   // ya hay mapa -> no molestar
     var ov=document.getElementById('wizOv'); if(!ov) return;
-    _wizShown=true; ov.hidden=false;
+    _wizShown=true; ov.hidden=false; updateWizConn();
+    fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
+      if(d.dns_host){ document.getElementById('wizHost').textContent=d.dns_host; }
+      document.getElementById('wizIP').textContent=d.server_ip||'(IP no detectada)';
+    }).catch(function(){});
   }
   (function initWizard(){
     var ov=document.getElementById('wizOv'); if(!ov) return;
+    _copyOnClick(document.getElementById('wizHost'));
+    _copyOnClick(document.getElementById('wizIP'));
     document.getElementById('wizSkip').addEventListener('click',function(){
       localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true;
     });
@@ -1580,7 +1709,7 @@
     var proto=location.protocol==='https:'?'wss':'ws';
     var ws=new WebSocket(proto+'://'+location.host+BASE+'ws');
     ws.onmessage=function(ev){var m=JSON.parse(ev.data);
-      if(m.type==='state'){st=m.state;render();}
+      if(m.type==='state'){st=m.state;render();if(!document.getElementById('wizOv').hidden)updateWizConn();}
       else if(m.type==='map'){applyMap(m.map);}
       else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
       else if(m.type==='view'){ VIEW=m.view||{rot:0,flip:0}; applyViewBtns(); if(MAP&&!MAP.sample)renderRealMap(); }

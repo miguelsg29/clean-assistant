@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.16.24
+- Asistente de primer arranque ampliado: ahora explica cómo redirigir el DNS del robot a
+  este servidor (AdGuard Home, Pi-hole o el router), mostrando el dominio a reescribir y la
+  IP de este servidor (detectada automáticamente), con un indicador en vivo de si el robot
+  ya conecta. Después ofrece crear el primer mapa. Nuevo endpoint `/api/setup`.
+- Mapa: ZOOM y DESPLAZAMIENTO. Rueda del ratón (hacia el cursor), pellizco (pinch) y
+  arrastre con dos dedos en el móvil, arrastre con un dedo cuando hay zoom, y botones
+  +/−/ajustar. Al girar el mapa se vuelve a encajar.
+- Táctil: el mapa ya no hace scroll de la página al interactuar (touch-action), así se
+  pueden dibujar zonas, dividir/unir habitaciones y seleccionar habitaciones a dedo en el
+  móvil.
+
 ## 0.16.23
 - Horarios: arreglado el desfase de 2 horas. El robot (como la nube de Cecotec) guarda la
   hora de los horarios en UTC y la app oficial la muestra en local; Clean Assistant hacía

@@ -11,6 +11,7 @@ import asyncio
 import datetime
 import json
 import os
+import socket
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -639,12 +640,35 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.23", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.24", lifespan=lifespan)
 
 
 @app.get("/api/state")
 def get_state():
     return robot.state.to_dict()
+
+
+def _server_ip() -> str | None:
+    """IP LAN de este servidor (la que el robot debe alcanzar vía DNS)."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))       # no envía nada; solo elige la interfaz de salida
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return None
+
+
+@app.get("/api/setup")
+def get_setup():
+    """Datos para el asistente de primer arranque: IP a la que redirigir el DNS del robot,
+    el hostname a reescribir, si el robot ya conecta, y si es primer arranque (sin mapas)."""
+    host = getattr(getattr(robot, "cfg", None), "cloud_host", "tcp-cecotec.3irobotix.net")
+    return {"server_ip": _server_ip(), "dns_host": host,
+            "robot_online": bool(getattr(robot.state, "online", False)),
+            "first_run": not house_maps.maps,
+            "mode": getattr(robot, "link", "local")}
 
 
 @app.get("/api/map")
