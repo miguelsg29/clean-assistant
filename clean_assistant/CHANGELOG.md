@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.27
+- Al cambiar de mapa se muestra un indicador de carga («Cambiando de mapa…») sobre el mapa
+  mientras el robot carga el mapa nuevo (tarda unos segundos), en lugar de enseñar un
+  instante el mapa anterior. Se quita en cuanto llega el mapa nuevo (o a los 9 s como
+  máximo, por si acaso).
+
 ## 0.16.26
 - Quitada la detección automática de «mapa fantasma» que añadió la 0.16.25: daba FALSOS
   POSITIVOS (el robot tarda en cargar el mapa al cambiar, y se interpretaba como que el

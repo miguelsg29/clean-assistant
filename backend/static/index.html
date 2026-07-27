@@ -84,6 +84,10 @@
   canvas.realmap{display:block;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
   .canvaswrap{display:none;position:relative;overflow:hidden;border-radius:12px;touch-action:none}
   .mapzoom{position:relative;width:100%;transform-origin:0 0;will-change:transform}
+  .maploader{position:absolute;inset:0;z-index:6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;border-radius:12px;font-size:13px;font-weight:600;color:var(--muted);background:color-mix(in srgb,var(--surface) 70%,transparent);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+  .maploader[hidden]{display:none}
+  .maploader .spin{width:26px;height:26px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
   .zoomctl{position:absolute;bottom:112px;right:12px;z-index:4;display:none;flex-direction:column;gap:6px}
   body.has-realmap .zoomctl{display:flex}
   .zoomctl .iconbtn{font-size:18px;font-weight:600;line-height:1}
@@ -344,6 +348,7 @@
             <canvas class="realmap" id="mapCanvas" aria-label="Mapa del robot"></canvas>
             <canvas class="realmap overlay" id="robotCanvas" aria-hidden="true"></canvas>
           </div>
+          <div class="maploader" id="mapLoader" hidden><span class="spin"></span><span>Cambiando de mapa…</span></div>
         </div>
       </div>
       <div class="dockbar" role="group" aria-label="Controles del robot">
@@ -609,6 +614,14 @@
     ZOOM.s=ns; applyZoom();
   }
   function zoomReset(){ ZOOM.s=1; ZOOM.tx=0; ZOOM.ty=0; applyZoom(); }
+  // loader de cambio de mapa: el robot tarda unos segundos en cargar el mapa nuevo al cambiar
+  var _wsActive=null, _loaderTimer=null, _loaderPrevCells=null, _loaderOn=false;
+  function showMapLoader(){
+    var el=document.getElementById('mapLoader'); if(!el)return;
+    _loaderPrevCells=(MAP&&MAP.cells_b64)||null; _loaderOn=true; el.hidden=false;
+    clearTimeout(_loaderTimer); _loaderTimer=setTimeout(hideMapLoader,9000);   // red de seguridad
+  }
+  function hideMapLoader(){ _loaderOn=false; var el=document.getElementById('mapLoader'); if(el)el.hidden=true; clearTimeout(_loaderTimer); }
   function vdims(){ var W=MAP.bbox[2],H=MAP.bbox[3]; return (VIEW.rot%2)?{w:H,h:W}:{w:W,h:H}; }
   function s2v(cx,cy){ var W=MAP.bbox[2],H=MAP.bbox[3],x=VIEW.flip?(W-cx):cx,y=cy;
     switch(VIEW.rot){case 1:return[H-y,x];case 2:return[W-x,H-y];case 3:return[y,W-x];default:return[x,y];} }
@@ -867,6 +880,9 @@
       setRobotTarget(m.robot, bb!==LAST_BBOX); LAST_BBOX=bb;
     }
     syncSel();
+    // ocultar el loader de cambio de mapa cuando ya ha llegado el mapa NUEVO (celdas
+    // distintas al de antes del cambio) o el robot se ha quedado sin mapa
+    if(_loaderOn && (m.no_map || m.sample || (m.cells_b64 && m.cells_b64!==_loaderPrevCells))) hideMapLoader();
     if(typeof renderSchedules==='function') renderSchedules();
     if(typeof renderFloors==='function') renderFloors();
     if(typeof loadSuggested==='function') loadSuggested();   // sugerencias según el mapa/suelo
@@ -1797,7 +1813,10 @@
       else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}
       else if(m.type==='orders'){ROBOT_ORDERS=m.orders||[];renderRobotOrders();}
       else if(m.type==='history'){HISTORY=m.history||[];renderHistory();}
-      else if(m.type==='maps'){HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();}
+      else if(m.type==='maps'){
+        if(_wsActive!=null && m.active!=null && m.active!==_wsActive) showMapLoader();   // cambió el mapa activo
+        _wsActive=m.active;
+        HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();}
       else if(m.type==='link'){LINKMODE=m.mode||'local';applyLinkSeg();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
