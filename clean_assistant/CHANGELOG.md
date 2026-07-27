@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.16.26
+- Quitada la detección automática de «mapa fantasma» que añadió la 0.16.25: daba FALSOS
+  POSITIVOS (el robot tarda en cargar el mapa al cambiar, y se interpretaba como que el
+  mapa no existía) y llegaba a ofrecer borrar un mapa BUENO. Los mapas que ya no existan se
+  quitan a mano con la ✕; el borrado previo al crear el primer mapa sigue evitando que se
+  acumulen.
+- El asistente de primer arranque ya NO aparece mientras el robot está mapeando o en la
+  primera limpieza automática (antes podía salir al no haber aún ningún mapa guardado).
+- Batería: aparece un ⚡ sobre el icono cuando el robot está cargando.
+- Copia de seguridad (exportar/importar) ahora incluye también las HABITACIONES de cada
+  mapa (nombre, tipo de estancia y tipo de suelo). Al importar en el MISMO robot que las
+  hubiera perdido, se le vuelven a aplicar (si coinciden los ids de habitación).
+- Zonas por mapa: al cambiar de mapa ya no se «cuelan» copias de las paredes de un mapa en
+  otro. Al adoptar las zonas del robot se deduplica contra TODOS los mapas (el robot puede
+  devolver un instante las paredes del mapa anterior por el retardo de carga).
+
 ## 0.16.25
 - Mapas fantasma: al activar un mapa que el robot ya no tiene, Clean Assistant lo detecta
   (el mapa cargado no cambia), vuelve al mapa anterior y avisa ofreciendo quitarlo de la

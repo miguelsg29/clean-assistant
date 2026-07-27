@@ -110,6 +110,17 @@ class MapStore:
             self._save()
         return m
 
+    def set_rooms(self, mid, rooms: list) -> bool:
+        """Cachea las habitaciones de un mapa (id, nombre, tipo de estancia y tipo de suelo).
+        Se usa para el backup y para poder RESTAURARLAS si el robot las pierde. Solo guarda
+        si cambian (para no reescribir el fichero en cada frame de mapa)."""
+        m = next((x for x in self.maps if x["id"] == int(mid)), None)
+        if m is None or m.get("rooms") == rooms:
+            return False
+        m["rooms"] = rooms
+        self._save()
+        return True
+
     def as_list(self, active_id=None) -> list[dict]:
         return [{"id": m["id"], "name": m.get("alias") or m.get("name") or f"Mapa {m['id']}",
                  "house": m.get("house_alias") or m.get("house", ""), "active": (m["id"] == active_id)}

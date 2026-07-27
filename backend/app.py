@@ -588,6 +588,14 @@ async def lifespan(app: FastAPI):
                     _mm["house"] = _new_map["house"]; house_maps._save()
             _new_map["awaiting"] = False
             _chg = True
+        # cachea las habitaciones del mapa activo (para el backup y para restaurarlas si el
+        # robot las pierde): id, nombre, tipo de estancia y tipo de suelo.
+        if _aid and _m.get("rooms"):
+            _rooms = [{"id": r["id"], "name": r.get("name"), "type": r.get("type"),
+                       "material": r.get("material")}
+                      for r in _m["rooms"] if r.get("named", True) and r.get("id") is not None]
+            if _rooms and house_maps.set_rooms(_aid, _rooms):
+                _chg = True
         # reenvía SOLO si cambió el mapa activo o la lista (evita parpadeo del "Activo")
         if _aid != _last_active_id[0] or _chg:
             _last_active_id[0] = _aid
@@ -640,7 +648,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.25", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.26", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -808,10 +816,12 @@ async def _reconcile_robot_zones():
         if kind not in ("nogo", "nomop", "clean") or not pts:
             continue
         active = _active_map()
-        if any(zz.get("kind") == kind and zz.get("mapid") in (active, None)
-               and _zones_match(pts, zz.get("points", []))
+        # dedup contra TODOS los mapas (no solo el activo): al cambiar de mapa el robot puede
+        # devolver un instante las paredes del mapa anterior (retardo); si dedujéramos solo
+        # por el mapa activo, esas paredes se COPIARÍAN a otros mapas (se "liaban" las zonas).
+        if any(zz.get("kind") == kind and _zones_match(pts, zz.get("points", []))
                for zz in zones.zones):
-            continue                      # ya la tenemos en este mapa
+            continue                      # ya la tenemos (en cualquier mapa) -> no re-adoptar
         try:
             zones.add(kind, [(p[0], p[1]) for p in pts], z.get("name") or "", mapid=active)
             changed = True
@@ -882,48 +892,15 @@ def _reconcile_schedules() -> bool:
     return changed
 
 
-async def _notice(level: str, text: str, **extra):
-    """Envía un aviso puntual a la interfaz (banner/modal)."""
-    msg = json.dumps({"type": "notice", "level": level, "text": text, **extra})
-    for ws in list(clients):
-        try:
-            await ws.send_text(msg)
-        except Exception:
-            clients.discard(ws)
-
-
-async def _verify_switch(mid, prev_bbox, prev_active):
-    """Comprueba que el robot cambió de verdad de mapa. El robot no lista sus mapas de forma
-    fiable, así que si tras el cambio el mapa cargado es IDÉNTICO al anterior, el mapa no
-    existe en el robot (fantasma): se revierte al anterior y se avisa para poder quitarlo."""
-    await asyncio.sleep(10)
-    if getattr(robot.state, "map_head_id", None) != mid:
-        return                                   # ya cambió por otra vía; nada que hacer
-    cur = (getattr(robot, "map", None) or {}).get("bbox")
-    if not (prev_bbox and cur and list(cur) == list(prev_bbox)):
-        return                                   # el mapa cambió -> el cambio funcionó
-    name = next((x["name"] for x in house_maps.as_list() if x["id"] == mid), str(mid))
-    if prev_active is not None and prev_active != mid:   # revertir al mapa anterior
-        robot.state.map_head_id = prev_active
-        pm = next((x for x in house_maps.maps if x["id"] == prev_active), None)
-        if pm:
-            robot.state.map_name = pm.get("alias") or pm.get("name")
-        robot.command(cmd.select_map(prev_active))
-        await broadcast_maps()
-        await broadcast_schedules()
-        await broadcast_zones()
-        await broadcast_orders()
-    await _notice("warn", f"No se pudo cambiar al mapa «{name}»: el robot ya no lo tiene "
-                          f"(mapa fantasma). ¿Quitarlo de la lista?", suggest_remove=mid)
-
-
 @app.post("/api/maps/select")
 async def maps_select(payload: dict):
     """Cambia el mapa activo (selectMapPlan). El robot aísla los horarios por mapa, así
-    que al cargar el nuevo se re-consultan y se sincronizan (importar/subir)."""
+    que al cargar el nuevo se re-consultan y se sincronizan (importar/subir).
+    Nota: NO se intenta detectar automáticamente un 'mapa fantasma'. El robot no expone en
+    local un id de mapa fiable por frame, y las heurísticas por contenido dan falsos
+    positivos (mapas reales de tamaño/escaneo parecido), llegando a ofrecer borrar mapas
+    buenos. Los mapas que ya no existan se quitan a mano con la ✕."""
     mid = int(payload["id"])
-    prev_active = getattr(robot.state, "map_head_id", None)
-    prev_bbox = (getattr(robot, "map", None) or {}).get("bbox")
     robot.command(cmd.select_map(mid))
     _activate_local(mid)                     # refleja el cambio YA + re-pide el mapa completo
     # difunde YA lo que depende del mapa activo -> la interfaz cambia al instante
@@ -931,8 +908,6 @@ async def maps_select(payload: dict):
     await broadcast_schedules()
     await broadcast_zones()
     await broadcast_orders()
-    if prev_active is not None and prev_active != mid:   # verifica que el cambio de verdad ocurrió
-        asyncio.create_task(_verify_switch(mid, prev_bbox, prev_active))
     return {"ok": True, **_maps_payload()}
 
 
@@ -1243,6 +1218,67 @@ async def consumable_reset(payload: dict):
     await broadcast()
     mqtt.publish_state()
     return {"ok": True}
+
+
+# ---- exportar / importar la configuración de Clean Assistant (para mover entre servidores) ----
+@app.get("/api/config/export")
+def config_export():
+    """Descarga la configuración de Clean Assistant: mapas (nombres/alias y las HABITACIONES
+    de cada mapa: nombre, tipo de estancia y tipo de suelo), zonas (prohibidas, sin fregona
+    y de limpieza), horarios y orientación de la vista. Las habitaciones se guardan también
+    aquí (además de en el robot) por si quieres pasarlas a otro robot o el robot las pierde."""
+    return {"clean_assistant_export": 1, "version": app.version, "exported_at": int(time.time()),
+            "maps": house_maps.maps, "deleted": list(house_maps.deleted),
+            "zones": zones.zones, "schedules": schedules.plans, "view": view_settings}
+
+
+@app.post("/api/config/import")
+async def config_import(payload: dict):
+    """Restaura una configuración exportada (reemplaza la actual). Tras importar, sube al robot
+    las zonas y horarios del mapa activo por si el robot (o este servidor) no los tenía."""
+    if not payload.get("clean_assistant_export"):
+        return {"ok": False, "error": "Archivo no válido (no es una exportación de Clean Assistant)."}
+    if isinstance(payload.get("maps"), list):
+        house_maps.maps = payload["maps"]
+        house_maps.deleted = set(payload.get("deleted", []) or [])
+        house_maps._save()
+    if isinstance(payload.get("zones"), list):
+        zones.zones = payload["zones"]
+        zones._save()
+    if isinstance(payload.get("schedules"), list):
+        schedules.plans = payload["schedules"]
+        schedules._save()
+    if isinstance(payload.get("view"), dict):
+        view_settings["rot"] = int(payload["view"].get("rot", 0)) % 4
+        view_settings["flip"] = 1 if payload["view"].get("flip") else 0
+        _save_view()
+    active = _active_map()                 # sube al robot lo del mapa activo (zonas + horarios)
+    if active is not None:
+        try:
+            _send_zone_group("restricted")
+            _send_zone_group("cleaning")
+            for p in schedules.for_map(active):
+                robot.command(schedules.order_command(p, active, _rooms_meta()))
+            # restaura nombres/tipo/suelo de habitación en el robot si las del backup coinciden
+            # con las del mapa cargado (mismo robot que las perdió). Distinto robot -> ids no
+            # coinciden y no se aplica (los datos quedan guardados igualmente en el backup).
+            saved = next((m.get("rooms") for m in house_maps.maps if m["id"] == active), None)
+            cur = getattr(robot, "map", None) or {}
+            cur_ids = {r["id"] for r in cur.get("rooms", []) if r.get("named", True)}
+            if saved and cur_ids:
+                rr = [{"room_id": s["id"], "room_name": s.get("name", ""),
+                       "room_type": s.get("type") or 0, "material": s.get("material") or 1}
+                      for s in saved if s["id"] in cur_ids]
+                if rr:
+                    robot.command(cmd.set_plan_data(_map_head_id(), rr))
+        except Exception:
+            pass
+    await broadcast_maps()
+    await broadcast_zones()
+    await broadcast_schedules()
+    await broadcast_view()
+    return {"ok": True, "maps": len(house_maps.maps),
+            "zones": len(zones.zones), "schedules": len(schedules.plans)}
 
 
 @app.websocket("/ws")
