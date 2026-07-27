@@ -32,6 +32,32 @@ from backend.mqtt_bridge import MqttBridge
 STATIC = Path(__file__).parent / "static"
 env = load_env()
 
+
+def _apply_host_timezone():
+    """En el add-on de HA, aplica al proceso la zona horaria configurada en Home Assistant
+    (vía Supervisor). Sin esto, el contenedor suele estar en UTC y la conversión de horarios
+    (UTC<->local) no se aplica -> los horarios se disparan con desfase (p. ej. 2 h)."""
+    import urllib.request
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok or not hasattr(time, "tzset"):
+        return
+    for path in ("/supervisor/info", "/core/info", "/info"):
+        try:
+            req = urllib.request.Request("http://supervisor" + path,
+                                         headers={"Authorization": "Bearer " + tok})
+            with urllib.request.urlopen(req, timeout=4) as r:
+                tz = ((json.load(r).get("data") or {}).get("timezone"))
+            if tz:
+                os.environ["TZ"] = tz
+                time.tzset()
+                print(f"[tz] zona horaria del host aplicada: {tz}")
+                return
+        except Exception:
+            continue
+
+
+_apply_host_timezone()
+
 # Carpeta de datos persistentes (mapa, zonas, horarios, vista, enlace, identidad).
 # Por defecto el directorio actual (desarrollo); en el add-on se apunta a /data.
 DATA_DIR = os.environ.get("DATA_DIR", ".")
@@ -126,7 +152,9 @@ def _load_view() -> dict:
             v = json.load(f)
         return {"rot": int(v.get("rot", 0)) % 4, "flip": 1 if v.get("flip") else 0}
     except Exception:
-        return {"rot": 0, "flip": 0}
+        # por defecto (instalación nueva) con espejo: el mapa del Conga sale invertido
+        # respecto a la casa real, así el usuario no tiene que darle al botón cada vez.
+        return {"rot": 0, "flip": 1}
 
 
 view_settings = _load_view()
@@ -648,7 +676,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.27", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.28", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -656,8 +684,47 @@ def get_state():
     return robot.state.to_dict()
 
 
+def _supervisor_get(path: str):
+    """GET a la API del Supervisor de Home Assistant (solo si corremos como add-on).
+    Devuelve el campo `data` o None. Necesita hassio_api: true en config.yaml."""
+    import urllib.request
+    tok = os.environ.get("SUPERVISOR_TOKEN")
+    if not tok:
+        return None
+    try:
+        req = urllib.request.Request("http://supervisor" + path,
+                                     headers={"Authorization": "Bearer " + tok})
+        with urllib.request.urlopen(req, timeout=4) as r:
+            return json.load(r).get("data")
+    except Exception:
+        return None
+
+
+def _host_lan_ip() -> str | None:
+    """En el add-on de HA, la IP LAN del HOST (a la que el robot debe llegar vía DNS), no la
+    del contenedor Docker (172.30.x.x). Se obtiene del Supervisor; si no, se ignora."""
+    data = _supervisor_get("/network/info")
+    if not data:
+        return None
+    best = None
+    for itf in data.get("interfaces", []) or []:
+        ip4 = (itf.get("ipv4") or {})
+        for addr in (ip4.get("address") or []):
+            ip = str(addr).split("/")[0]
+            if ip.startswith(("172.30.", "127.")):      # docker/loopback: descartar
+                continue
+            if itf.get("primary"):
+                return ip
+            best = best or ip
+    return best
+
+
 def _server_ip() -> str | None:
-    """IP LAN de este servidor (la que el robot debe alcanzar vía DNS)."""
+    """IP a la que el robot debe llegar vía DNS. En el add-on de HA = IP del host (Supervisor);
+    si no, la IP LAN de la interfaz de salida de esta máquina."""
+    hip = _host_lan_ip()
+    if hip:
+        return hip
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         s.connect(("8.8.8.8", 80))       # no envía nada; solo elige la interfaz de salida
@@ -1021,6 +1088,31 @@ async def maps_delete(payload: dict):
     await broadcast_schedules()
     await broadcast_orders()
     return {"ok": True, **_maps_payload()}
+
+
+@app.post("/api/maps/wipe")
+async def maps_wipe(payload: dict = None):
+    """Borra TODOS los mapas del robot y de Clean Assistant (empezar de cero / limpiar
+    fantasmas al cambiar de servidor). El robot queda sin mapa; luego se crea uno nuevo."""
+    ids = _robot_known_map_ids()
+    for mid in ids:
+        try:
+            robot.command(cmd.delete_map(mid))
+        except Exception:
+            pass
+        house_maps.remove(mid)
+        zones.remove_map(mid)
+        schedules.remove_map(mid)
+    robot.state.map_head_id = None
+    robot.state.map_name = None
+    robot.orders = []
+    if ids:
+        print(f"[mapa] borrado total: {len(ids)} mapa(s) del robot y de CA")
+    await broadcast_maps()
+    await broadcast_zones()
+    await broadcast_schedules()
+    await broadcast_orders()
+    return {"ok": True, "wiped": len(ids)}
 
 
 @app.post("/api/rooms/merge")

@@ -59,9 +59,9 @@
   .battglyph::after{content:"";position:absolute;right:-3.5px;top:3px;width:2px;height:4px;background:var(--muted);border-radius:0 1px 1px 0}
   .battglyph i{position:absolute;inset:1.5px;background:var(--accent);border-radius:1px;transform-origin:left center;transform:scaleX(.7);transition:transform .4s,background .3s}
   .battglyph i.low{background:var(--critical)}
-  .battglyph .chg{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:9px;line-height:1;color:#fff;text-shadow:0 0 2px rgba(0,0,0,.55);pointer-events:none}
-  .battglyph.charging .chg{display:flex;animation:chgpulse 1.6s ease-in-out infinite}
-  @keyframes chgpulse{0%,100%{opacity:.55}50%{opacity:1}}
+  .battchg{color:var(--accent);font-size:12px;line-height:1;margin-left:1px;animation:chgpulse 1.6s ease-in-out infinite}
+  .battchg[hidden]{display:none}
+  @keyframes chgpulse{0%,100%{opacity:.5}50%{opacity:1}}
   .iconbtn{width:32px;height:32px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
   .iconbtn:hover{color:var(--ink)}
   .iconbtn svg{width:16px;height:16px}
@@ -295,7 +295,7 @@
     </div>
     <div class="status">
       <span class="pill state" id="statePill" data-s="offline"><span class="dot"></span><span id="stateTxt">Conectando…</span></span>
-      <span class="pill batt"><span class="battglyph" id="battGlyph"><i id="battBar"></i><span class="chg">⚡</span></span><b id="battTxt">—</b></span>
+      <span class="pill batt"><span class="battglyph"><i id="battBar"></i></span><b id="battTxt">—</b><span class="battchg" id="battChg" hidden>⚡</span></span>
       <span class="pill local"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Local</span>
       <button class="iconbtn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg id="themeIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
     </div>
@@ -477,7 +477,7 @@
         <div class="phead">Mapas de la casa</div>
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
         <div id="mapsList"></div>
-        <div class="btnrow"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button></div>
+        <div class="btnrow"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button><button class="btn ghost" id="wipeMapsBtn" style="color:var(--critical)">Borrar todos</button></div>
         <div id="newMapForm" style="display:none">
           <div class="field"><label>Nombre del mapa</label><input type="text" id="nmName" class="tinput" placeholder="Planta baja"/></div>
           <div class="field"><label>Nombre de la casa</label><input type="text" id="nmHouse" class="tinput" placeholder="Casa"/></div>
@@ -543,7 +543,8 @@
 
     <div class="wizstep">
       <div class="wizstep-h"><span class="wiznum">2</span> Crea el mapa de tu casa</div>
-      <div class="field"><label>Nombre del mapa</label><input type="text" id="wizName" class="tinput" value="Mi casa"/></div>
+      <div class="field"><label>Nombre de la casa</label><input type="text" id="wizHouse" class="tinput" value="Mi casa" placeholder="Mi casa"/></div>
+      <div class="field"><label>Nombre del mapa</label><input type="text" id="wizName" class="tinput" value="Planta baja" placeholder="Planta baja"/></div>
       <p class="hint" style="color:var(--critical)">⚠ Al crear el mapa se borrarán los mapas, zonas y horarios que el robot tenga ahora, para empezar de cero con uno solo. El robot recorrerá toda la casa (tarda un rato).</p>
     </div>
 
@@ -590,8 +591,9 @@
   var ZONES=[], drawKind=null, drawStart=null, drawRect=null, moveZoneId=null;
   var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
-  // orientación de la VISTA del mapa (no afecta a las coords que van al robot)
-  var VIEW={rot:0,flip:0}, LAST_BBOX=null;
+  // orientación de la VISTA del mapa (no afecta a las coords que van al robot).
+  // flip=1 por defecto: el mapa del Conga sale en espejo respecto a la casa real.
+  var VIEW={rot:0,flip:1}, LAST_BBOX=null;
   // zoom/desplazamiento del mapa (transform CSS del wrapper; evtCell lo compensa vía getBoundingClientRect)
   var ZOOM={s:1,tx:0,ty:0};
   function _clampPan(){
@@ -716,7 +718,7 @@
     if(st.battery!=null){var _bb=document.getElementById('battBar');
       _bb.style.transform='scaleX('+Math.max(.06,st.battery/100)+')';
       _bb.classList.toggle('low',st.battery<=20);}
-    var _bg=document.getElementById('battGlyph'); if(_bg) _bg.classList.toggle('charging',!!st.charging);
+    var _bc=document.getElementById('battChg'); if(_bc) _bc.hidden=!st.charging;
     document.body.classList.toggle('cleaning',s==='cleaning'||s==='paused');
     if(typeof startRbt==='function') startRbt();   // mantiene vivo el anillo pulsante del robot
     // resalta la habitación en limpieza en el mapa cuando cambie (o cambie de pasada)
@@ -1692,6 +1694,14 @@
   loadMaps();
   setTimeout(maybeWizard, 3000);   // tras dar tiempo a que lleguen los mapas del robot (WS)
   document.getElementById('newMapBtn').addEventListener('click',function(){ var f=document.getElementById('newMapForm'); f.style.display=(f.style.display==='none'?'block':'none'); });
+  document.getElementById('wipeMapsBtn').addEventListener('click',async function(){
+    if(!(await uiConfirm('¿Borrar TODOS los mapas del robot y de Clean Assistant? El robot se quedará sin mapa y tendrás que crear uno nuevo. Útil para empezar de cero o limpiar mapas fantasma. No se puede deshacer.'))) return;
+    var b=this; b.disabled=true; b.textContent='Borrando…';
+    fetch(BASE+'api/maps/wipe',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
+      .then(function(r){return r.json();}).then(function(res){ b.disabled=false; b.textContent='Borrar todos';
+        uiAlert('Borrados '+(res.wiped||0)+' mapa(s). El robot está sin mapa; crea uno nuevo con «Crear mapa nuevo».'); })
+      .catch(function(){ b.disabled=false; b.textContent='Borrar todos'; });
+  });
   document.getElementById('nmCancel').addEventListener('click',function(){ document.getElementById('newMapForm').style.display='none'; });
   document.getElementById('nmCreate').addEventListener('click',async function(){
     var name=document.getElementById('nmName').value.trim(), house=document.getElementById('nmHouse').value.trim();
@@ -1748,9 +1758,10 @@
       localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true;
     });
     document.getElementById('wizCreate').addEventListener('click',function(){
-      var name=(document.getElementById('wizName').value||'Mi casa').trim()||'Mi casa';
+      var name=(document.getElementById('wizName').value||'Planta baja').trim()||'Planta baja';
+      var house=(document.getElementById('wizHouse').value||'Mi casa').trim()||'Mi casa';
       var b=this; b.disabled=true; b.textContent='Iniciando…';
-      fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:name,wipe:true})})
+      fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:house,wipe:true})})
         .then(function(r){return r.json();}).then(function(){
           localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true; b.disabled=false; b.textContent='Crear y mapear';
           uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
@@ -1816,7 +1827,10 @@
       else if(m.type==='maps'){
         if(_wsActive!=null && m.active!=null && m.active!==_wsActive) showMapLoader();   // cambió el mapa activo
         _wsActive=m.active;
-        HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();}
+        var _prevN=(HOUSE_MAPS.maps||[]).length, _newN=(m.maps||[]).length;
+        HOUSE_MAPS={maps:m.maps||[],active:m.active};renderMaps();
+        // se han borrado TODOS los mapas -> volver a ofrecer el asistente (aunque se saltara antes)
+        if(_prevN>0 && _newN===0){ localStorage.removeItem('ca_wizard_dismissed'); _wizShown=false; setTimeout(maybeWizard,600); }}
       else if(m.type==='link'){LINKMODE=m.mode||'local';applyLinkSeg();}};
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};

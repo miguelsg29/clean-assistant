@@ -29,14 +29,16 @@ def _lvl(table, v):
 
 
 # ---------------- zona horaria de los horarios ----------------
-# El robot guarda/compara la hora de los horarios (day_time) en UTC, igual que la nube
-# de Cecotec: la app oficial convierte a la hora local al mostrarla. Clean Assistant hace
-# lo mismo para que la hora que ve/pone el usuario coincida con la app y el robot dispare
-# a la hora correcta. day_time = minutos desde medianoche; weekday = máscara de bits de
-# días (dom=1, lun=2, mar=4, mie=8, jue=16, vie=32, sab=64, consecutivos).
+# El robot compara la hora de los horarios (day_time) contra SU RELOJ INTERNO. Como Clean
+# Assistant pone ese reloj en hora LOCAL al conectar (set_time con la zona horaria local),
+# el day_time también va en hora LOCAL: NO se convierte. Verificado en vivo: un horario
+# escrito en UTC no disparaba (era pasado); escrito en local dispara a la hora puesta.
+# (Antes se convertía a UTC pensando que el robot guardaba en UTC como la nube; eso solo
+# es cierto si el reloj está en UTC, p. ej. un contenedor sin zona horaria configurada.)
+# day_time = minutos desde medianoche; weekday = máscara de bits (dom=1, lun=2, ... sab=64).
 def tz_offset_min() -> int:
-    """Minutos que hay que SUMAR a UTC para obtener la hora local (maneja el horario de
-    verano/invierno automáticamente)."""
+    """Minutos que hay que SUMAR a UTC para obtener la hora local (con horario de verano).
+    Se usa para el campo `timezone` de set_time (poner el reloj del robot en hora local)."""
     try:
         off = datetime.datetime.now().astimezone().utcoffset()
         return int(off.total_seconds() // 60) if off else 0
@@ -44,36 +46,14 @@ def tz_offset_min() -> int:
         return 0
 
 
-def _rot_weekday(mask: int, delta: int) -> int:
-    """Rota la máscara de días `delta` días (rotación de 7 bits). +1 = día siguiente."""
-    m = int(mask or 0) & 0x7F
-    if not m:
-        return m
-    delta %= 7
-    return ((m << delta) | (m >> (7 - delta))) & 0x7F
-
-
-def _shift_daytime(day_min: int, weekday: int, delta_min: int):
-    """Aplica un desfase en minutos a (hora, días); si cruza medianoche, mueve los días."""
-    t = int(day_min) + int(delta_min)
-    day_delta = 0
-    while t < 0:
-        t += 1440
-        day_delta -= 1
-    while t >= 1440:
-        t -= 1440
-        day_delta += 1
-    return t, _rot_weekday(weekday, day_delta)
-
-
 def local_to_robot(day_min: int, weekday: int):
-    """Hora local (min) + días -> hora UTC + días que guarda/compara el robot."""
-    return _shift_daytime(day_min, weekday, -tz_offset_min())
+    """day_time va en hora local (el reloj del robot está en local vía set_time): identidad."""
+    return int(day_min), int(weekday)
 
 
 def robot_to_local(day_min: int, weekday: int):
-    """Hora UTC + días del robot -> hora local + días para mostrar/guardar en CA."""
-    return _shift_daytime(day_min, weekday, tz_offset_min())
+    """day_time del robot ya está en hora local: identidad."""
+    return int(day_min), int(weekday)
 
 
 # ---------------- config sugerida según el tipo de suelo (roomMaterialId) ----------------

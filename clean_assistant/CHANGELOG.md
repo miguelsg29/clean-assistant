@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.16.28
+- HORARIOS: arreglado de raíz que se disparaban a destiempo (o no se disparaban). El robot
+  compara la hora contra SU RELOJ, y Clean Assistant se lo pone en hora LOCAL al conectar
+  (set_time), así que la hora del horario va en LOCAL y NO se convierte. Antes se convertía
+  a UTC y quedaba desfasada. Verificado en vivo: un horario a las 20:56 disparó a las 20:56.
+- Home Assistant (add-on): ahora lee del Supervisor la ZONA HORARIA de Home Assistant y la
+  aplica (el contenedor suele estar en UTC, lo que rompía la hora del reloj del robot), y la
+  IP LAN del HOST para las instrucciones de DNS (no la IP interna de Docker 172.30.x.x).
+  Requiere el permiso `hassio_api` (añadido).
+- Asistente de primer arranque: pide el nombre de la CASA y el nombre del MAPA por separado.
+- El asistente vuelve a aparecer si borras TODOS los mapas (antes, tras saltarlo una vez, no
+  reaparecía).
+- Mapa: el ESPEJO (invertido) viene activado por defecto — el mapa del Conga sale en espejo
+  respecto a la casa, así no hay que darle al botón cada vez. (El giro sigue a tu gusto.)
+- Batería: el ⚡ de carga se muestra al lado del porcentaje (no dentro del icono).
+- Mapas: nuevo botón «Borrar todos» (borra todos los mapas del robot y de Clean Assistant)
+  para empezar de cero o limpiar mapas fantasma al cambiar de servidor de un tirón.
+
 ## 0.16.27
 - Al cambiar de mapa se muestra un indicador de carga («Cambiando de mapa…») sobre el mapa
   mientras el robot carga el mapa nuevo (tarda unos segundos), en lugar de enseñar un
