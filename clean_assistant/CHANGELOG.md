@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.16.30
+- INDEPENDENCIA DE LA NUBE: Clean Assistant ahora suplanta también los servicios auxiliares
+  de Cecotec, así que el robot sigue funcionando aunque Cecotec apague sus servidores.
+  - OTA (puerto 8001): al arrancar, el robot pregunta «¿hay firmware nuevo y dónde están los
+    servicios?». Respondemos «sin actualización» + un directorio que apunta al control LOCAL.
+    Es la pieza clave: sin esta respuesta el robot no sabía a dónde conectar y se quedaba en
+    bucle de reconexión. Descubierto por ingeniería inversa del propio Conga 8090.
+  - Historial (puertos 8002/8006): el robot sube un informe por cada limpieza. Ahora los
+    aceptamos y los volcamos al HISTORIAL de Clean Assistant (fecha, hora, m², duración, mapa),
+    para tener el histórico de limpiezas SIN nube.
+  - Para activarlo, redirige por DNS (AdGuard/Pi-hole) los dominios de Cecotec a Home Assistant
+    (los mismos del control). Los puertos 8001/8002/8006 se abren automáticamente en el add-on.
+
 ## 0.16.29
 - Zonas por mapa: al CREAR o activar un mapa ya no se ven un rato las zonas del mapa
   anterior. El backend ahora reemite las zonas (y los horarios guardados en el robot)

@@ -30,7 +30,12 @@ class HistoryStore:
         except Exception:
             pass
 
-    def add(self, entry: dict) -> dict:
+    def add(self, entry: dict):
+        """Añade una entrada. Si ya existe una con el mismo id (p. ej. un informe de la nube
+        re-subido), NO la duplica y devuelve None. Devuelve la entrada si se añadió."""
+        eid = entry.get("id")
+        if eid is not None and any(e.get("id") == eid for e in self.entries):
+            return None
         self.entries.append(entry)
         self.entries = self.entries[-self.cap:]
         self._save()

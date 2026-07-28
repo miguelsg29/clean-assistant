@@ -28,6 +28,7 @@ from backend.schedules import ScheduleStore, suggested_plans, plan_from_order
 from backend.maps import MapStore
 from backend.history import HistoryStore
 from backend.mqtt_bridge import MqttBridge
+from backend.cloud_stub import LocalCloud
 
 STATIC = Path(__file__).parent / "static"
 env = load_env()
@@ -337,6 +338,28 @@ def _track_faults():
              "message": msg, "is_error": not (500 <= cur <= 599),
              "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
              "day": days[dt.weekday()]}
+    return history.add(entry)
+
+
+def _ingest_report(rep: dict):
+    """Convierte un informe de limpieza (subido por el robot al cloud_stub) en una entrada
+    del historial. Solo los sweeping_img con datos útiles. Devuelve la entrada si es NUEVA
+    (dedup por id = taskId, ya que el robot re-sube el backlog al reconectar)."""
+    if not rep.get("is_img") or not rep.get("beginTime"):
+        return None
+    dur = int(rep.get("cleanTime") or 0)
+    area = round((rep.get("totalArea") or 0) / 100.0, 2)   # totalArea en centésimas de m²
+    if area < 0.3 and dur < 1:
+        return None                                        # sin datos útiles (aborto): no registrar
+    dt = datetime.datetime.fromtimestamp(rep["beginTime"])
+    days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    mid = rep.get("mapId") or None
+    map_name = next((m["name"] for m in house_maps.as_list(mid) if m["id"] == mid), None)
+    entry = {"id": rep.get("taskId") or int(rep["beginTime"]), "kind": "clean",
+             "type": "limpieza", "source": "nube",
+             "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
+             "day": days[dt.weekday()], "rooms": [], "room_ids": [],
+             "area": area, "duration": dur, "map_id": mid, "map_name": map_name}
     return history.add(entry)
 
 
@@ -673,6 +696,18 @@ async def lifespan(app: FastAPI):
         robot.start()
     except Exception as e:
         print(f"[robot] no se pudo arrancar el servidor ({MODE}): {e}")
+    # cloud LOCAL: suplanta OTA (para que el robot no dependa de la nube ni actualice firmware)
+    # y acepta las subidas de informes de limpieza, que ingerimos en el historial. Requiere
+    # redirigir por DNS los dominios de Cecotec a este servidor (ver cloud_stub.py).
+    if MODE == "real":
+        def _on_report(rep):
+            if _ingest_report(rep):
+                asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
+        try:
+            LocalCloud(robot.cfg.cert_path, robot.cfg.key_path,
+                       on_report=_on_report, logger=print).start()
+        except Exception as e:
+            print(f"[cloud-local] no se pudo arrancar: {e}")
     mqtt.start()
     print(f"[Clean Assistant] modo={MODE}")
     task = asyncio.create_task(_loop())
@@ -681,7 +716,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.29", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.30", lifespan=lifespan)
 
 
 @app.get("/api/state")
