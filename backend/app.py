@@ -625,10 +625,15 @@ async def lifespan(app: FastAPI):
             if _rooms and house_maps.set_rooms(_aid, _rooms):
                 _chg = True
         # reenvía SOLO si cambió el mapa activo o la lista (evita parpadeo del "Activo")
-        if _aid != _last_active_id[0] or _chg:
+        _active_changed = (_aid != _last_active_id[0])
+        if _active_changed or _chg:
             _last_active_id[0] = _aid
             asyncio.run_coroutine_threadsafe(broadcast_maps(), loop)
             asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)   # horarios del nuevo mapa
+        if _active_changed:   # al cambiar de mapa activo, refrescar TAMBIÉN zonas y horarios del
+            # robot (si no, al crear/activar un mapa se seguían viendo las zonas del anterior).
+            asyncio.run_coroutine_threadsafe(broadcast_zones(), loop)
+            asyncio.run_coroutine_threadsafe(broadcast_orders(), loop)
         mqtt.publish_discovery()   # el mapa trae las habitaciones -> refresca botones HA
 
     # muestra el mapa guardado de la vez anterior aunque el robot aún no haya enviado uno
@@ -676,7 +681,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.28", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.29", lifespan=lifespan)
 
 
 @app.get("/api/state")

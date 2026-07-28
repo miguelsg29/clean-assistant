@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.29
+- Zonas por mapa: al CREAR o activar un mapa ya no se ven un rato las zonas del mapa
+  anterior. El backend ahora reemite las zonas (y los horarios guardados en el robot)
+  cuando cambia el mapa activo, no solo cuando cambias de mapa a mano. (Los horarios de
+  Clean Assistant ya se refrescaban; faltaba hacerlo con las zonas.)
+
 ## 0.16.28
 - HORARIOS: arreglado de raíz que se disparaban a destiempo (o no se disparaban). El robot
   compara la hora contra SU RELOJ, y Clean Assistant se lo pone en hora LOCAL al conectar
