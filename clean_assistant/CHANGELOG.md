@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.31
+- ACTUALIZACIONES AUTOMÁTICAS (OTA) OFF POR DEFECTO EN AMBOS MODOS: en una instalación nueva
+  se desactivan tanto en modo local como en modo cloud (antes solo se aplicaba en local). El
+  usuario las puede activar a mano cuando quiera (acción «ota»); nunca se activan solas.
+  Además, cuando los dominios OTA de Cecotec se redirigen a Clean Assistant, el servidor OTA
+  local siempre responde «sin actualización», así que el robot tampoco descarga firmware por
+  su cuenta. (Instalaciones existentes: no se toca tu ajuste actual.)
+
 ## 0.16.30
 - INDEPENDENCIA DE LA NUBE: Clean Assistant ahora suplanta también los servicios auxiliares
   de Cecotec, así que el robot sigue funcionando aunque Cecotec apague sus servidores.

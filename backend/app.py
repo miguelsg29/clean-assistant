@@ -116,15 +116,16 @@ def _mark_first_run_done():
 
 
 def _apply_first_run_defaults():
-    """Aplica los defaults de primer arranque cuando el robot está conectado en local."""
+    """Aplica los defaults de primer arranque en cuanto el robot conecta, TANTO en local
+    COMO en cloud: actualizaciones automáticas (OTA) desactivadas y vaciado tras cada
+    limpieza. Las OTA quedan siempre OFF por defecto en ambos modos; el usuario las puede
+    activar a mano después (acción «ota»). En cloud el comando se inyecta por la pasarela."""
     if _first_run["done"] or not _first_run["apply"]:
         return
-    if getattr(robot, "link", "local") == "cloud":
-        return                                   # en cloud manda la nube; se aplica en local
     if not getattr(robot.state, "online", False):
         return                                   # aún sin robot: se reintenta al conectar
     try:
-        robot.command(cmd.set_upgrade(False))    # OTA desactivada
+        robot.command(cmd.set_upgrade(False))    # OTA (auto-actualización) desactivada
         robot.state.auto_upgrade = 0
         robot.command(cmd.dust_freq(0))          # vaciar tras cada limpieza
         robot.state.collect_freq = 0
@@ -716,7 +717,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.30", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.31", lifespan=lifespan)
 
 
 @app.get("/api/state")
