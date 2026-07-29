@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.33
+- INDEPENDENCIA TOTAL: Clean Assistant ahora puede APRENDER la identidad del robot del PROPIO
+  robot, sin nube y sin tenerla guardada. En una instalación nueva, en cuanto rediriges los
+  DNS del robot a Clean Assistant, el robot revela en sus peticiones (OTA/historial) su DID,
+  número de serie y modelo; la MAC se obtiene de la red (ARP) y el identificador de cuenta se
+  genera a partir del DID (en local, Clean Assistant hace de «nube» y empareja el robot). Así
+  ya no hace falta pasar por la nube de Cecotec ni siquiera la PRIMERA vez. (Si ya tienes
+  identidad guardada o configurada, no se toca nada; la «llave de recuperación» sigue siendo
+  útil para clonar/mover a otro servidor.)
+
 ## 0.16.32
 - ARREGLO IMPORTANTE (independencia de la nube): el robot se quedaba en bucle consultando OTA
   sin parar (spam de `cecotec-ota` en el DNS) y no arrancaba el control tras un reinicio si

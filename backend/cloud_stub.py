@@ -16,6 +16,8 @@ Requiere redirigir por DNS (AdGuard/Pi-hole) estos dominios a este servidor:
   cecotec.das / cecotec-das / eu.das / eu-log (das/log NO son necesarios).
 """
 from __future__ import annotations
+import base64
+import json
 import socket
 import ssl
 import threading
@@ -25,6 +27,50 @@ from urllib.parse import urlparse, parse_qs
 # así el robot conecta al control local (9090) en vez de a la nube.
 CONTROL_HOST = "tcp-cecotec.3irobotix.net"
 PORTS = (8001, 8002, 8006)
+
+
+def _parse_identity(data: bytes) -> dict:
+    """Identidad que el ROBOT revela de sí mismo en sus peticiones (OTA/historial), para
+    auto-provisionar Clean Assistant SIN nube ni datos guardados:
+      - cabecera `id:` -> DID; JWT `authorization` -> DID + factory_id
+      - cuerpo JSON de la OTA -> SN (`username`) y project_type (`projectType`)
+    No trae MAC (se saca por ARP) ni userid (no es un dato del robot; se acuña del DID)."""
+    ident: dict = {}
+    try:
+        head, _, body = data.partition(b"\r\n\r\n")
+        for line in head.split(b"\r\n"):
+            low = line.lower()
+            if low.startswith(b"id:"):
+                try:
+                    ident["did"] = int(line.split(b":", 1)[1].strip())
+                except (ValueError, IndexError):
+                    pass
+            elif low.startswith(b"authorization:"):
+                parts = line.split(b":", 1)[1].strip().split(b".")
+                if len(parts) >= 2:
+                    try:
+                        pad = parts[1] + b"=" * (-len(parts[1]) % 4)
+                        payload = json.loads(base64.urlsafe_b64decode(pad))
+                        inner = json.loads(payload.get("value") or "{}")
+                        if inner.get("id"):
+                            ident.setdefault("did", int(inner["id"]))
+                        fid = (inner.get("data") or {}).get("FACTORY_ID")
+                        if fid:
+                            ident["factory_id"] = str(fid)
+                    except Exception:
+                        pass
+        if body[:1] == b"{":                              # cuerpo JSON (OTA); el de historial es zlib
+            try:
+                b = json.loads(body.split(b"\x00", 1)[0].decode("latin1"))
+                if b.get("username"):
+                    ident["sn"] = str(b["username"])
+                if b.get("projectType"):
+                    ident["project_type"] = str(b["projectType"])
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return ident
 
 
 def _parse_report(path: str) -> dict:
@@ -48,10 +94,11 @@ def _parse_report(path: str) -> dict:
 class LocalCloud:
     """Suplanta OTA + subida de informes. `on_report(dict)` se llama por cada informe."""
 
-    def __init__(self, cert_path, key_path, on_report=None, logger=print):
+    def __init__(self, cert_path, key_path, on_report=None, on_identity=None, logger=print):
         self.cert_path = cert_path
         self.key_path = key_path
         self.on_report = on_report
+        self.on_identity = on_identity     # on_identity(ident: dict, ip: str) -> auto-provisión local
         self.log = logger
         self._ctx = None
         self._ota_logged = False
@@ -93,6 +140,10 @@ class LocalCloud:
 
     def _handle(self, conn, port=0):
         try:
+            peer = conn.getpeername()[0]
+        except Exception:
+            peer = ""
+        try:
             # 8006 = HTTP plano; 8001/8002 = HTTPS (según la ingeniería inversa). Detectamos por
             # PUERTO, no espiando el primer byte: el firmware del robot no tolera el peek + el
             # settimeout previos al handshake (se colgaba). Handshake TLS BLOQUEANTE y directo,
@@ -112,6 +163,14 @@ class LocalCloud:
                 path = data.split(b"\r\n", 1)[0].split(b" ")[1].decode("latin1")
             except Exception:
                 pass
+            # auto-provisión local: aprende la identidad del propio robot de esta petición
+            if self.on_identity:
+                try:
+                    ident = _parse_identity(data)
+                    if ident:
+                        self.on_identity(ident, peer)
+                except Exception:
+                    pass
             if "/upgrade/try_upgrade" in path:            # OTA: sin update + directorio local
                 body = ('{"code":0,"result":{"targetUrls":['
                         f'"wss://{CONTROL_HOST}:9090",'

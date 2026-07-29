@@ -579,6 +579,40 @@ async def _loop():
         mqtt.publish_state()
 
 
+# ------- auto-provisión LOCAL de la identidad del robot (sin nube ni datos guardados) -------
+# El robot revela su identidad en sus propias peticiones (OTA/historial), que el cloud_stub ya
+# recibe: DID (cabecera `id:`/JWT), SN y project_type (cuerpo OTA), factory_id (JWT). La MAC se
+# saca de la tabla ARP y el userid se acuña del DID (no es un dato del robot: en local CA es la
+# "nube" y le asigna el emparejamiento en el BIND_LIST del login). Así una instalación nueva se
+# configura sola con solo redirigir los DNS del robot a Clean Assistant. Ver [[cloud_stub]].
+_auto_ident: dict = {}
+
+
+def _mac_for_ip(ip: str):
+    """MAC de una IP de la LAN a partir de la tabla ARP (el robot no manda su MAC). Portable:
+    /proc/net/arp en el add-on (Linux) y `arp -a` como reserva (Windows/otros)."""
+    if not ip:
+        return None
+    try:
+        with open("/proc/net/arp", encoding="utf-8") as f:
+            for line in f.readlines()[1:]:
+                c = line.split()
+                if len(c) >= 4 and c[0] == ip and c[3] != "00:00:00:00:00:00":
+                    return c[3].lower()
+    except Exception:
+        pass
+    try:
+        import subprocess
+        import re
+        out = subprocess.run(["arp", "-a", ip], capture_output=True, text=True, timeout=4).stdout
+        m = re.search(r"(?:[0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}", out or "")
+        if m:
+            return m.group(0).replace("-", ":").lower()
+    except Exception:
+        pass
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     loop = asyncio.get_running_loop()
@@ -674,10 +708,43 @@ async def lifespan(app: FastAPI):
         _save_link("local")
         asyncio.run_coroutine_threadsafe(broadcast_link(), loop)
 
-    # sin identidad configurada -> auto-provisión: arrancar en cloud, capturar y pasar a local
+    def _auto_provision(ident: dict, ip: str):
+        """Auto-provisión LOCAL (sin nube): acumula la identidad que el robot revela en sus
+        peticiones (via cloud_stub) y, cuando tiene los esenciales (DID + SN), completa MAC
+        (ARP) + factory_id (por defecto 1003) + userid (acuñado del DID) y configura CA. Solo
+        si aún no hay identidad; no toca instalaciones ya configuradas."""
+        if MODE != "real" or robot.cfg.configured:
+            return
+        for k in ("did", "sn", "project_type", "factory_id"):
+            if ident.get(k) and not _auto_ident.get(k):
+                _auto_ident[k] = ident[k]
+        if not _auto_ident.get("did") or not _auto_ident.get("sn"):
+            return                              # faltan esenciales; se completa en otra petición
+        if ip and not _auto_ident.get("mac"):
+            mac = _mac_for_ip(ip)
+            if mac:
+                _auto_ident["mac"] = mac
+        _auto_ident.setdefault("factory_id", "1003")            # estándar Cecotec
+        _auto_ident.setdefault("userid", int(_auto_ident["did"]))  # el robot no lo manda: se acuña
+        save_identity(_auto_ident)
+        robot.cfg.apply_identity(_auto_ident)
+        print("[provision-local] identidad aprendida del propio robot (sin nube); paso a local")
+        robot.set_link("local")
+        _save_link("local")
+        asyncio.run_coroutine_threadsafe(broadcast_link(), loop)
+        try:
+            robot.reconnect()      # re-login con la identidad ya provisionada
+        except Exception:
+            pass
+
+    # sin identidad configurada -> auto-provisión. Vía preferente: LOCAL, aprendiendo la
+    # identidad del propio robot de sus peticiones OTA (_auto_provision, sin nube). Arrancamos
+    # en cloud como RESERVA (si solo se redirige tcp-cecotec, se captura del relay); en cuanto
+    # llega la OTA al cloud_stub, _auto_provision configura CA y cambia a local por su cuenta.
     if MODE == "real" and not robot.cfg.configured:
         robot.link = "cloud"
-        print("[provision] primer arranque: capturo la identidad del robot de la nube")
+        print("[provision] primer arranque: aprendo la identidad del robot "
+              "(local por OTA; cloud como reserva)")
     else:
         saved_link = _load_link()      # respeta el último modo elegido (local/cloud)
         if saved_link:
@@ -706,7 +773,7 @@ async def lifespan(app: FastAPI):
                 asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
         try:
             LocalCloud(robot.cfg.cert_path, robot.cfg.key_path,
-                       on_report=_on_report, logger=print).start()
+                       on_report=_on_report, on_identity=_auto_provision, logger=print).start()
         except Exception as e:
             print(f"[cloud-local] no se pudo arrancar: {e}")
     mqtt.start()
@@ -717,7 +784,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.32", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.33", lifespan=lifespan)
 
 
 @app.get("/api/state")
