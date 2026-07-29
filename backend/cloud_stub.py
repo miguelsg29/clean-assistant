@@ -53,6 +53,22 @@ class LocalCloud:
         self.key_path = key_path
         self.on_report = on_report
         self.log = logger
+        self._ctx = None
+        self._ota_logged = False
+
+    def _tls_ctx(self):
+        """Contexto TLS único y reutilizado (igual que el servidor de control 9090, que sí
+        hace TLS con el robot). Se construye una vez para no rehacerlo por conexión."""
+        if self._ctx is None:
+            ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            ctx.load_cert_chain(self.cert_path, self.key_path)
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            try:
+                ctx.set_ciphers("ALL:@SECLEVEL=0")
+            except Exception:
+                pass
+            self._ctx = ctx
+        return self._ctx
 
     def start(self):
         for p in PORTS:
@@ -71,26 +87,23 @@ class LocalCloud:
         while True:
             try:
                 c, _ = s.accept()
-                threading.Thread(target=self._handle, args=(c,), daemon=True).start()
+                threading.Thread(target=self._handle, args=(c, port), daemon=True).start()
             except Exception:
                 pass
 
-    def _handle(self, conn):
+    def _handle(self, conn, port=0):
         try:
-            conn.settimeout(15)
-            # detecta TLS (0x16) sin consumir el byte; envuelve si hace falta (8001/8002 = HTTPS)
-            try:
-                peek = conn.recv(1, socket.MSG_PEEK)
-            except Exception:
-                peek = b""
-            if peek[:1] == b"\x16":
-                ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-                ctx.load_cert_chain(self.cert_path, self.key_path)
+            # 8006 = HTTP plano; 8001/8002 = HTTPS (según la ingeniería inversa). Detectamos por
+            # PUERTO, no espiando el primer byte: el firmware del robot no tolera el peek + el
+            # settimeout previos al handshake (se colgaba). Handshake TLS BLOQUEANTE y directo,
+            # exactamente como el servidor de control 9090, que sí funciona con el robot.
+            if port != 8006:
                 try:
-                    ctx.set_ciphers("ALL:@SECLEVEL=0")
-                except Exception:
-                    pass
-                conn = ctx.wrap_socket(conn, server_side=True)
+                    conn = self._tls_ctx().wrap_socket(conn, server_side=True)
+                except Exception as e:
+                    self.log(f"[cloud-local][{port}] handshake TLS: {e}")
+                    return
+            conn.settimeout(15)
             data = conn.recv(65536)
             if not data:
                 return
@@ -104,12 +117,17 @@ class LocalCloud:
                         f'"wss://{CONTROL_HOST}:9090",'
                         '"https://web-cecotec.3irobotix.net:8002",'
                         '"http://web-eu.3irobotix.net:8006"]}}').encode()
+                if not self._ota_logged:                  # solo la 1ª vez (el robot lo repite)
+                    self._ota_logged = True
+                    self.log("[cloud-local] OTA respondido: sin actualización + directorio local")
             else:
                 if "/sweeper-report/" in path and self.on_report:
                     try:
                         self.on_report(_parse_report(path))
                     except Exception:
                         pass
+                else:
+                    self.log(f"[cloud-local] petición NO reconocida -> respuesta genérica: {path[:100]}")
                 body = b'{"code":0,"result":true}'
             conn.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json;charset=UTF-8\r\n"
                          b"Content-Length: " + str(len(body)).encode()

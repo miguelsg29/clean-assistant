@@ -717,7 +717,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.31", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.32", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1412,6 +1412,50 @@ async def config_import(payload: dict):
     await broadcast_view()
     return {"ok": True, "maps": len(house_maps.maps),
             "zones": len(zones.zones), "schedules": len(schedules.plans)}
+
+
+@app.get("/api/identity/export")
+def identity_export():
+    """Descarga los DATOS DE IDENTIDAD del robot (DID, userid, SN, MAC, factory_id,
+    project_type). Es la «llave de recuperación»: con ella Clean Assistant puede volver a
+    servir al robot en una instalación NUEVA sin pasar por la nube de Cecotec (en local, CA
+    responde al login con estos datos; no los aprende del robot). El JWT NO se incluye: se
+    genera solo a partir del DID. Son credenciales del robot: guárdalo en lugar seguro."""
+    c = robot.cfg
+    if MODE != "real" or not getattr(c, "configured", False):
+        return {"ok": False, "error": "Aún no hay una identidad real del robot que exportar."}
+    return {"clean_assistant_identity": 1, "version": app.version, "exported_at": int(time.time()),
+            "did": c.did, "userid": c.userid, "sn": c.sn, "mac": c.mac,
+            "factory_id": c.factory_id, "project_type": c.project_type}
+
+
+@app.post("/api/identity/import")
+async def identity_import(payload: dict):
+    """Restaura la identidad del robot desde una exportación (la «llave de recuperación»).
+    La guarda en identity.json (que manda sobre la config del add-on) y reconecta el robot
+    para que el login use ya la identidad restaurada. Así no hace falta la nube de Cecotec
+    para el primer arranque en un servidor nuevo."""
+    if not payload.get("clean_assistant_identity"):
+        return {"ok": False, "error": "Archivo no válido (no es una identidad de Clean Assistant)."}
+    ident = {}
+    for k in ("did", "userid"):
+        try:
+            if payload.get(k) not in (None, "", 0, "0"):
+                ident[k] = int(payload[k])
+        except (TypeError, ValueError):
+            pass
+    for k in ("sn", "mac", "factory_id", "project_type"):
+        if payload.get(k):
+            ident[k] = str(payload[k])
+    if not ident.get("did") or not ident.get("userid"):
+        return {"ok": False, "error": "La identidad no trae DID/userid válidos."}
+    save_identity(ident)
+    robot.cfg.apply_identity(ident)
+    try:
+        robot.reconnect()      # el robot vuelve a hacer login con la identidad restaurada
+    except Exception:
+        pass
+    return {"ok": True, "did": ident["did"], "userid": ident["userid"]}
 
 
 @app.websocket("/ws")

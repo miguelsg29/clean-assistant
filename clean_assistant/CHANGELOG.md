@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.16.32
+- ARREGLO IMPORTANTE (independencia de la nube): el robot se quedaba en bucle consultando OTA
+  sin parar (spam de `cecotec-ota` en el DNS) y no arrancaba el control tras un reinicio si
+  todos los dominios apuntaban a Clean Assistant. Causa: el robot VALIDA el nombre del
+  certificado en cada conexión, y el cert de Clean Assistant solo cubría `tcp-cecotec` (el
+  control), no los dominios de OTA/historial. Ahora el certificado incluye TODOS los dominios
+  de Cecotec (con comodines), así que el robot completa OTA e historial y arranca 100% local.
+  Los certificados antiguos se regeneran solos al actualizar.
+- LLAVE DE RECUPERACIÓN DEL ROBOT: en «Copia de seguridad» puedes exportar/importar los DATOS
+  DE IDENTIDAD del robot (DID, número de serie, MAC…) aparte de los mapas/zonas/horarios. Con
+  ella puedes restaurar el robot en un servidor nuevo SIN pasar por la nube de Cecotec (en
+  local, Clean Assistant responde al robot con estos datos; no los aprende solo). Guárdala en
+  lugar seguro: son credenciales del robot.
+
 ## 0.16.31
 - ACTUALIZACIONES AUTOMÁTICAS (OTA) OFF POR DEFECTO EN AMBOS MODOS: en una instalación nueva
   se desactivan tanto en modo local como en modo cloud (antes solo se aplicaba en local). El

@@ -84,13 +84,32 @@ class RealRobot:
     # ---------------- servidor ----------------
     def _ensure_certs(self):
         cp, kp = self.cfg.cert_path, self.cfg.key_path
-        if os.path.exists(cp) and os.path.exists(kp):
+        if os.path.exists(cp) and os.path.exists(kp) and self._cert_has_san(cp):
             return
-        self.log(f"[cert] generando certificados autofirmados en {cp}/{kp}...")
+        self.log(f"[cert] generando certificados autofirmados (con SAN) en {cp}/{kp}...")
+        # El robot VALIDA el hostname del certificado al conectar por TLS a CADA servicio:
+        # control (tcp-cecotec), OTA (cecotec-ota/eu-ota) e historial (web-eu/web-cecotec).
+        # Con un cert de solo CN=tcp-cecotec, el robot ACEPTA el control pero RECHAZA el OTA
+        # (hostname distinto) y se queda en bucle sin poder arrancar. El SAN con comodines
+        # cubre todos los subdominios de Cecotec, así el mismo cert vale para todo.
+        san = ("subjectAltName=DNS:tcp-cecotec.3irobotix.net,DNS:web-eu.3irobotix.net,"
+               "DNS:cecotec-ota.3irobotix.net,DNS:eu-ota.3irobotix.net,"
+               "DNS:web-cecotec.3irobotix.net,DNS:*.3irobotix.net,DNS:*.3irobotics.net")
         subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048",
                         "-keyout", kp, "-out", cp, "-days", "3650", "-nodes",
-                        "-subj", "/CN=tcp-cecotec.3irobotix.net"],
+                        "-subj", "/CN=tcp-cecotec.3irobotix.net", "-addext", san],
                        check=True, capture_output=True)
+
+    def _cert_has_san(self, cp):
+        """True si el cert ya trae el SAN de Cecotec. Sirve para no regenerar en cada
+        arranque, pero SÍ actualizar un cert antiguo que solo tenía CN=tcp-cecotec (sin SAN),
+        que hacía que el robot no completara el OTA."""
+        try:
+            r = subprocess.run(["openssl", "x509", "-in", cp, "-noout", "-ext",
+                                "subjectAltName"], capture_output=True, text=True)
+            return "3irobotix" in (r.stdout or "")
+        except Exception:
+            return True    # si no puedo comprobarlo, no regenero (no rompo un cert válido)
 
     def _serve(self):
         ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -356,6 +375,19 @@ class RealRobot:
             try:
                 if x:
                     x.close()   # fuerza al robot a reconectar en el nuevo modo
+            except Exception:
+                pass
+
+    def reconnect(self):
+        """Cierra la conexión actual para forzar al robot a reconectar y volver a hacer
+        login. Se usa tras restaurar la identidad importada, para que el nuevo login use
+        ya la identidad actualizada (self.cfg)."""
+        with self._lock:
+            s, c = self._sock, self._cloud
+        for x in (s, c):
+            try:
+                if x:
+                    x.close()
             except Exception:
                 pass
 

@@ -472,6 +472,9 @@
           <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Exporta o importa la configuración de Clean Assistant: <b>mapas</b> (nombres), <b>zonas prohibidas</b>, <b>zonas sin fregona</b>, <b>zonas de limpieza</b> y <b>horarios</b>. Útil para pasarla entre servidores (p. ej. de este equipo al add-on de Home Assistant). Las <b>habitaciones</b> (nombres, tipo y suelo) las guarda el propio robot en su mapa, así que viajan con él.</p>
           <div class="btnrow"><button class="btn ghost" id="cfgExport" style="width:auto;padding:7px 14px;font-size:12.5px">Exportar</button><button class="btn ghost" id="cfgImport" style="width:auto;padding:7px 14px;font-size:12.5px">Importar…</button></div>
           <input type="file" id="cfgFile" accept="application/json,.json" style="display:none"/>
+          <p class="hint" style="opacity:.7;font-size:11.5px;margin:12px 0 6px;border-top:1px solid rgba(128,128,128,.18);padding-top:12px"><b>Datos del robot (llave de recuperación).</b> Exporta la <b>identidad del robot</b> (DID, número de serie, MAC…). Guárdala aparte, en lugar seguro: con ella Clean Assistant puede volver a servir al robot en una instalación nueva <b>sin pasar por la nube de Cecotec</b>. Son credenciales del robot; no las compartas. (El resto —mapas, zonas y horarios— va en la exportación de arriba.)</p>
+          <div class="btnrow"><button class="btn ghost" id="idExport" style="width:auto;padding:7px 14px;font-size:12.5px">Exportar datos del robot</button><button class="btn ghost" id="idImport" style="width:auto;padding:7px 14px;font-size:12.5px">Importar…</button></div>
+          <input type="file" id="idFile" accept="application/json,.json" style="display:none"/>
         </details>
 
         <div class="phead">Mapas de la casa</div>
@@ -1803,6 +1806,34 @@
         fetch(BASE+'api/config/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
           .then(function(r){return r.json();}).then(function(res){
             if(res.ok) uiAlert('Importado: '+res.maps+' mapa(s), '+res.zones+' zona(s), '+res.schedules+' horario(s). Se han enviado al robot los del mapa activo.');
+            else uiAlert(res.error||'No se pudo importar.');
+          }).catch(function(){ uiAlert('No se pudo importar.'); });
+      };
+      rd.readAsText(f); e.target.value='';
+    });
+  })();
+  // ---- exportar / importar identidad del robot (llave de recuperación) ----
+  (function initIdentityBackup(){
+    var ex=document.getElementById('idExport'), im=document.getElementById('idImport'), fi=document.getElementById('idFile');
+    if(!ex||!im||!fi)return;
+    ex.addEventListener('click',function(){
+      fetch(BASE+'api/identity/export').then(function(r){return r.json();}).then(function(d){
+        if(d.ok===false){ uiAlert(d.error||'No se pudo exportar.'); return; }
+        var blob=new Blob([JSON.stringify(d,null,1)],{type:'application/json'});
+        var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+        a.download='clean-assistant-robot-identity.json'; document.body.appendChild(a); a.click();
+        setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
+      }).catch(function(){ uiAlert('No se pudo exportar.'); });
+    });
+    im.addEventListener('click',function(){ fi.click(); });
+    fi.addEventListener('change',function(e){
+      var f=e.target.files[0]; if(!f)return; var rd=new FileReader();
+      rd.onload=async function(){
+        var data; try{ data=JSON.parse(rd.result); }catch(_){ uiAlert('El archivo no es un JSON válido.'); return; }
+        if(!(await uiConfirm('Restaurar la identidad del robot desde el archivo y reconectar. ¿Continuar?'))) return;
+        fetch(BASE+'api/identity/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+          .then(function(r){return r.json();}).then(function(res){
+            if(res.ok) uiAlert('Identidad restaurada (DID '+res.did+'). El robot se reconectará con ella.');
             else uiAlert(res.error||'No se pudo importar.');
           }).catch(function(){ uiAlert('No se pudo importar.'); });
       };
