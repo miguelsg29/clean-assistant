@@ -37,10 +37,17 @@ MAC de la red y se autoconfigura sola. También puedes exportar esa identidad co
 La forma recomendada de usar Clean Assistant. Se abre desde la barra lateral de HA,
 sin login aparte.
 
-1. **Añade este repositorio de add-ons**: en Home Assistant, **Ajustes → Add-ons →
-   Tienda de add-ons → menú ⋮ (arriba a la derecha) → Repositorios**, pega
-   `https://github.com/miguelsg29/clean-assistant` y pulsa **Añadir**.
-2. **Instala «Clean Assistant»** desde la tienda (si no aparece, recarga con ⋮ →
+> Desde **Home Assistant 2026.2**, los «Add-ons» se llaman ahora **«Apps»**. Uso el
+> término nuevo; si tu Home Assistant es anterior, es exactamente lo mismo que «Add-ons».
+
+1. **Añade este repositorio** a tu Home Assistant. Un clic:
+
+   [![Añadir repositorio a tu instancia de Home Assistant](https://my.home-assistant.io/badges/supervisor_add_addon_repository.svg)](https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2Fmiguelsg29%2Fclean-assistant)
+
+   O a mano: en Home Assistant, **Ajustes → Apps → Tienda de Apps → menú ⋮ (arriba a la
+   derecha) → Repositorios**, pega `https://github.com/miguelsg29/clean-assistant` y pulsa
+   **Añadir**.
+2. **Instala «Clean Assistant»** desde la Tienda de Apps (si no aparece, recarga con ⋮ →
    Recargar) y ábrelo.
 3. **Redirige el robot a Home Assistant** con un servidor DNS (AdGuard Home, Pi-hole o
    tu router). Para independencia total, haz que **todos** estos dominios apunten a la
@@ -55,12 +62,12 @@ sin login aparte.
    Luego **reinicia el robot** (corte de luz) para que reconecte ahí. *(El asistente de
    primer arranque te muestra estas instrucciones con la IP ya detectada y un indicador
    en vivo de si el robot conecta.)*
-4. **Arranca el add-on.** No hace falta rellenar los IDs del robot: se
+4. **Arranca la app.** No hace falta rellenar los IDs del robot: se
    **autoconfiguran** solos aprendiendo la identidad del propio robot.
 5. Abre **Clean Assistant** en la barra lateral: verás el **mapa real** y todos los
    controles. 🎉
-6. *(Opcional)* **Entidades en Home Assistant (MQTT):** si tienes el add-on de
-   **Mosquitto broker**, el add-on coge host/usuario/contraseña **solos**. Aparecerá el
+6. *(Opcional)* **Entidades en Home Assistant (MQTT):** si tienes la app de
+   **Mosquitto broker**, Clean Assistant coge host/usuario/contraseña **solos**. Aparecerá el
    dispositivo **Conga 8090** con aspiradora, batería, botones por habitación,
    selectores, horarios… Solo rellena los campos `MQTT_*` a mano si usas un broker
    externo a Home Assistant.
@@ -68,7 +75,7 @@ sin login aparte.
 ## Qué ofrece
 
 App completa y **verificada de punta a punta con un Conga 8090 real**, empaquetada para
-**Docker** y como **add-on de Home Assistant** (ingress). Incluye un **robot simulado**
+**Docker** y como **app de Home Assistant** (add-on/ingress). Incluye un **robot simulado**
 para desarrollar la interfaz sin un Conga.
 
 ### 🗺️ Mapa en vivo
@@ -207,11 +214,11 @@ La web queda en `http://este-host:8000` y los servidores del robot en `:9090` (c
 y `:8001/:8002/:8006` (OTA/historial). Los certificados, mapas, zonas, horarios,
 historial, identidad y vista se guardan en `./data` (persistente).
 
-## Add-on de Home Assistant (ingress)
+## App de Home Assistant (ingress)
 
-Este repositorio **es también un repositorio de add-ons de Home Assistant** (ver
+Este repositorio **es también un repositorio de Apps de Home Assistant** (add-ons; ver
 «Instalación en Home Assistant»). La interfaz se abre desde la barra lateral (ingress,
-con la sesión de HA). El add-on lee del Supervisor la **zona horaria** y la **IP LAN**
+con la sesión de HA). La app lee del Supervisor la **zona horaria** y la **IP LAN**
 del host (para las instrucciones de DNS), coge el broker **MQTT** de HA solo, y abre los
 puertos del robot (9090/8001/8002/8006). Instala la app desde este repo sin duplicar
 código; para fijar versión, pon `CA_REF` a un tag de release en su `Dockerfile`.
@@ -240,8 +247,8 @@ clean-assistant/
 ├── requirements.txt
 ├── Dockerfile            # imagen Docker independiente
 ├── docker-compose.yml    # despliegue con Compose
-├── repository.yaml       # este repo como repositorio de add-ons de HA
-└── clean_assistant/      # add-on de Home Assistant (ingress)
+├── repository.yaml       # este repo como repositorio de Apps de HA (add-ons)
+└── clean_assistant/      # app de Home Assistant (add-on/ingress)
     ├── config.yaml
     ├── CHANGELOG.md       # novedades de cada versión
     ├── Dockerfile
