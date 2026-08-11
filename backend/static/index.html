@@ -459,11 +459,13 @@
 
         <details class="netcfg" id="netCfg">
           <summary>Configuración de red (DNS del robot)</summary>
-          <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Para que el robot hable con Clean Assistant, su tráfico a la nube de Cecotec debe redirigirse a este servidor. Crea una reescritura de DNS en AdGuard Home / Pi-hole / router:</p>
+          <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Para que el robot hable con Clean Assistant, su tráfico a la nube de Cecotec debe redirigirse a este servidor. Crea reescrituras de DNS en AdGuard Home / Pi-hole / router:</p>
           <div class="wizdns">
             <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="netHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
             <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="netIP" title="Toca para copiar">…</code></div>
           </div>
+          <p class="hint" style="opacity:.7;font-size:11.5px;margin:8px 0 4px">Con ese dominio, Clean Assistant ya <b>controla</b> el robot. Para que sea <b>100&nbsp;% local</b> (que siga funcionando aunque Cecotec apague sus servidores), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
+          <div class="wizdns" id="netHostsExtra"></div>
           <div class="wizconn" id="netConn" style="margin-top:8px">…</div>
         </details>
 
@@ -535,12 +537,14 @@
 
     <div class="wizstep">
       <div class="wizstep-h"><span class="wiznum">1</span> Redirige el DNS del robot a este servidor</div>
-      <p class="hint">El robot busca la nube de Cecotec en un dominio fijo. Para que hable con Clean Assistant, redirige ese dominio a la IP de este servidor con tu bloqueador de DNS (AdGuard Home, Pi-hole) o el router:</p>
+      <p class="hint">El robot busca la nube de Cecotec en unos dominios fijos. Para que hable con Clean Assistant, redirígelos a la IP de este servidor con tu bloqueador de DNS (AdGuard Home, Pi-hole) o el router:</p>
       <div class="wizdns">
         <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="wizHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
         <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="wizIP" title="Toca para copiar">…</code></div>
       </div>
-      <p class="hint"><b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP de arriba). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.</p>
+      <p class="hint" style="margin:8px 0 4px">Con ese basta para <b>controlar</b> el robot. Para <b>100&nbsp;% local</b> (sin depender nunca de Cecotec), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
+      <div class="wizdns" id="wizHostsExtra"></div>
+      <p class="hint"><b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.</p>
       <div class="wizconn" id="wizConn">⏳ Esperando a que el robot conecte…</div>
     </div>
 
@@ -1751,7 +1755,20 @@
     fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
       if(d.dns_host){ document.getElementById('wizHost').textContent=d.dns_host; }
       document.getElementById('wizIP').textContent=d.server_ip||'(IP no detectada)';
+      renderDnsExtra(document.getElementById('wizHostsExtra'), d.dns_hosts);
     }).catch(function(){});
+  }
+  // rellena la lista de dominios ADICIONALES (OTA + historial) para el 100% local
+  function renderDnsExtra(el, hosts){
+    if(!el) return;
+    el.innerHTML='';
+    var roleName={ota:'OTA (arranque)',historial:'historial'};
+    (hosts||[]).filter(function(h){return h.role!=='control';}).forEach(function(h){
+      var row=document.createElement('div'); row.className='wizdns-row';
+      var k=document.createElement('span'); k.className='wizdns-k'; k.textContent=roleName[h.role]||h.role;
+      var c=document.createElement('code'); c.title='Toca para copiar'; c.textContent=h.host; _copyOnClick(c);
+      row.appendChild(k); row.appendChild(c); el.appendChild(row);
+    });
   }
   (function initWizard(){
     var ov=document.getElementById('wizOv'); if(!ov) return;
@@ -1782,6 +1799,7 @@
     if(!h||!ip)return;
     fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
       if(d.dns_host)h.textContent=d.dns_host; ip.textContent=d.server_ip||'(IP no detectada)';
+      renderDnsExtra(document.getElementById('netHostsExtra'), d.dns_hosts);
     }).catch(function(){});
     _copyOnClick(h); _copyOnClick(ip); updateNetConn();
   })();

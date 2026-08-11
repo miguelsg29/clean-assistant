@@ -313,6 +313,13 @@ def _finish_session(ss):
              "rooms": [(meta.get(r) or {}).get("name") or f"Hab {r}" for r in rooms],
              "room_ids": rooms, "area": round(ss["area"] or 0, 2), "duration": dur,
              "map_id": mid, "map_name": map_name}
+    # si un informe de la nube ya había registrado esta limpieza (entrada más pobre, sin
+    # habitaciones), lo quitamos: esta entrada local es más completa y la sustituye.
+    dupes = [e for e in history.entries if e.get("kind") == "clean"
+             and e.get("source") == "nube" and abs(_entry_ts(e) - ss["start"]) < _SAME_CLEAN_S]
+    if dupes:
+        history.entries = [e for e in history.entries if e not in dupes]
+        history._save()
     return history.add(entry)
 
 
@@ -342,17 +349,34 @@ def _track_faults():
     return history.add(entry)
 
 
+def _entry_ts(e: dict) -> float:
+    """Epoch (s) de inicio de una entrada del historial, sacado de su id: las entradas
+    LOCALES usan id = start*1000 (milisegundos); las de la NUBE usan id = beginTime (s)."""
+    i = e.get("id") or 0
+    return i / 1000.0 if i > 1e11 else float(i)
+
+
+# ventana para considerar que dos entradas son la MISMA limpieza (el robot no solapa
+# limpiezas y cada una dura decenas de minutos, así que 10 min es holgado y seguro)
+_SAME_CLEAN_S = 600
+
+
 def _ingest_report(rep: dict):
     """Convierte un informe de limpieza (subido por el robot al cloud_stub) en una entrada
-    del historial. Solo los sweeping_img con datos útiles. Devuelve la entrada si es NUEVA
-    (dedup por id = taskId, ya que el robot re-sube el backlog al reconectar)."""
+    del historial. Solo los sweeping_img con datos útiles. Devuelve la entrada si es NUEVA."""
     if not rep.get("is_img") or not rep.get("beginTime"):
         return None
     dur = int(rep.get("cleanTime") or 0)
     area = round((rep.get("totalArea") or 0) / 100.0, 2)   # totalArea en centésimas de m²
     if area < 0.3 and dur < 1:
         return None                                        # sin datos útiles (aborto): no registrar
-    dt = datetime.datetime.fromtimestamp(rep["beginTime"])
+    bt = int(rep["beginTime"])
+    # dedup entre fuentes: si el seguimiento LOCAL ya registró esta limpieza (más completo:
+    # trae habitaciones y el nombre del horario), NO la dupliques con el informe de la nube.
+    if any(e.get("kind") == "clean" and abs(_entry_ts(e) - bt) < _SAME_CLEAN_S
+           for e in history.entries):
+        return None
+    dt = datetime.datetime.fromtimestamp(bt)
     days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
     mid = rep.get("mapId") or None
     map_name = next((m["name"] for m in house_maps.as_list(mid) if m["id"] == mid), None)
@@ -784,7 +808,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.33", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.34", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -848,7 +872,16 @@ def get_setup():
     """Datos para el asistente de primer arranque: IP a la que redirigir el DNS del robot,
     el hostname a reescribir, si el robot ya conecta, y si es primer arranque (sin mapas)."""
     host = getattr(getattr(robot, "cfg", None), "cloud_host", "tcp-cecotec.3irobotix.net")
-    return {"server_ip": _server_ip(), "dns_host": host,
+    # con solo el de CONTROL, Clean Assistant ya manda al robot; los de OTA e HISTORIAL lo
+    # hacen 100% local (funciona aunque Cecotec apague sus servidores). das/log NO hacen falta.
+    dns_hosts = [
+        {"host": host, "role": "control"},
+        {"host": "cecotec-ota.3irobotix.net", "role": "ota"},
+        {"host": "eu-ota.3irobotix.net", "role": "ota"},
+        {"host": "web-eu.3irobotix.net", "role": "historial"},
+        {"host": "web-cecotec.3irobotix.net", "role": "historial"},
+    ]
+    return {"server_ip": _server_ip(), "dns_host": host, "dns_hosts": dns_hosts,
             "robot_online": bool(getattr(robot.state, "online", False)),
             "first_run": not house_maps.maps,
             "mode": getattr(robot, "link", "local")}

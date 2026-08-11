@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.34
+- Historial: arreglado que cada limpieza aparecía DUPLICADA — una vez con su horario real y
+  otra como «Manual · Toda la casa». Eran dos registros de la MISMA limpieza: el seguimiento
+  local y el informe que el robot sube (historial de la nube local). Ahora se deduplican: se
+  conserva el registro local (más completo, con habitaciones y nombre del horario) y el
+  informe solo rellena limpiezas que Clean Assistant no vio (p. ej. hechas sin él conectado).
+- Instrucciones de DNS (Ajustes y asistente de primer arranque): ahora dejan claro que con
+  `tcp-cecotec` basta para CONTROLAR el robot, y que para el 100 % local (que siga funcionando
+  aunque Cecotec apague sus servidores) hay que redirigir TAMBIÉN los dominios de OTA e
+  historial. Se listan todos con su función y todos apuntan a la misma IP.
+
 ## 0.16.33
 - INDEPENDENCIA TOTAL: Clean Assistant ahora puede APRENDER la identidad del robot del PROPIO
   robot, sin nube y sin tenerla guardada. En una instalación nueva, en cuanto rediriges los
