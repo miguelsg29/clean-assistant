@@ -51,7 +51,14 @@ def _apply_host_timezone():
             if tz:
                 os.environ["TZ"] = tz
                 time.tzset()
-                print(f"[tz] zona horaria del host aplicada: {tz}")
+                off = int(datetime.datetime.now().astimezone().utcoffset().total_seconds() // 60)
+                # Si tras aplicar la TZ el offset sigue en 0 pero la zona no es UTC, casi seguro
+                # falta tzdata en la imagen (Alpine): avísalo, porque los horarios saldrán a
+                # destiempo (el reloj del robot se quedaría en UTC).
+                if off == 0 and tz not in ("UTC", "Etc/UTC"):
+                    print(f"[tz] AVISO: {tz} pero offset=0; ¿falta tzdata? los horarios saldrán a destiempo")
+                else:
+                    print(f"[tz] zona horaria del host aplicada: {tz} (offset {off:+d} min)")
                 return
         except Exception:
             continue
@@ -808,7 +815,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.16.34", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.16.35", lifespan=lifespan)
 
 
 @app.get("/api/state")

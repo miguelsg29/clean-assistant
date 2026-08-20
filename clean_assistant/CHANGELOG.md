@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.35
+- Horarios: arreglado que las limpiezas programadas se disparaban con DESFASE (p. ej. 2 h más
+  tarde en verano). Causa: la imagen del add-on (Alpine) no incluía `tzdata`, así que aplicar la
+  zona horaria de Home Assistant no surtía efecto y el contenedor se quedaba en UTC; el reloj del
+  robot acababa en UTC y un horario de las 11:00 disparaba a las 13:00 (CEST). Ahora se instala
+  `tzdata` y el log del add-on muestra el offset aplicado (`[tz] ... (offset +120 min)`) para
+  poder verificarlo. Tras actualizar, el arreglo se aplica al reconectar el robot (o reinícialo).
+
 ## 0.16.34
 - Historial: arreglado que cada limpieza aparecía DUPLICADA — una vez con su horario real y
   otra como «Manual · Toda la casa». Eran dos registros de la MISMA limpieza: el seguimiento

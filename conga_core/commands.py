@@ -146,7 +146,10 @@ def set_upgrade(auto):   return {"control": "set_upgrade_config", "auto_upgrade"
 
 def set_time(epoch: int | None = None, tz_offset_sec: int | None = None):
     """Ajusta el reloj del robot (set_time). time = epoch UTC; timezone = offset local en
-    segundos. Con el reloj correcto, los horarios (day_time en UTC) disparan a su hora."""
+    segundos. El robot reconstruye su reloj LOCAL (UTC+offset) y compara los horarios contra él,
+    por eso day_time va en hora LOCAL (ver local_to_robot, que es identidad). Con el offset
+    correcto los horarios disparan a su hora; si el offset sale 0 (contenedor en UTC sin tzdata)
+    el reloj del robot se queda en UTC y los horarios salen a destiempo."""
     if epoch is None:
         epoch = int(_time.time())
     if tz_offset_sec is None:

@@ -441,8 +441,10 @@ class RealRobot:
     def _query_startup(self):
         """Pide no molestar / consumibles / OTA / voz (con reintentos)."""
         uid = self.cfg.userid
-        # ajusta el reloj del robot una vez por conexión (los horarios se guardan en UTC y
-        # disparan según el reloj del robot; sin esto podían dispararse a destiempo).
+        # ajusta el reloj del robot una vez por conexión: pone su reloj en hora LOCAL (UTC+offset)
+        # para que los horarios (day_time en local) disparen a su hora. Requiere que el contenedor
+        # conozca la zona horaria (tzdata + TZ del host); sin ello el offset sería 0 (reloj en UTC)
+        # y los horarios saldrían a destiempo.
         if not self._diag.get("time"):
             self._diag["time"] = 1
             self.command(cmd.set_time())

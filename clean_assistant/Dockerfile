@@ -4,9 +4,12 @@
 FROM alpine:3.20
 
 ENV PYTHONUNBUFFERED=1
-RUN apk add --no-cache python3 py3-pip openssl jq git curl
+# tzdata es imprescindible: sin la base de zonas horarias, poner TZ + time.tzset() no surte
+# efecto en Alpine y el contenedor se queda en UTC -> el reloj del robot se pone en UTC y los
+# horarios se disparan con desfase (p. ej. 2 h en verano). Ver backend/app.py _apply_host_timezone.
+RUN apk add --no-cache python3 py3-pip openssl jq git curl tzdata
 
-ARG CA_REF=v0.16.34
+ARG CA_REF=v0.16.35
 RUN git clone --depth 1 --branch ${CA_REF} https://github.com/miguelsg29/clean-assistant /app \
     && pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 

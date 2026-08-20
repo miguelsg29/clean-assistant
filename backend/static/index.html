@@ -79,6 +79,7 @@
   body.has-realmap .mapctl{display:flex}
   .mapctl .iconbtn{width:34px;height:34px;font-size:16px;line-height:1}
   .mapwrap{padding:54px 12px 104px}  /* hueco arriba (cabecera+giros) y abajo (dock) sin solapar el mapa */
+  body.has-mapwarn .mapwrap{padding-top:86px}  /* con aviso (p. ej. «agua bajo») la cabecera ocupa una línea más: baja el mapa para no taparlo */
   svg.map{width:100%;height:auto;display:block;border-radius:12px}
   svg.map.hidden{display:none}
   canvas.realmap{display:block;width:100%;height:auto;border-radius:12px;image-rendering:pixelated;cursor:pointer}
@@ -749,6 +750,8 @@
     if(mStats) mStats.textContent = parts.length? parts.join(' · ') : '';
     var mWarn=document.getElementById('mapWarn');   // aviso del robot (p. ej. agua baja)
     if(mWarn) mWarn.textContent = (st.online!==false && st.warning) ? ('⚠ '+st.warning) : '';
+    // con aviso, la cabecera flotante crece a una línea más; baja el mapa para que no lo tape
+    document.body.classList.toggle('has-mapwarn', !!(mWarn && mWarn.textContent));
     // dock play/pause
     var PLAY='<path d="M8 5v14l11-7z"/>',PAUSE='<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
     var pi=document.getElementById('playIco'),pl=document.getElementById('playLbl');
