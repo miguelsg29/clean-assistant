@@ -65,6 +65,12 @@
   .iconbtn{width:32px;height:32px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
   .iconbtn:hover{color:var(--ink)}
   .iconbtn svg{width:16px;height:16px}
+  .langsel{height:32px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);
+    font:600 12px var(--font);padding:0 22px 0 10px;cursor:pointer;box-shadow:var(--shadow);
+    appearance:none;-webkit-appearance:none;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235f6b68' stroke-width='2.5' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat:no-repeat;background-position:right 6px center;background-size:12px}
+  .langsel:hover{color:var(--ink)}
   .stage{display:grid;grid-template-columns:1fr 384px;gap:20px;align-items:start}
   @media(max-width:880px){.stage{grid-template-columns:1fr}}
   .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
@@ -298,6 +304,9 @@
       <span class="pill state" id="statePill" data-s="offline"><span class="dot"></span><span id="stateTxt">Conectando…</span></span>
       <span class="pill batt"><span class="battglyph"><i id="battBar"></i></span><b id="battTxt">—</b><span class="battchg" id="battChg" hidden>⚡</span></span>
       <span class="pill local"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Local</span>
+      <select class="langsel" id="langSel" title="Idioma" aria-label="Idioma">
+        <option value="es">ES</option><option value="en">EN</option><option value="pt">PT</option><option value="fr">FR</option>
+      </select>
       <button class="iconbtn" id="themeBtn" title="Cambiar tema" aria-label="Cambiar tema"><svg id="themeIco" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg></button>
     </div>
   </header>
@@ -373,13 +382,13 @@
         <div class="rooms" id="roomChips"></div>
         <p class="hint" id="houseSum" style="opacity:.75;font-size:12px;margin:2px 0 4px;font-weight:560"></p>
         <div class="phead">Modo</div>
-        <div class="seg" data-cmd="mode"><button aria-pressed="true">Auto</button><button>Fregado</button><button>Bordes</button><button>Espiral</button></div>
+        <div class="seg" data-cmd="mode"><button data-v="Auto" aria-pressed="true">Auto</button><button data-v="Fregado">Fregado</button><button data-v="Bordes">Bordes</button><button data-v="Espiral">Espiral</button></div>
         <div class="phead">Succión</div>
-        <div class="seg" data-cmd="fan"><button>Eco</button><button aria-pressed="true">Normal</button><button>Turbo</button><button data-v="Off">Máx</button></div>
+        <div class="seg" data-cmd="fan"><button data-v="Eco">Eco</button><button data-v="Normal" aria-pressed="true">Normal</button><button data-v="Turbo">Turbo</button><button data-v="Off">Máx</button></div>
         <div class="phead">Agua</div>
-        <div class="seg" data-cmd="water"><button>Off</button><button>Bajo</button><button aria-pressed="true">Medio</button><button>Alto</button></div>
+        <div class="seg" data-cmd="water"><button data-v="Off">Off</button><button data-v="Bajo">Bajo</button><button data-v="Medio" aria-pressed="true">Medio</button><button data-v="Alto">Alto</button></div>
         <div class="phead">Mopa</div>
-        <div class="seg" data-cmd="mop"><button>Off</button><button aria-pressed="true">Estándar</button><button>Fuerte</button><button>Potente</button></div>
+        <div class="seg" data-cmd="mop"><button data-v="Off">Off</button><button data-v="Estándar" aria-pressed="true">Estándar</button><button data-v="Fuerte">Fuerte</button><button data-v="Potente">Potente</button></div>
         <div class="row" style="margin-top:8px"><div class="rt"><div class="t">Doble pasada (x2)</div><div class="d">Pasa dos veces por cada zona</div></div><button class="toggle" id="twiceTog"></button></div>
         <div class="btnrow">
           <button class="btn" id="cleanSel" disabled>Limpiar selección</button>
@@ -465,17 +474,17 @@
             <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="netHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
             <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="netIP" title="Toca para copiar">…</code></div>
           </div>
-          <p class="hint" style="opacity:.7;font-size:11.5px;margin:8px 0 4px">Con ese dominio, Clean Assistant ya <b>controla</b> el robot. Para que sea <b>100&nbsp;% local</b> (que siga funcionando aunque Cecotec apague sus servidores), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
+          <p class="hint" data-i18n-html="net_local_extra" style="opacity:.7;font-size:11.5px;margin:8px 0 4px">Con ese dominio, Clean Assistant ya <b>controla</b> el robot. Para que sea <b>100&nbsp;% local</b> (que siga funcionando aunque Cecotec apague sus servidores), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
           <div class="wizdns" id="netHostsExtra"></div>
           <div class="wizconn" id="netConn" style="margin-top:8px">…</div>
         </details>
 
         <details class="netcfg" id="backupCfg">
           <summary>Copia de seguridad / mover a otro servidor</summary>
-          <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Exporta o importa la configuración de Clean Assistant: <b>mapas</b> (nombres), <b>zonas prohibidas</b>, <b>zonas sin fregona</b>, <b>zonas de limpieza</b> y <b>horarios</b>. Útil para pasarla entre servidores (p. ej. de este equipo al add-on de Home Assistant). Las <b>habitaciones</b> (nombres, tipo y suelo) las guarda el propio robot en su mapa, así que viajan con él.</p>
+          <p class="hint" data-i18n-html="backup_desc" style="opacity:.7;font-size:11.5px;margin:6px 0">Exporta o importa la configuración de Clean Assistant: <b>mapas</b> (nombres), <b>zonas prohibidas</b>, <b>zonas sin fregona</b>, <b>zonas de limpieza</b> y <b>horarios</b>. Útil para pasarla entre servidores (p. ej. de este equipo al add-on de Home Assistant). Las <b>habitaciones</b> (nombres, tipo y suelo) las guarda el propio robot en su mapa, así que viajan con él.</p>
           <div class="btnrow"><button class="btn ghost" id="cfgExport" style="width:auto;padding:7px 14px;font-size:12.5px">Exportar</button><button class="btn ghost" id="cfgImport" style="width:auto;padding:7px 14px;font-size:12.5px">Importar…</button></div>
           <input type="file" id="cfgFile" accept="application/json,.json" style="display:none"/>
-          <p class="hint" style="opacity:.7;font-size:11.5px;margin:12px 0 6px;border-top:1px solid rgba(128,128,128,.18);padding-top:12px"><b>Datos del robot (llave de recuperación).</b> Exporta la <b>identidad del robot</b> (DID, número de serie, MAC…). Guárdala aparte, en lugar seguro: con ella Clean Assistant puede volver a servir al robot en una instalación nueva <b>sin pasar por la nube de Cecotec</b>. Son credenciales del robot; no las compartas. (El resto —mapas, zonas y horarios— va en la exportación de arriba.)</p>
+          <p class="hint" data-i18n-html="backup_robotkey" style="opacity:.7;font-size:11.5px;margin:12px 0 6px;border-top:1px solid rgba(128,128,128,.18);padding-top:12px"><b>Datos del robot (llave de recuperación).</b> Exporta la <b>identidad del robot</b> (DID, número de serie, MAC…). Guárdala aparte, en lugar seguro: con ella Clean Assistant puede volver a servir al robot en una instalación nueva <b>sin pasar por la nube de Cecotec</b>. Son credenciales del robot; no las compartas. (El resto —mapas, zonas y horarios— va en la exportación de arriba.)</p>
           <div class="btnrow"><button class="btn ghost" id="idExport" style="width:auto;padding:7px 14px;font-size:12.5px">Exportar datos del robot</button><button class="btn ghost" id="idImport" style="width:auto;padding:7px 14px;font-size:12.5px">Importar…</button></div>
           <input type="file" id="idFile" accept="application/json,.json" style="display:none"/>
         </details>
@@ -500,7 +509,7 @@
         <div class="row"><div class="rt"><div class="t">Turbo en alfombras</div><div class="d">Sube potencia al detectar alfombra</div></div><button class="toggle" id="carpetTog" aria-pressed="true"></button></div>
         <div class="row"><div class="rt"><div class="t">Actualizaciones automáticas</div><div class="d">Recomendado desactivar en local</div></div><button class="toggle" id="otaTog"></button></div>
         <div class="phead">Base</div>
-        <div class="field"><label>Tipo de base</label><div class="seg" data-cmd="base_type"><button>Base de carga</button><button aria-pressed="true">Colector automático</button></div></div>
+        <div class="field"><label>Tipo de base</label><div class="seg" data-cmd="base_type"><button data-v="Base de carga">Base de carga</button><button data-v="Colector automático" aria-pressed="true">Colector automático</button></div></div>
         <div class="field"><label>Frecuencia de vaciado</label>
           <select id="dustFreq" class="tinput">
             <option value="-1">Nunca</option>
@@ -517,7 +526,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.16 · 100% local, sin nube · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.17 · <span>100% local, sin nube</span> · <span id="modeTag">robot simulado</span></footer>
 </div>
 
 <div class="modal-ov" id="modalOv" hidden>
@@ -543,9 +552,9 @@
         <div class="wizdns-row"><span class="wizdns-k">Dominio</span><code id="wizHost" title="Toca para copiar">tcp-cecotec.3irobotix.net</code></div>
         <div class="wizdns-row"><span class="wizdns-k">Apunta a</span><code id="wizIP" title="Toca para copiar">…</code></div>
       </div>
-      <p class="hint" style="margin:8px 0 4px">Con ese basta para <b>controlar</b> el robot. Para <b>100&nbsp;% local</b> (sin depender nunca de Cecotec), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
+      <p class="hint" data-i18n-html="wiz_local_extra" style="margin:8px 0 4px">Con ese basta para <b>controlar</b> el robot. Para <b>100&nbsp;% local</b> (sin depender nunca de Cecotec), redirige <b>también</b> estos a la <b>misma IP</b>:</p>
       <div class="wizdns" id="wizHostsExtra"></div>
-      <p class="hint"><b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.</p>
+      <p class="hint" data-i18n-html="wiz_adguard"><b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.</p>
       <div class="wizconn" id="wizConn">⏳ Esperando a que el robot conecte…</div>
     </div>
 
@@ -562,6 +571,352 @@
     </div>
   </div>
 </div>
+
+<script>
+/* ============================ i18n (multiidioma): ES · EN · PT · FR ============================
+   Diseño: el ESPAÑOL es la fuente de la verdad (las claves del diccionario son el texto en
+   español). El markup estático se traduce por texto-origen en una pasada (i18nStatic); el
+   contenido dinámico usa t('texto español', {params}). Los DATOS del usuario (nombres de
+   habitaciones/mapas/horarios) NO se traducen. El cambio de idioma recarga la página. */
+(function(){
+  var VALID={es:1,en:1,pt:1,fr:1};
+  function detect(){
+    try{ var s=localStorage.getItem('ca_lang'); if(s&&VALID[s])return s; }catch(e){}
+    var n=(navigator.language||navigator.userLanguage||'es').slice(0,2).toLowerCase();
+    return VALID[n]?n:'es';
+  }
+  var L=detect(); window.CA_LANG=L;
+  // Inicial del día de la semana (lun..dom) por idioma, para los horarios.
+  window.CA_DAYLET={es:['L','M','X','J','V','S','D'],en:['M','T','W','T','F','S','S'],
+                    pt:['S','T','Q','Q','S','S','D'],fr:['L','M','M','J','V','S','D']};
+  // Diccionario. Clave = texto ORIGEN en español (colapsando espacios). Solo se listan los
+  // idiomas que difieren del español; lo que falte cae al español.
+  var STR={
+  // — cabecera / estado —
+  "Conga 8090 Ultra · control local":{en:"Conga 8090 Ultra · local control",pt:"Conga 8090 Ultra · controlo local",fr:"Conga 8090 Ultra · contrôle local"},
+  "Conectando…":{en:"Connecting…",pt:"A ligar…",fr:"Connexion…"},
+  "Cambiar tema":{en:"Toggle theme",pt:"Mudar tema",fr:"Changer de thème"},
+  "Idioma":{en:"Language",pt:"Idioma",fr:"Langue"},
+  // — controles del mapa —
+  "Girar 90° a la izquierda":{en:"Rotate 90° left",pt:"Girar 90° à esquerda",fr:"Pivoter de 90° à gauche"},
+  "Girar izquierda":{en:"Rotate left",pt:"Girar à esquerda",fr:"Pivoter à gauche"},
+  "Girar 90° a la derecha":{en:"Rotate 90° right",pt:"Girar 90° à direita",fr:"Pivoter de 90° à droite"},
+  "Girar derecha":{en:"Rotate right",pt:"Girar à direita",fr:"Pivoter à droite"},
+  "Voltear en espejo":{en:"Mirror flip",pt:"Inverter em espelho",fr:"Retourner en miroir"},
+  "Espejo":{en:"Mirror",pt:"Espelho",fr:"Miroir"},
+  "Acercar":{en:"Zoom in",pt:"Aproximar",fr:"Zoom avant"},
+  "Alejar":{en:"Zoom out",pt:"Afastar",fr:"Zoom arrière"},
+  "Ajustar":{en:"Fit",pt:"Ajustar",fr:"Ajuster"},
+  "Mapa de la vivienda":{en:"Home map",pt:"Mapa da casa",fr:"Plan du logement"},
+  "Mapa del robot":{en:"Robot map",pt:"Mapa do robô",fr:"Carte du robot"},
+  "Cambiando de mapa…":{en:"Switching map…",pt:"A mudar de mapa…",fr:"Changement de carte…"},
+  "Controles del robot":{en:"Robot controls",pt:"Controlos do robô",fr:"Commandes du robot"},
+  // — etiquetas del mapa de ejemplo (demo) —
+  "Cocina":{en:"Kitchen",pt:"Cozinha",fr:"Cuisine"},
+  "Salón":{en:"Living room",pt:"Sala",fr:"Salon"},
+  "Pasillo":{en:"Hallway",pt:"Corredor",fr:"Couloir"},
+  "Dorm. Principal":{en:"Master bedroom",pt:"Quarto principal",fr:"Chambre principale"},
+  "Dormitorio":{en:"Bedroom",pt:"Quarto",fr:"Chambre"},
+  "Baño":{en:"Bathroom",pt:"Casa de banho",fr:"Salle de bain"},
+  "privado":{en:"private",pt:"privada",fr:"privée"},
+  "Mesa":{en:"Table",pt:"Mesa",fr:"Table"},
+  // — dock —
+  "Iniciar":{en:"Start",pt:"Iniciar",fr:"Démarrer"},
+  "Pausar":{en:"Pause",pt:"Pausar",fr:"Pause"},
+  "Reanudar":{en:"Resume",pt:"Retomar",fr:"Reprendre"},
+  "Base":{en:"Dock",pt:"Base",fr:"Base"},
+  "Localizar":{en:"Locate",pt:"Localizar",fr:"Localiser"},
+  // — pestañas —
+  "Limpieza":{en:"Cleaning",pt:"Limpeza",fr:"Nettoyage"},
+  "Zonas":{en:"Zones",pt:"Zonas",fr:"Zones"},
+  "Horarios":{en:"Schedules",pt:"Horários",fr:"Horaires"},
+  "Actividad":{en:"Activity",pt:"Atividade",fr:"Activité"},
+  "Ajustes":{en:"Settings",pt:"Definições",fr:"Réglages"},
+  // — limpieza —
+  "Toca una habitación (aquí o en el mapa) y pulsa limpiar.":{en:"Tap a room (here or on the map) and press clean.",pt:"Toca numa divisão (aqui ou no mapa) e prime limpar.",fr:"Touchez une pièce (ici ou sur le plan) et appuyez sur nettoyer."},
+  "Modo":{en:"Mode",pt:"Modo",fr:"Mode"},
+  "Fregado":{en:"Mopping",pt:"Lavagem",fr:"Lavage"},
+  "Bordes":{en:"Edges",pt:"Bordas",fr:"Bords"},
+  "Espiral":{en:"Spiral",pt:"Espiral",fr:"Spirale"},
+  "Succión":{en:"Suction",pt:"Sucção",fr:"Aspiration"},
+  "Máx":{en:"Max",pt:"Máx",fr:"Max"},
+  "Agua":{en:"Water",pt:"Água",fr:"Eau"},
+  "Bajo":{en:"Low",pt:"Baixo",fr:"Faible"},
+  "Medio":{en:"Medium",pt:"Médio",fr:"Moyen"},
+  "Alto":{en:"High",pt:"Alto",fr:"Élevé"},
+  "Mopa":{en:"Mop",pt:"Mopa",fr:"Serpillière"},
+  "Estándar":{en:"Standard",pt:"Padrão",fr:"Standard"},
+  "Fuerte":{en:"Strong",pt:"Forte",fr:"Fort"},
+  "Potente":{en:"Powerful",pt:"Potente",fr:"Puissant"},
+  "Doble pasada (x2)":{en:"Double pass (x2)",pt:"Passagem dupla (x2)",fr:"Double passage (x2)"},
+  "Pasa dos veces por cada zona":{en:"Goes twice over each area",pt:"Passa duas vezes por cada zona",fr:"Passe deux fois sur chaque zone"},
+  "Limpiar selección":{en:"Clean selection",pt:"Limpar seleção",fr:"Nettoyer la sélection"},
+  "Limpiar {n} habitación":{en:"Clean {n} room",pt:"Limpar {n} divisão",fr:"Nettoyer {n} pièce"},
+  "Limpiar {n} habitaciones":{en:"Clean {n} rooms",pt:"Limpar {n} divisões",fr:"Nettoyer {n} pièces"},
+  "Limpieza completa de la casa":{en:"Full house clean",pt:"Limpeza completa da casa",fr:"Nettoyage complet de la maison"},
+  "Casa: {m2} · {n} habitación":{en:"Home: {m2} · {n} room",pt:"Casa: {m2} · {n} divisão",fr:"Maison : {m2} · {n} pièce"},
+  "Casa: {m2} · {n} habitaciones":{en:"Home: {m2} · {n} rooms",pt:"Casa: {m2} · {n} divisões",fr:"Maison : {m2} · {n} pièces"},
+  // — zonas —
+  "Elige un tipo y dibuja un rectángulo sobre el mapa.":{en:"Pick a type and draw a rectangle on the map.",pt:"Escolhe um tipo e desenha um retângulo no mapa.",fr:"Choisissez un type et dessinez un rectangle sur le plan."},
+  "Aún no hay zonas.":{en:"No zones yet.",pt:"Ainda não há zonas.",fr:"Aucune zone pour l’instant."},
+  "+ Prohibida":{en:"+ No-go",pt:"+ Proibida",fr:"+ Interdite"},
+  "+ Sin fregona":{en:"+ No-mop",pt:"+ Sem mopa",fr:"+ Sans serpillière"},
+  "+ Limpieza x2":{en:"+ Clean x2",pt:"+ Limpeza x2",fr:"+ Nettoyage x2"},
+  "Prohibida":{en:"No-go",pt:"Proibida",fr:"Interdite"},
+  "Sin fregona":{en:"No-mop",pt:"Sem mopa",fr:"Sans serpillière"},
+  "Limpieza":{en:"Cleaning",pt:"Limpeza",fr:"Nettoyage"},
+  "Limpieza x2":{en:"Clean x2",pt:"Limpeza x2",fr:"Nettoyage x2"},
+  "Editar en el mapa (mover / tamaño / rotar)":{en:"Edit on the map (move / resize / rotate)",pt:"Editar no mapa (mover / tamanho / rodar)",fr:"Modifier sur le plan (déplacer / taille / pivoter)"},
+  "Editar":{en:"Edit",pt:"Editar",fr:"Modifier"},
+  "Renombrar zona":{en:"Rename zone",pt:"Renomear zona",fr:"Renommer la zone"},
+  "Renombrar":{en:"Rename",pt:"Renomear",fr:"Renommer"},
+  "Borrar zona":{en:"Delete zone",pt:"Eliminar zona",fr:"Supprimer la zone"},
+  "Borrar":{en:"Delete",pt:"Eliminar",fr:"Supprimer"},
+  "Editar habitaciones":{en:"Edit rooms",pt:"Editar divisões",fr:"Modifier les pièces"},
+  "Une dos habitaciones en una, o separa una dibujando una línea de corte sobre el mapa.":{en:"Merge two rooms into one, or split one by drawing a cut line on the map.",pt:"Une duas divisões numa, ou separa uma desenhando uma linha de corte no mapa.",fr:"Fusionnez deux pièces en une, ou divisez-en une en traçant une ligne de coupe sur le plan."},
+  "Unir habitaciones":{en:"Merge rooms",pt:"Unir divisões",fr:"Fusionner des pièces"},
+  "Separar habitación":{en:"Split room",pt:"Separar divisão",fr:"Diviser une pièce"},
+  "Tipo de suelo por habitación":{en:"Floor type per room",pt:"Tipo de piso por divisão",fr:"Type de sol par pièce"},
+  "Suave":{en:"Soft",pt:"Macio",fr:"Doux"},
+  "Azulejos":{en:"Tiles",pt:"Azulejos",fr:"Carrelage"},
+  "Madera":{en:"Wood",pt:"Madeira",fr:"Bois"},
+  "Alfombra":{en:"Carpet",pt:"Tapete",fr:"Tapis"},
+  "El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).":{en:"Drawing zones needs the robot's real map (start in real mode and wait for the map to load).",pt:"Desenhar zonas precisa do mapa real do robô (arranca em modo real e aguarda que o mapa carregue).",fr:"Le dessin de zones nécessite la vraie carte du robot (démarrez en mode réel et attendez le chargement de la carte)."},
+  "Necesita el mapa real del robot.":{en:"Needs the robot's real map.",pt:"Precisa do mapa real do robô.",fr:"Nécessite la vraie carte du robot."},
+  "✏️ Dibuja un rectángulo de \"{k}\" sobre el mapa (pulsa el botón otra vez para cancelar).":{en:"✏️ Draw a \"{k}\" rectangle on the map (press the button again to cancel).",pt:"✏️ Desenha um retângulo de \"{k}\" no mapa (prime o botão outra vez para cancelar).",fr:"✏️ Dessinez un rectangle « {k} » sur le plan (appuyez à nouveau sur le bouton pour annuler)."},
+  "✏️ Dibuja el nuevo rectángulo para \"{name}\" sobre el mapa.":{en:"✏️ Draw the new rectangle for \"{name}\" on the map.",pt:"✏️ Desenha o novo retângulo para \"{name}\" no mapa.",fr:"✏️ Dessinez le nouveau rectangle pour « {name} » sur le plan."},
+  "Arrastra la zona para moverla y las esquinas para cambiar el tamaño. Toca fuera para terminar.":{en:"Drag the zone to move it and the corners to resize. Tap outside to finish.",pt:"Arrasta a zona para a mover e os cantos para mudar o tamanho. Toca fora para terminar.",fr:"Faites glisser la zone pour la déplacer et les coins pour la redimensionner. Touchez à l’extérieur pour terminer."},
+  "Toca 2 habitaciones en el mapa para unirlas.":{en:"Tap 2 rooms on the map to merge them.",pt:"Toca em 2 divisões no mapa para as unir.",fr:"Touchez 2 pièces sur le plan pour les fusionner."},
+  "Uniendo {a} + {b}… el mapa se actualizará en unos segundos.":{en:"Merging {a} + {b}… the map will update in a few seconds.",pt:"A unir {a} + {b}… o mapa vai atualizar em alguns segundos.",fr:"Fusion de {a} + {b}… le plan se mettra à jour dans quelques secondes."},
+  "«{name}» seleccionada. Toca otra habitación para unirlas.":{en:"\"{name}\" selected. Tap another room to merge them.",pt:"«{name}» selecionada. Toca noutra divisão para as unir.",fr:"« {name} » sélectionnée. Touchez une autre pièce pour les fusionner."},
+  "Dibuja una línea de corte cruzando la habitación que quieras separar.":{en:"Draw a cut line across the room you want to split.",pt:"Desenha uma linha de corte a atravessar a divisão que queres separar.",fr:"Tracez une ligne de coupe à travers la pièce à diviser."},
+  "Dibuja una línea que CRUCE la habitación (puede salirse por los bordes).":{en:"Draw a line that CROSSES the room (it can extend past the edges).",pt:"Desenha uma linha que ATRAVESSE a divisão (pode sair pelas bordas).",fr:"Tracez une ligne qui TRAVERSE la pièce (elle peut dépasser les bords)."},
+  "Separando «{name}»… el mapa se actualizará en unos segundos.":{en:"Splitting \"{name}\"… the map will update in a few seconds.",pt:"A separar «{name}»… o mapa vai atualizar em alguns segundos.",fr:"Division de « {name} »… le plan se mettra à jour dans quelques secondes."},
+  "Renombrar habitación":{en:"Rename room",pt:"Renomear divisão",fr:"Renommer la pièce"},
+  "Tipo":{en:"Type",pt:"Tipo",fr:"Type"},
+  "Suelo":{en:"Floor",pt:"Piso",fr:"Sol"},
+  "Sin tipo":{en:"No type",pt:"Sem tipo",fr:"Sans type"},
+  "Comedor":{en:"Dining room",pt:"Sala de jantar",fr:"Salle à manger"},
+  "Terraza":{en:"Terrace",pt:"Terraço",fr:"Terrasse"},
+  "Otros":{en:"Other",pt:"Outros",fr:"Autres"},
+  // — horarios —
+  "El robot limpia solo a la hora y días elegidos, con el modo de cada habitación.":{en:"The robot cleans on its own at the chosen time and days, with each room's mode.",pt:"O robô limpa sozinho à hora e dias escolhidos, com o modo de cada divisão.",fr:"Le robot nettoie seul à l’heure et aux jours choisis, avec le mode de chaque pièce."},
+  "Aún no hay horarios.":{en:"No schedules yet.",pt:"Ainda não há horários.",fr:"Aucun horaire pour l’instant."},
+  "+ Nuevo horario":{en:"+ New schedule",pt:"+ Novo horário",fr:"+ Nouvel horaire"},
+  "Planes sugeridos":{en:"Suggested plans",pt:"Planos sugeridos",fr:"Plans suggérés"},
+  "Según tu mapa y el tipo de suelo de cada habitación. Púlsalos para añadirlos; luego los editas o desactivas como cualquier horario.":{en:"Based on your map and each room's floor type. Tap them to add; then edit or disable them like any schedule.",pt:"Segundo o teu mapa e o tipo de piso de cada divisão. Prime-os para os adicionar; depois editas ou desativas como qualquer horário.",fr:"Selon votre plan et le type de sol de chaque pièce. Touchez-les pour les ajouter ; ensuite modifiez-les ou désactivez-les comme tout horaire."},
+  "+ Añadir":{en:"+ Add",pt:"+ Adicionar",fr:"+ Ajouter"},
+  "Nuevo horario":{en:"New schedule",pt:"Novo horário",fr:"Nouvel horaire"},
+  "Editar horario":{en:"Edit schedule",pt:"Editar horário",fr:"Modifier l’horaire"},
+  "Nombre":{en:"Name",pt:"Nome",fr:"Nom"},
+  "Noche entre semana":{en:"Weeknight",pt:"Noite de semana",fr:"Soir en semaine"},
+  "Hora":{en:"Time",pt:"Hora",fr:"Heure"},
+  "Días":{en:"Days",pt:"Dias",fr:"Jours"},
+  "Habitaciones":{en:"Rooms",pt:"Divisões",fr:"Pièces"},
+  "Modo por habitación":{en:"Mode per room",pt:"Modo por divisão",fr:"Mode par pièce"},
+  "Elige habitaciones para configurar su modo.":{en:"Pick rooms to set their mode.",pt:"Escolhe divisões para configurar o seu modo.",fr:"Choisissez des pièces pour régler leur mode."},
+  "Guardar horario":{en:"Save schedule",pt:"Guardar horário",fr:"Enregistrer l’horaire"},
+  "Cancelar":{en:"Cancel",pt:"Cancelar",fr:"Annuler"},
+  "Aceptar":{en:"OK",pt:"Aceitar",fr:"OK"},
+  "Elige al menos un día.":{en:"Pick at least one day.",pt:"Escolhe pelo menos um dia.",fr:"Choisissez au moins un jour."},
+  "Elige al menos una habitación.":{en:"Pick at least one room.",pt:"Escolhe pelo menos uma divisão.",fr:"Choisissez au moins une pièce."},
+  "¿Borrar el horario \"{name}\"?":{en:"Delete the schedule \"{name}\"?",pt:"Eliminar o horário \"{name}\"?",fr:"Supprimer l’horaire « {name} » ?"},
+  "Horario":{en:"Schedule",pt:"Horário",fr:"Horaire"},
+  "Horarios guardados en el robot (diagnóstico)":{en:"Schedules stored in the robot (diagnostics)",pt:"Horários guardados no robô (diagnóstico)",fr:"Horaires enregistrés dans le robot (diagnostic)"},
+  "Clean Assistant mantiene estos horarios sincronizados con los de arriba automáticamente, así que normalmente coinciden. Esta lista es solo para comprobar lo que el robot tiene guardado (incluye los creados en la app de Cecotec).":{en:"Clean Assistant keeps these schedules in sync with the ones above automatically, so they usually match. This list is only to check what the robot has stored (including those created in the Cecotec app).",pt:"O Clean Assistant mantém estes horários sincronizados com os de cima automaticamente, por isso normalmente coincidem. Esta lista serve só para verificar o que o robô tem guardado (inclui os criados na app da Cecotec).",fr:"Clean Assistant garde ces horaires synchronisés automatiquement avec ceux du dessus, donc ils correspondent généralement. Cette liste sert seulement à vérifier ce que le robot a enregistré (y compris ceux créés dans l’app Cecotec)."},
+  "Consultar al robot":{en:"Query the robot",pt:"Consultar o robô",fr:"Interroger le robot"},
+  "Consultar":{en:"Query",pt:"Consultar",fr:"Interroger"},
+  "Consultando…":{en:"Querying…",pt:"A consultar…",fr:"Interrogation…"},
+  "Sin datos. Pulsa «Consultar».":{en:"No data. Press \"Query\".",pt:"Sem dados. Prime «Consultar».",fr:"Aucune donnée. Appuyez sur « Interroger »."},
+  "Habitaciones: {list}":{en:"Rooms: {list}",pt:"Divisões: {list}",fr:"Pièces : {list}"},
+  "todas":{en:"all",pt:"todas",fr:"toutes"},
+  "Borrar del robot":{en:"Delete from robot",pt:"Eliminar do robô",fr:"Supprimer du robot"},
+  "⚠ sábado":{en:"⚠ Saturday",pt:"⚠ sábado",fr:"⚠ samedi"},
+  "¿Borrar del robot el horario \"{name}\"? (orderid {id})":{en:"Delete the schedule \"{name}\" from the robot? (orderid {id})",pt:"Eliminar do robô o horário \"{name}\"? (orderid {id})",fr:"Supprimer l’horaire « {name} » du robot ? (orderid {id})"},
+  // — actividad —
+  "Registro de actividad":{en:"Activity log",pt:"Registo de atividade",fr:"Journal d’activité"},
+  "Vaciar":{en:"Clear",pt:"Limpar",fr:"Vider"},
+  "Cada limpieza que hace el robot: tipo (manual/programada), habitaciones, m², duración, día y hora.":{en:"Every cleaning the robot does: type (manual/scheduled), rooms, m², duration, day and time.",pt:"Cada limpeza que o robô faz: tipo (manual/programada), divisões, m², duração, dia e hora.",fr:"Chaque nettoyage du robot : type (manuel/programmé), pièces, m², durée, jour et heure."},
+  "Aún no hay limpiezas registradas.":{en:"No cleanings recorded yet.",pt:"Ainda não há limpezas registadas.",fr:"Aucun nettoyage enregistré pour l’instant."},
+  "Error":{en:"Error",pt:"Erro",fr:"Erreur"},
+  "Aviso":{en:"Warning",pt:"Aviso",fr:"Avertissement"},
+  "Error (código {code})":{en:"Error (code {code})",pt:"Erro (código {code})",fr:"Erreur (code {code})"},
+  "Aviso (código {code})":{en:"Warning (code {code})",pt:"Aviso (código {code})",fr:"Avertissement (code {code})"},
+  "Programada":{en:"Scheduled",pt:"Programada",fr:"Programmé"},
+  "Manual":{en:"Manual",pt:"Manual",fr:"Manuel"},
+  "Toda la casa":{en:"Whole house",pt:"Toda a casa",fr:"Toute la maison"},
+  "¿Vaciar el registro de actividad? No se puede deshacer.":{en:"Clear the activity log? This can't be undone.",pt:"Limpar o registo de atividade? Não pode ser desfeito.",fr:"Vider le journal d’activité ? Action irréversible."},
+  // — nombres de día (backend, historial) —
+  "lunes":{en:"Monday",pt:"segunda-feira",fr:"lundi"},
+  "martes":{en:"Tuesday",pt:"terça-feira",fr:"mardi"},
+  "miércoles":{en:"Wednesday",pt:"quarta-feira",fr:"mercredi"},
+  "jueves":{en:"Thursday",pt:"quinta-feira",fr:"jeudi"},
+  "viernes":{en:"Friday",pt:"sexta-feira",fr:"vendredi"},
+  "sábado":{en:"Saturday",pt:"sábado",fr:"samedi"},
+  "domingo":{en:"Sunday",pt:"domingo",fr:"dimanche"},
+  // — avisos del robot (backend) —
+  "Depósito de agua bajo":{en:"Water tank low",pt:"Depósito de água baixo",fr:"Réservoir d’eau bas"},
+  "Error al volver a la base":{en:"Error returning to dock",pt:"Erro ao voltar à base",fr:"Erreur de retour à la base"},
+  // — consumibles —
+  "Cepillo central":{en:"Main brush",pt:"Escova central",fr:"Brosse centrale"},
+  "Cepillo lateral":{en:"Side brush",pt:"Escova lateral",fr:"Brosse latérale"},
+  "Filtro":{en:"Filter",pt:"Filtro",fr:"Filtre"},
+  "Restablecer al cambiar la pieza":{en:"Reset when you replace the part",pt:"Repor ao trocar a peça",fr:"Réinitialiser au remplacement de la pièce"},
+  "Restablecer":{en:"Reset",pt:"Repor",fr:"Réinitialiser"},
+  "¿Restablecer \"{n}\" a 0? Hazlo cuando cambies la pieza.":{en:"Reset \"{n}\" to 0? Do this when you replace the part.",pt:"Repor \"{n}\" a 0? Faz isto quando trocares a peça.",fr:"Réinitialiser « {n} » à 0 ? À faire lors du remplacement de la pièce."},
+  // — ajustes —
+  "Modo de funcionamiento":{en:"Operating mode",pt:"Modo de funcionamento",fr:"Mode de fonctionnement"},
+  "Local: sin nube (la app de Cecotec no llega al robot). Cloud + Local: el robot pasa por la nube real, la app oficial funciona y se capturan sus comandos (útil para depurar).":{en:"Local: no cloud (the Cecotec app can't reach the robot). Cloud + Local: the robot goes through the real cloud, the official app works and its commands are captured (useful for debugging).",pt:"Local: sem nuvem (a app da Cecotec não chega ao robô). Cloud + Local: o robô passa pela nuvem real, a app oficial funciona e os seus comandos são capturados (útil para depurar).",fr:"Local : sans cloud (l’app Cecotec n’atteint pas le robot). Cloud + Local : le robot passe par le vrai cloud, l’app officielle fonctionne et ses commandes sont capturées (utile pour déboguer)."},
+  "Configuración de red (DNS del robot)":{en:"Network configuration (robot DNS)",pt:"Configuração de rede (DNS do robô)",fr:"Configuration réseau (DNS du robot)"},
+  "Para que el robot hable con Clean Assistant, su tráfico a la nube de Cecotec debe redirigirse a este servidor. Crea reescrituras de DNS en AdGuard Home / Pi-hole / router:":{en:"For the robot to talk to Clean Assistant, its traffic to Cecotec's cloud must be redirected to this server. Create DNS rewrites in AdGuard Home / Pi-hole / router:",pt:"Para o robô falar com o Clean Assistant, o seu tráfego para a nuvem da Cecotec deve ser redirecionado para este servidor. Cria reescritas de DNS no AdGuard Home / Pi-hole / router:",fr:"Pour que le robot communique avec Clean Assistant, son trafic vers le cloud Cecotec doit être redirigé vers ce serveur. Créez des réécritures DNS dans AdGuard Home / Pi-hole / routeur :"},
+  "Dominio":{en:"Domain",pt:"Domínio",fr:"Domaine"},
+  "Apunta a":{en:"Points to",pt:"Aponta para",fr:"Pointe vers"},
+  "Toca para copiar":{en:"Tap to copy",pt:"Toca para copiar",fr:"Touchez pour copier"},
+  "(IP no detectada)":{en:"(IP not detected)",pt:"(IP não detetado)",fr:"(IP non détectée)"},
+  "Copia de seguridad / mover a otro servidor":{en:"Backup / move to another server",pt:"Cópia de segurança / mover para outro servidor",fr:"Sauvegarde / déplacer vers un autre serveur"},
+  "Exportar":{en:"Export",pt:"Exportar",fr:"Exporter"},
+  "Importar…":{en:"Import…",pt:"Importar…",fr:"Importer…"},
+  "Exportar datos del robot":{en:"Export robot data",pt:"Exportar dados do robô",fr:"Exporter les données du robot"},
+  "Mapas de la casa":{en:"House maps",pt:"Mapas da casa",fr:"Cartes de la maison"},
+  "Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.":{en:"Clean Assistant remembers the maps it sees. Tap one to activate it on the robot. (When you switch maps, zones and schedules are per map.) You can delete any map; if you delete the last one, the robot is left with no map and you can create a new one from scratch.",pt:"O Clean Assistant lembra-se dos mapas que vai vendo. Prime um para o ativar no robô. (Ao mudar de mapa, as zonas e horários são por mapa.) Podes eliminar qualquer mapa; se eliminares o último, o robô fica sem mapa e poderás criar um novo do zero.",fr:"Clean Assistant mémorise les cartes qu’il voit. Touchez-en une pour l’activer sur le robot. (En changeant de carte, les zones et horaires sont par carte.) Vous pouvez supprimer n’importe quelle carte ; si vous supprimez la dernière, le robot se retrouve sans carte et vous pourrez en créer une de zéro."},
+  "+ Crear mapa nuevo":{en:"+ Create new map",pt:"+ Criar novo mapa",fr:"+ Créer une nouvelle carte"},
+  "Borrar todos":{en:"Delete all",pt:"Eliminar todos",fr:"Tout supprimer"},
+  "Nombre del mapa":{en:"Map name",pt:"Nome do mapa",fr:"Nom de la carte"},
+  "Planta baja":{en:"Ground floor",pt:"Piso térreo",fr:"Rez-de-chaussée"},
+  "Nombre de la casa":{en:"House name",pt:"Nome da casa",fr:"Nom de la maison"},
+  "Casa":{en:"Home",pt:"Casa",fr:"Maison"},
+  "Mi casa":{en:"My home",pt:"Minha casa",fr:"Ma maison"},
+  "Al crear, el robot recorrerá toda la casa para mapearla (tarda un rato). El mapa nuevo empieza en blanco (sin zonas ni horarios).":{en:"On creation, the robot will roam the whole house to map it (takes a while). The new map starts blank (no zones or schedules).",pt:"Ao criar, o robô vai percorrer toda a casa para a mapear (demora um pouco). O novo mapa começa em branco (sem zonas nem horários).",fr:"À la création, le robot parcourt toute la maison pour la cartographier (cela prend un moment). La nouvelle carte démarre vierge (sans zones ni horaires)."},
+  "Crear y mapear":{en:"Create and map",pt:"Criar e mapear",fr:"Créer et cartographier"},
+  "Robot":{en:"Robot",pt:"Robô",fr:"Robot"},
+  "No molestar":{en:"Do not disturb",pt:"Não incomodar",fr:"Ne pas déranger"},
+  "Franja de silencio (inicio – fin)":{en:"Quiet window (start – end)",pt:"Faixa de silêncio (início – fim)",fr:"Plage de silence (début – fin)"},
+  "Sonido":{en:"Sound",pt:"Som",fr:"Son"},
+  "Volumen":{en:"Volume",pt:"Volume",fr:"Volume"},
+  "Turbo en alfombras":{en:"Carpet turbo",pt:"Turbo em tapetes",fr:"Turbo sur tapis"},
+  "Sube potencia al detectar alfombra":{en:"Boosts power when it detects carpet",pt:"Aumenta a potência ao detetar tapete",fr:"Augmente la puissance quand un tapis est détecté"},
+  "Actualizaciones automáticas":{en:"Automatic updates",pt:"Atualizações automáticas",fr:"Mises à jour automatiques"},
+  "Recomendado desactivar en local":{en:"Recommended off when local",pt:"Recomendado desativar em local",fr:"Recommandé désactivé en local"},
+  "Tipo de base":{en:"Dock type",pt:"Tipo de base",fr:"Type de base"},
+  "Base de carga":{en:"Charging dock",pt:"Base de carga",fr:"Base de charge"},
+  "Colector automático":{en:"Auto-empty dock",pt:"Coletor automático",fr:"Bac auto-vidage"},
+  "Frecuencia de vaciado":{en:"Emptying frequency",pt:"Frequência de esvaziamento",fr:"Fréquence de vidage"},
+  "Nunca":{en:"Never",pt:"Nunca",fr:"Jamais"},
+  "Después de cada limpieza":{en:"After every cleaning",pt:"Depois de cada limpeza",fr:"Après chaque nettoyage"},
+  "Cada 30 minutos":{en:"Every 30 minutes",pt:"A cada 30 minutos",fr:"Toutes les 30 minutes"},
+  "Cada 60 minutos":{en:"Every 60 minutes",pt:"A cada 60 minutos",fr:"Toutes les 60 minutes"},
+  "Cada 90 minutos":{en:"Every 90 minutes",pt:"A cada 90 minutos",fr:"Toutes les 90 minutes"},
+  "Cada 2 horas":{en:"Every 2 hours",pt:"A cada 2 horas",fr:"Toutes les 2 heures"},
+  "Vaciar base ahora":{en:"Empty dock now",pt:"Esvaziar base agora",fr:"Vider la base maintenant"},
+  "Consumibles":{en:"Consumables",pt:"Consumíveis",fr:"Consommables"},
+  // — mapas (dinámico) —
+  "Sin mapa":{en:"No map",pt:"Sem mapa",fr:"Aucune carte"},
+  "Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.":{en:"No maps remembered yet. They'll appear when the robot's map loads.",pt:"Ainda não há mapas guardados. Aparecerão ao carregar o mapa do robô.",fr:"Aucune carte mémorisée pour l’instant. Elles apparaîtront au chargement de la carte du robot."},
+  "(sin nombre)":{en:"(no name)",pt:"(sem nome)",fr:"(sans nom)"},
+  "Activo":{en:"Active",pt:"Ativo",fr:"Actif"},
+  "Activar":{en:"Activate",pt:"Ativar",fr:"Activer"},
+  "Toca para editar la casa":{en:"Tap to edit the house",pt:"Toca para editar a casa",fr:"Touchez pour modifier la maison"},
+  "Renombrar mapa":{en:"Rename map",pt:"Renomear mapa",fr:"Renommer la carte"},
+  "Borrar mapa del robot":{en:"Delete map from robot",pt:"Eliminar mapa do robô",fr:"Supprimer la carte du robot"},
+  "¿Cambiar al mapa \"{name}\"? El robot cargará ese mapa.":{en:"Switch to map \"{name}\"? The robot will load that map.",pt:"Mudar para o mapa \"{name}\"? O robô vai carregar esse mapa.",fr:"Passer à la carte « {name} » ? Le robot chargera cette carte."},
+  "¿Borrar el último mapa \"{name}\"? El robot se quedará SIN mapa; tendrás que crear uno nuevo (remapear) para empezar de cero. No se puede deshacer.":{en:"Delete the last map \"{name}\"? The robot will be left WITH NO map; you'll have to create a new one (remap) to start from scratch. This can't be undone.",pt:"Eliminar o último mapa \"{name}\"? O robô ficará SEM mapa; terás de criar um novo (remapear) para começar do zero. Não pode ser desfeito.",fr:"Supprimer la dernière carte « {name} » ? Le robot se retrouvera SANS carte ; vous devrez en créer une nouvelle (recartographier) pour repartir de zéro. Action irréversible."},
+  "¿Borrar el mapa activo \"{name}\"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.":{en:"Delete the active map \"{name}\"? It will switch to another map and delete it (takes a few seconds). This can't be undone.",pt:"Eliminar o mapa ativo \"{name}\"? Vai mudar para outro mapa e eliminá-lo (demora alguns segundos). Não pode ser desfeito.",fr:"Supprimer la carte active « {name} » ? Une autre carte sera activée puis celle-ci supprimée (quelques secondes). Action irréversible."},
+  "¿Borrar del robot el mapa \"{name}\"? No se puede deshacer.":{en:"Delete the map \"{name}\" from the robot? This can't be undone.",pt:"Eliminar do robô o mapa \"{name}\"? Não pode ser desfeito.",fr:"Supprimer la carte « {name} » du robot ? Action irréversible."},
+  "¿Borrar TODOS los mapas del robot y de Clean Assistant? El robot se quedará sin mapa y tendrás que crear uno nuevo. Útil para empezar de cero o limpiar mapas fantasma. No se puede deshacer.":{en:"Delete ALL maps from the robot and from Clean Assistant? The robot will be left with no map and you'll have to create a new one. Useful to start over or clear ghost maps. This can't be undone.",pt:"Eliminar TODOS os mapas do robô e do Clean Assistant? O robô ficará sem mapa e terás de criar um novo. Útil para começar do zero ou limpar mapas fantasma. Não pode ser desfeito.",fr:"Supprimer TOUTES les cartes du robot et de Clean Assistant ? Le robot se retrouvera sans carte et vous devrez en créer une nouvelle. Utile pour repartir de zéro ou effacer les cartes fantômes. Action irréversible."},
+  "Borrando…":{en:"Deleting…",pt:"A eliminar…",fr:"Suppression…"},
+  "Borrados {n} mapa(s). El robot está sin mapa; crea uno nuevo con «Crear mapa nuevo».":{en:"Deleted {n} map(s). The robot has no map; create a new one with \"Create new map\".",pt:"Eliminados {n} mapa(s). O robô está sem mapa; cria um novo com «Criar novo mapa».",fr:"{n} carte(s) supprimée(s). Le robot n’a plus de carte ; créez-en une nouvelle avec « Créer une nouvelle carte »."},
+  "Ponle un nombre al mapa.":{en:"Give the map a name.",pt:"Dá um nome ao mapa.",fr:"Donnez un nom à la carte."},
+  "¿Crear el mapa \"{name}\"? Se borrarán los mapas, zonas y horarios que el robot tenga ahora y empezará a mapear la casa de cero.":{en:"Create the map \"{name}\"? The robot's current maps, zones and schedules will be deleted and it will start mapping the house from scratch.",pt:"Criar o mapa \"{name}\"? Serão eliminados os mapas, zonas e horários que o robô tem agora e começará a mapear a casa do zero.",fr:"Créer la carte « {name} » ? Les cartes, zones et horaires actuels du robot seront supprimés et il commencera à cartographier la maison de zéro."},
+  "¿Crear el mapa \"{name}\"? El robot empezará a recorrer la casa para mapearla (se añadirá a los mapas que ya tienes).":{en:"Create the map \"{name}\"? The robot will start roaming the house to map it (it'll be added to the maps you already have).",pt:"Criar o mapa \"{name}\"? O robô começará a percorrer a casa para a mapear (será adicionado aos mapas que já tens).",fr:"Créer la carte « {name} » ? Le robot commencera à parcourir la maison pour la cartographier (elle s’ajoutera aux cartes existantes)."},
+  "Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.":{en:"Mapping started: the robot is roaming the house. The map will appear when it finishes.",pt:"Mapeamento iniciado: o robô está a percorrer a casa. O mapa aparecerá quando terminar.",fr:"Cartographie lancée : le robot parcourt la maison. La carte apparaîtra une fois terminé."},
+  // — asistente / red / copia —
+  "✓ Robot conectado — el DNS ya apunta aquí":{en:"✓ Robot connected — DNS now points here",pt:"✓ Robô ligado — o DNS já aponta para aqui",fr:"✓ Robot connecté — le DNS pointe désormais ici"},
+  "⏳ Esperando a que el robot conecte… (revisa el DNS y reinicia el robot)":{en:"⏳ Waiting for the robot to connect… (check DNS and restart the robot)",pt:"⏳ À espera que o robô ligue… (verifica o DNS e reinicia o robô)",fr:"⏳ En attente de la connexion du robot… (vérifiez le DNS et redémarrez le robot)"},
+  "✓ Robot conectado — el DNS apunta aquí":{en:"✓ Robot connected — DNS points here",pt:"✓ Robô ligado — o DNS aponta para aqui",fr:"✓ Robot connecté — le DNS pointe ici"},
+  "⏳ El robot no está conectado (revisa el DNS y reinicia el robot)":{en:"⏳ The robot isn't connected (check DNS and restart the robot)",pt:"⏳ O robô não está ligado (verifica o DNS e reinicia o robô)",fr:"⏳ Le robot n’est pas connecté (vérifiez le DNS et redémarrez le robot)"},
+  "¡copiado!":{en:"copied!",pt:"copiado!",fr:"copié !"},
+  "OTA (arranque)":{en:"OTA (boot)",pt:"OTA (arranque)",fr:"OTA (démarrage)"},
+  "historial":{en:"history",pt:"histórico",fr:"historique"},
+  "Iniciando…":{en:"Starting…",pt:"A iniciar…",fr:"Démarrage…"},
+  "No se pudo exportar.":{en:"Could not export.",pt:"Não foi possível exportar.",fr:"Échec de l’exportation."},
+  "El archivo no es un JSON válido.":{en:"The file is not valid JSON.",pt:"O ficheiro não é um JSON válido.",fr:"Le fichier n’est pas un JSON valide."},
+  "Importar reemplazará los mapas, zonas y horarios actuales de Clean Assistant por los del archivo. ¿Continuar?":{en:"Importing will replace Clean Assistant's current maps, zones and schedules with those from the file. Continue?",pt:"Importar vai substituir os mapas, zonas e horários atuais do Clean Assistant pelos do ficheiro. Continuar?",fr:"L’import remplacera les cartes, zones et horaires actuels de Clean Assistant par ceux du fichier. Continuer ?"},
+  "Importado: {maps} mapa(s), {zones} zona(s), {schedules} horario(s). Se han enviado al robot los del mapa activo.":{en:"Imported: {maps} map(s), {zones} zone(s), {schedules} schedule(s). Those of the active map have been sent to the robot.",pt:"Importado: {maps} mapa(s), {zones} zona(s), {schedules} horário(s). Foram enviados ao robô os do mapa ativo.",fr:"Importé : {maps} carte(s), {zones} zone(s), {schedules} horaire(s). Ceux de la carte active ont été envoyés au robot."},
+  "No se pudo importar.":{en:"Could not import.",pt:"Não foi possível importar.",fr:"Échec de l’importation."},
+  "Restaurar la identidad del robot desde el archivo y reconectar. ¿Continuar?":{en:"Restore the robot's identity from the file and reconnect. Continue?",pt:"Restaurar a identidade do robô a partir do ficheiro e voltar a ligar. Continuar?",fr:"Restaurer l’identité du robot depuis le fichier et se reconnecter. Continuer ?"},
+  "Identidad restaurada (DID {did}). El robot se reconectará con ella.":{en:"Identity restored (DID {did}). The robot will reconnect with it.",pt:"Identidade restaurada (DID {did}). O robô voltará a ligar com ela.",fr:"Identité restaurée (DID {did}). Le robot se reconnectera avec elle."},
+  "El robot pasará por la nube de Cecotec (la app oficial funcionará) y se reconectará. ¿Continuar?":{en:"The robot will go through Cecotec's cloud (the official app will work) and reconnect. Continue?",pt:"O robô passará pela nuvem da Cecotec (a app oficial funcionará) e voltará a ligar. Continuar?",fr:"Le robot passera par le cloud Cecotec (l’app officielle fonctionnera) et se reconnectera. Continuer ?"},
+  // — estados del robot —
+  "En la base":{en:"Docked",pt:"Na base",fr:"À la base"},
+  "Limpiando":{en:"Cleaning",pt:"A limpar",fr:"Nettoyage"},
+  "Mapeando":{en:"Mapping",pt:"A mapear",fr:"Cartographie"},
+  "En pausa":{en:"Paused",pt:"Em pausa",fr:"En pause"},
+  "Volviendo a la base":{en:"Returning to dock",pt:"A voltar à base",fr:"Retour à la base"},
+  "Inactivo":{en:"Idle",pt:"Inativo",fr:"Inactif"},
+  "Sin conexión":{en:"Offline",pt:"Sem ligação",fr:"Hors ligne"},
+  "Primera limpieza automática":{en:"First automatic cleaning",pt:"Primeira limpeza automática",fr:"Premier nettoyage automatique"},
+  "Activo · ":{en:"On · ",pt:"Ativo · ",fr:"Actif · "},
+  "Desactivado · ":{en:"Off · ",pt:"Desativado · ",fr:"Désactivé · "},
+  // — pie / etiqueta de modo —
+  "100% local, sin nube":{en:"100% local, no cloud",pt:"100% local, sem nuvem",fr:"100 % local, sans cloud"},
+  "sin mapa · crea uno nuevo en Ajustes":{en:"no map · create a new one in Settings",pt:"sem mapa · cria um novo em Definições",fr:"aucune carte · créez-en une dans Réglages"},
+  "robot simulado (mapa de ejemplo)":{en:"simulated robot (example map)",pt:"robô simulado (mapa de exemplo)",fr:"robot simulé (carte d’exemple)"},
+  "mapa real del robot":{en:"robot's real map",pt:"mapa real do robô",fr:"vraie carte du robot"},
+  "robot simulado":{en:"simulated robot",pt:"robô simulado",fr:"robot simulé"},
+  // — bloques con formato (innerHTML) —
+  "net_local_extra":{es:"Con ese dominio, Clean Assistant ya <b>controla</b> el robot. Para que sea <b>100&nbsp;% local</b> (que siga funcionando aunque Cecotec apague sus servidores), redirige <b>también</b> estos a la <b>misma IP</b>:",en:"With that domain, Clean Assistant already <b>controls</b> the robot. For it to be <b>100&nbsp;% local</b> (to keep working even if Cecotec shuts down its servers), redirect <b>these too</b> to the <b>same IP</b>:",pt:"Com esse domínio, o Clean Assistant já <b>controla</b> o robô. Para ser <b>100&nbsp;% local</b> (continuar a funcionar mesmo que a Cecotec desligue os servidores), redireciona <b>também</b> estes para o <b>mesmo IP</b>:",fr:"Avec ce domaine, Clean Assistant <b>contrôle</b> déjà le robot. Pour qu’il soit <b>100&nbsp;% local</b> (continuer à fonctionner même si Cecotec ferme ses serveurs), redirigez <b>aussi</b> ceux-ci vers la <b>même IP</b> :"},
+  "backup_desc":{es:"Exporta o importa la configuración de Clean Assistant: <b>mapas</b> (nombres), <b>zonas prohibidas</b>, <b>zonas sin fregona</b>, <b>zonas de limpieza</b> y <b>horarios</b>. Útil para pasarla entre servidores (p. ej. de este equipo al add-on de Home Assistant). Las <b>habitaciones</b> (nombres, tipo y suelo) las guarda el propio robot en su mapa, así que viajan con él.",en:"Export or import Clean Assistant's configuration: <b>maps</b> (names), <b>no-go zones</b>, <b>no-mop zones</b>, <b>cleaning zones</b> and <b>schedules</b>. Handy for moving it between servers (e.g. from this machine to the Home Assistant add-on). The <b>rooms</b> (names, type and floor) are stored by the robot itself in its map, so they travel with it.",pt:"Exporta ou importa a configuração do Clean Assistant: <b>mapas</b> (nomes), <b>zonas proibidas</b>, <b>zonas sem mopa</b>, <b>zonas de limpeza</b> e <b>horários</b>. Útil para a passar entre servidores (ex.: deste equipamento para o add-on do Home Assistant). As <b>divisões</b> (nomes, tipo e piso) são guardadas pelo próprio robô no seu mapa, por isso viajam com ele.",fr:"Exportez ou importez la configuration de Clean Assistant : <b>cartes</b> (noms), <b>zones interdites</b>, <b>zones sans serpillière</b>, <b>zones de nettoyage</b> et <b>horaires</b>. Pratique pour la transférer entre serveurs (p. ex. de cette machine vers l’add-on Home Assistant). Les <b>pièces</b> (noms, type et sol) sont stockées par le robot lui-même dans sa carte, elles voyagent donc avec lui."},
+  "backup_robotkey":{es:"<b>Datos del robot (llave de recuperación).</b> Exporta la <b>identidad del robot</b> (DID, número de serie, MAC…). Guárdala aparte, en lugar seguro: con ella Clean Assistant puede volver a servir al robot en una instalación nueva <b>sin pasar por la nube de Cecotec</b>. Son credenciales del robot; no las compartas. (El resto —mapas, zonas y horarios— va en la exportación de arriba.)",en:"<b>Robot data (recovery key).</b> Export the <b>robot's identity</b> (DID, serial number, MAC…). Keep it separately, in a safe place: with it, Clean Assistant can serve the robot again on a fresh install <b>without going through Cecotec's cloud</b>. These are the robot's credentials; don't share them. (Everything else —maps, zones and schedules— is in the export above.)",pt:"<b>Dados do robô (chave de recuperação).</b> Exporta a <b>identidade do robô</b> (DID, número de série, MAC…). Guarda-a à parte, em lugar seguro: com ela o Clean Assistant pode voltar a servir o robô numa instalação nova <b>sem passar pela nuvem da Cecotec</b>. São credenciais do robô; não as partilhes. (O resto —mapas, zonas e horários— vai na exportação de cima.)",fr:"<b>Données du robot (clé de récupération).</b> Exportez l’<b>identité du robot</b> (DID, numéro de série, MAC…). Conservez-la à part, en lieu sûr : grâce à elle, Clean Assistant peut à nouveau servir le robot sur une installation neuve <b>sans passer par le cloud Cecotec</b>. Ce sont les identifiants du robot ; ne les partagez pas. (Le reste —cartes, zones et horaires— est dans l’export ci-dessus.)"},
+  "wiz_local_extra":{es:"Con ese basta para <b>controlar</b> el robot. Para <b>100&nbsp;% local</b> (sin depender nunca de Cecotec), redirige <b>también</b> estos a la <b>misma IP</b>:",en:"That's enough to <b>control</b> the robot. For <b>100&nbsp;% local</b> (never depending on Cecotec), redirect <b>these too</b> to the <b>same IP</b>:",pt:"Isso basta para <b>controlar</b> o robô. Para <b>100&nbsp;% local</b> (nunca depender da Cecotec), redireciona <b>também</b> estes para o <b>mesmo IP</b>:",fr:"Cela suffit pour <b>contrôler</b> le robot. Pour un fonctionnement <b>100&nbsp;% local</b> (sans jamais dépendre de Cecotec), redirigez <b>aussi</b> ceux-ci vers la <b>même IP</b> :"},
+  "wiz_adguard":{es:"<b>AdGuard Home</b>: Filtros → Reescrituras DNS → Añadir (Dominio e IP). <b>Pi-hole</b>: Local DNS → DNS Records. Muchos <b>routers</b>: DNS estático / entrada de host local. Luego <b>reinicia el robot</b> (apágalo y enciéndelo) para que reconecte aquí.",en:"<b>AdGuard Home</b>: Filters → DNS rewrites → Add (Domain and IP). <b>Pi-hole</b>: Local DNS → DNS Records. Many <b>routers</b>: static DNS / local host entry. Then <b>restart the robot</b> (turn it off and on) so it reconnects here.",pt:"<b>AdGuard Home</b>: Filtros → Reescritas DNS → Adicionar (Domínio e IP). <b>Pi-hole</b>: Local DNS → DNS Records. Muitos <b>routers</b>: DNS estático / entrada de host local. Depois <b>reinicia o robô</b> (desliga e liga) para que volte a ligar aqui.",fr:"<b>AdGuard Home</b> : Filtres → Réécritures DNS → Ajouter (Domaine et IP). <b>Pi-hole</b> : Local DNS → DNS Records. Beaucoup de <b>routeurs</b> : DNS statique / entrée d’hôte local. Puis <b>redémarrez le robot</b> (éteignez-le et rallumez-le) pour qu’il se reconnecte ici."},
+  // — asistente (wizard) —
+  "¡Bienvenido a Clean Assistant!":{en:"Welcome to Clean Assistant!",pt:"Bem-vindo ao Clean Assistant!",fr:"Bienvenue dans Clean Assistant !"},
+  "Controla tu Conga 100% en local, sin la nube de Cecotec. Solo hay que hacer dos cosas:":{en:"Control your Conga 100% locally, without Cecotec's cloud. You only need to do two things:",pt:"Controla o teu Conga 100% em local, sem a nuvem da Cecotec. Só há que fazer duas coisas:",fr:"Contrôlez votre Conga 100 % en local, sans le cloud Cecotec. Il n’y a que deux choses à faire :"},
+  "Redirige el DNS del robot a este servidor":{en:"Redirect the robot's DNS to this server",pt:"Redireciona o DNS do robô para este servidor",fr:"Rediriger le DNS du robot vers ce serveur"},
+  "El robot busca la nube de Cecotec en unos dominios fijos. Para que hable con Clean Assistant, redirígelos a la IP de este servidor con tu bloqueador de DNS (AdGuard Home, Pi-hole) o el router:":{en:"The robot looks for Cecotec's cloud at some fixed domains. For it to talk to Clean Assistant, redirect them to this server's IP with your DNS blocker (AdGuard Home, Pi-hole) or the router:",pt:"O robô procura a nuvem da Cecotec em alguns domínios fixos. Para falar com o Clean Assistant, redireciona-os para o IP deste servidor com o teu bloqueador de DNS (AdGuard Home, Pi-hole) ou o router:",fr:"Le robot cherche le cloud Cecotec sur des domaines fixes. Pour qu’il communique avec Clean Assistant, redirigez-les vers l’IP de ce serveur avec votre bloqueur DNS (AdGuard Home, Pi-hole) ou le routeur :"},
+  "Crea el mapa de tu casa":{en:"Create your house map",pt:"Cria o mapa da tua casa",fr:"Créez le plan de votre maison"},
+  "Ahora no":{en:"Not now",pt:"Agora não",fr:"Pas maintenant"}
+  };
+  window.CA_STR=STR;
+  function norm(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim(); }
+  function interp(s,p){ if(!p)return s; return s.replace(/\{(\w+)\}/g,function(m,k){return p[k]!=null?p[k]:m;}); }
+  function t(s,p){
+    if(L==='es') return interp(s,p);
+    var e=STR[norm(s)];
+    var o=(e&&e[L]!=null)?e[L]:s;
+    return interp(o,p);
+  }
+  window.t=t;
+  function trAttr(el,attr){ var v=el.getAttribute(attr); if(!v)return; var e=STR[norm(v)]; if(e&&e[L]!=null)el.setAttribute(attr,e[L]); }
+  function trHtml(el){ var e=STR[el.getAttribute('data-i18n-html')]; if(e&&e[L]!=null)el.innerHTML=e[L]; }
+  function i18nStatic(root){
+    root=root||document.body; if(L==='es'||!root)return;
+    if(root.nodeType===1&&root.hasAttribute&&root.hasAttribute('data-i18n-html')) trHtml(root);
+    if(root.querySelectorAll) Array.prototype.forEach.call(root.querySelectorAll('[data-i18n-html]'),trHtml);
+    var attrEls=root.querySelectorAll?root.querySelectorAll('[title],[aria-label],[placeholder]'):[];
+    Array.prototype.forEach.call(attrEls,function(el){ trAttr(el,'title'); trAttr(el,'aria-label'); trAttr(el,'placeholder'); });
+    if(root.nodeType===1){ trAttr(root,'title'); trAttr(root,'aria-label'); trAttr(root,'placeholder'); }
+    var w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,{acceptNode:function(n){
+      if(!n.nodeValue||!n.nodeValue.trim())return NodeFilter.FILTER_REJECT;
+      var p=n.parentNode; if(!p)return NodeFilter.FILTER_REJECT;
+      var tag=p.nodeName; if(tag==='SCRIPT'||tag==='STYLE'||tag==='OPTION'&&p.parentNode&&p.parentNode.id==='langSel')return NodeFilter.FILTER_REJECT;
+      if(p.closest&&p.closest('[data-i18n-html],[data-no-i18n]'))return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }});
+    var nodes=[],x; while(x=w.nextNode())nodes.push(x);
+    nodes.forEach(function(n){ var raw=n.nodeValue,core=raw.trim(); if(!core)return; var e=STR[norm(core)]; if(e&&e[L]!=null)n.nodeValue=raw.replace(core,e[L]); });
+  }
+  window.i18nStatic=i18nStatic;
+  function boot(){
+    document.documentElement.setAttribute('lang',L);
+    var sel=document.getElementById('langSel');
+    if(sel){ sel.value=L; sel.addEventListener('change',function(){ try{localStorage.setItem('ca_lang',sel.value);}catch(e){} location.reload(); }); }
+    i18nStatic(document.body);
+    if(L!=='es'){ ['wizHouse','wizName'].forEach(function(id){var el=document.getElementById(id); if(el&&el.value){var e=STR[norm(el.value)]; if(e&&e[L]!=null){el.value=e[L]; if(el.placeholder)el.placeholder=e[L];}}}); }
+  }
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot); else boot();
+})();
+</script>
 
 <script>
 (function(){
@@ -584,7 +939,7 @@
       _mres=res;
       document.getElementById('modalT').textContent=o.title||'';
       document.getElementById('modalM').textContent=o.message||'';
-      _mok.textContent=o.okText||'Aceptar'; _mcancel.textContent=o.cancelText||'Cancelar';
+      _mok.textContent=o.okText||t('Aceptar'); _mcancel.textContent=o.cancelText||t('Cancelar');
       _mcancel.hidden=!!o.alert;
       _mov.hidden=false; setTimeout(function(){_mok.focus();},20);
     });
@@ -685,7 +1040,7 @@
     });
     var hs=document.getElementById('houseSum');   // total de la casa
     if(hs){ var n=Object.keys(AREAS.byRoom).length;
-      hs.textContent = n ? ('Casa: '+fmtM2(AREAS.total)+' · '+n+' habitacion'+(n===1?'':'es')) : ''; }
+      hs.textContent = n ? t(n===1?'Casa: {m2} · {n} habitación':'Casa: {m2} · {n} habitaciones',{m2:fmtM2(AREAS.total),n:n}) : ''; }
   }
   function toggleRoom(id){ if(NAMED.size&&!NAMED.has(id))return;   // no seleccionar segmentos temporales
     selected.has(id)?selected.delete(id):selected.add(id); syncSel(); }
@@ -698,7 +1053,7 @@
     document.querySelectorAll('.map .room').forEach(function(r){r.classList.toggle('sel',selected.has(KEY2ID[r.dataset.room]));});
     var b=document.getElementById('cleanSel'),n=selected.size;
     b.disabled=n===0;
-    b.textContent=n===0?'Limpiar selección':('Limpiar '+n+(n===1?' habitación':' habitaciones'));
+    b.textContent=n===0?t('Limpiar selección'):t(n===1?'Limpiar {n} habitación':'Limpiar {n} habitaciones',{n:n});
     if(MAP && !MAP.sample) renderRealMap();
   }
   document.querySelectorAll('.map .room').forEach(function(r){
@@ -713,9 +1068,9 @@
     var h=Math.floor(min/60), m=min%60; return h+'h'+(m?(' '+m+'m'):''); }
   var lastClean=(function(){ try{ return JSON.parse(localStorage.getItem('ca_lastClean_v2'))||{area:0,time:0}; }catch(e){ return {area:0,time:0}; } })();
   function stLabel(s){                       // etiqueta del estado (con caso especial de mapa nuevo)
-    if(st.online===false) return LABEL.offline;
-    if(s==='cleaning' && st.work_mode===45) return 'Primera limpieza automática';
-    return LABEL[s]||s;
+    if(st.online===false) return t(LABEL.offline);
+    if(s==='cleaning' && st.work_mode===45) return t('Primera limpieza automática');
+    return t(LABEL[s]||s);
   }
   function render(){
     var s=st.state||'unknown';
@@ -749,18 +1104,18 @@
     if(lastClean.time>0) parts.push(fmtDur(lastClean.time));
     if(mStats) mStats.textContent = parts.length? parts.join(' · ') : '';
     var mWarn=document.getElementById('mapWarn');   // aviso del robot (p. ej. agua baja)
-    if(mWarn) mWarn.textContent = (st.online!==false && st.warning) ? ('⚠ '+st.warning) : '';
+    if(mWarn) mWarn.textContent = (st.online!==false && st.warning) ? ('⚠ '+t(st.warning)) : '';
     // con aviso, la cabecera flotante crece a una línea más; baja el mapa para que no lo tape
     document.body.classList.toggle('has-mapwarn', !!(mWarn && mWarn.textContent));
     // dock play/pause
     var PLAY='<path d="M8 5v14l11-7z"/>',PAUSE='<path d="M7 5h4v14H7zM13 5h4v14h-4z"/>';
     var pi=document.getElementById('playIco'),pl=document.getElementById('playLbl');
-    if(s==='cleaning'){pi.innerHTML=PAUSE;pl.textContent='Pausar';}
-    else if(s==='paused'){pi.innerHTML=PLAY;pl.textContent='Reanudar';}
-    else{pi.innerHTML=PLAY;pl.textContent='Iniciar';}
+    if(s==='cleaning'){pi.innerHTML=PAUSE;pl.textContent=t('Pausar');}
+    else if(s==='paused'){pi.innerHTML=PLAY;pl.textContent=t('Reanudar');}
+    else{pi.innerHTML=PLAY;pl.textContent=t('Iniciar');}
     // ajustes reflejados
     if(st.quiet){var q=st.quiet;document.getElementById('quietTog').setAttribute('aria-pressed',!!q.is_open);
-      document.getElementById('quietDesc').textContent=(q.is_open?'Activo · ':'Desactivado · ')+hhmm(q.begin_time)+' a '+hhmm(q.end_time);
+      document.getElementById('quietDesc').textContent=t(q.is_open?'Activo · ':'Desactivado · ')+hhmm(q.begin_time)+' a '+hhmm(q.end_time);
       var qb=document.getElementById('quietBegin'),qe=document.getElementById('quietEnd');
       if(document.activeElement!==qb)qb.value=hhmm(q.begin_time);
       if(document.activeElement!==qe)qe.value=hhmm(q.end_time);}
@@ -786,11 +1141,11 @@
       var barw=(pct==null)?0:Math.max(0,Math.min(100,pct));
       var cls=(absurd||(pct!=null&&pct<=0))?'crit':((pct!=null&&pct<20)?'warn':'');
       var d=document.createElement('div');d.className='cons';
-      d.innerHTML='<span class="cn">'+m.n+'</span><span class="track"><i class="'+cls+'" style="width:'+barw+'%"></i></span>'+
+      d.innerHTML='<span class="cn">'+t(m.n)+'</span><span class="track"><i class="'+cls+'" style="width:'+barw+'%"></i></span>'+
         '<span class="pct '+(cls==='crit'?'crit':'')+'">'+(absurd?'⚠':pct+'%')+'</span>'+
-        '<button class="iconbtn consreset" title="Restablecer al cambiar la pieza" aria-label="Restablecer">↺</button>';
+        '<button class="iconbtn consreset" title="'+t('Restablecer al cambiar la pieza')+'" aria-label="'+t('Restablecer')+'">↺</button>';
       d.querySelector('.consreset').addEventListener('click',async function(){
-        if(await uiConfirm('¿Restablecer "'+m.n+'" a 0? Hazlo cuando cambies la pieza.'))
+        if(await uiConfirm(t('¿Restablecer "{n}" a 0? Hazlo cuando cambies la pieza.',{n:t(m.n)})))
           fetch(BASE+'api/consumable/reset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})}).then(function(r){return r.json();});
       });
       el.appendChild(d);
@@ -879,7 +1234,7 @@
     IDX={}; NAMED=new Set();
     ROOMS.forEach(function(r,i){ IDX[r.id]=i; if(r.named!==false)NAMED.add(r.id); });
     buildChips();
-    document.getElementById('modeTag').textContent=m.no_map?'sin mapa · crea uno nuevo en Ajustes':(m.sample?'robot simulado (mapa de ejemplo)':'mapa real del robot');
+    document.getElementById('modeTag').textContent=m.no_map?t('sin mapa · crea uno nuevo en Ajustes'):(m.sample?t('robot simulado (mapa de ejemplo)'):t('mapa real del robot'));
     var svg=document.querySelector('svg.map'), wrap=document.getElementById('canvasWrap');
     if(m.sample){ svg.classList.remove('hidden'); wrap.classList.remove('show'); document.body.classList.remove('has-realmap'); }
     else{
@@ -1095,10 +1450,10 @@
   function _zoneCells(z){ return z.points.map(function(p){return worldToCell(p[0],p[1]);}); }
   function selectZone(z){ editZone=z; z._cells=_zoneCells(z);
     exitDraw(); if(typeof exitRoomEdit==='function')exitRoomEdit();
-    var h=document.getElementById('zoneHint'); if(h)h.textContent='Arrastra la zona para moverla y las esquinas para cambiar el tamaño. Toca fuera para terminar.';
+    var h=document.getElementById('zoneHint'); if(h)h.textContent=t('Arrastra la zona para moverla y las esquinas para cambiar el tamaño. Toca fuera para terminar.');
     renderZones(); if(MAP&&!MAP.sample)renderRealMap(); }
   function deselectZone(){ if(!editZone)return; editZone=null;
-    var h=document.getElementById('zoneHint'); if(h)h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.';
+    var h=document.getElementById('zoneHint'); if(h)h.textContent=t('Elige un tipo y dibuja un rectángulo sobre el mapa.');
     renderZones(); if(MAP&&!MAP.sample)renderRealMap(); }
   function _applyDrag(pc){ var m=editDrag, orig=m.orig;
     if(m.mode==='move'){ var dx=pc[0]-m.start[0], dy=pc[1]-m.start[1];
@@ -1126,15 +1481,15 @@
       if(!_m){ editZone=null; } else if(_m!==editZone){ _m._cells=_zoneCells(_m); editZone=_m; }
     }
     var el=document.getElementById('zoneList'); if(!el)return; el.innerHTML='';
-    if(!ZONES.length){ if(editZone)editZone=null; el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Aún no hay zonas.</p>'; return; }
+    if(!ZONES.length){ if(editZone)editZone=null; el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">'+t('Aún no hay zonas.')+'</p>'; return; }
     ZONES.forEach(function(z){
       var k=ZK[z.kind]||{c:'--faint',l:z.kind}, isSel=(editZone&&editZone.id===z.id);
       var d=document.createElement('div'); d.className='zrow'+(isSel?' zsel':'');
       d.innerHTML='<span class="zdot" style="background:var('+k.c+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k">'+k.l+'</div></div>'+
-        '<button class="iconbtn zmov" title="Editar en el mapa (mover / tamaño / rotar)" aria-label="Editar">'+(isSel?'✓':'✥')+'</button>'+
-        '<button class="iconbtn zren" title="Renombrar zona" aria-label="Renombrar">✎</button>'+
-        '<button class="iconbtn zdel" title="Borrar zona" aria-label="Borrar">✕</button>';
+        '<div class="zt"><div class="n"></div><div class="k">'+t(k.l)+'</div></div>'+
+        '<button class="iconbtn zmov" title="'+t('Editar en el mapa (mover / tamaño / rotar)')+'" aria-label="'+t('Editar')+'">'+(isSel?'✓':'✥')+'</button>'+
+        '<button class="iconbtn zren" title="'+t('Renombrar zona')+'" aria-label="'+t('Renombrar')+'">✎</button>'+
+        '<button class="iconbtn zdel" title="'+t('Borrar zona')+'" aria-label="'+t('Borrar')+'">✕</button>';
       d.querySelector('.n').textContent=z.name;
       d.querySelector('.zmov').addEventListener('click',function(){ isSel?deselectZone():selectZone(z); });
       d.querySelector('.zren').addEventListener('click',function(){
@@ -1182,7 +1537,7 @@
   function renderFloors(){
     var el=document.getElementById('floorList'); if(!el)return; el.innerHTML='';
     var rooms=(MAP&&!MAP.sample?(MAP.rooms||[]):[]).filter(function(r){return r.named!==false;});
-    if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">Necesita el mapa real del robot.</p>'; return; }
+    if(!rooms.length){ el.innerHTML='<p class="hint" style="opacity:.65;margin:2px 0 12px">'+t('Necesita el mapa real del robot.')+'</p>'; return; }
     computeAreas();
     rooms.forEach(function(r){
       var row=document.createElement('div'); row.className='frow'; row.style.cssText='display:flex;flex-direction:column;gap:7px;align-items:stretch';
@@ -1190,7 +1545,7 @@
       var ic=document.createElement('span'); ic.className='rtico'; ic.textContent=typeIcon(r.type);
       var nt=document.createElement('span'); nt.className='fnt'; nt.textContent=r.name;
       var ed=document.createElement('button'); ed.className='iconbtn fren'; ed.textContent='✎';
-      ed.title='Renombrar habitación'; ed.setAttribute('aria-label','Renombrar habitación');
+      ed.title=t('Renombrar habitación'); ed.setAttribute('aria-label',t('Renombrar habitación'));
       ed.addEventListener('click',function(){
         inlineEdit(nt, r.name, function(nv){
           if(nv){ r.name=nv; fetch(BASE+'api/room/update',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:r.id,name:nv})}).then(function(x){return x.json();}); }
@@ -1200,20 +1555,20 @@
       var am=document.createElement('span'); am.className='rm2'; am.style.marginLeft='auto'; am.textContent=fmtM2(AREAS.byRoom[r.id]);
       nm.appendChild(ic); nm.appendChild(nt); nm.appendChild(am); nm.appendChild(ed); row.appendChild(nm);
       // selector de TIPO de habitación (desplegable propio, con el look de la app)
-      var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent='Tipo'; row.appendChild(tlbl);
+      var tlbl=document.createElement('div'); tlbl.className='rmlbl'; tlbl.textContent=t('Tipo'); row.appendChild(tlbl);
       var tsel=document.createElement('div'); tsel.className='rtsel';
       var cur=document.createElement('button'); cur.type='button'; cur.className='cur';
-      var curHTML=function(id){ var i=typeIndex(id), t=(i>=0?ROOMTYPES[i]:{i:'🏠',n:'Sin tipo'}); return '<span class="ic">'+t.i+'</span><span class="lbl">'+t.n+'</span><span class="chev">▾</span>'; };
+      var curHTML=function(id){ var i=typeIndex(id), rt=(i>=0?ROOMTYPES[i]:{i:'🏠',n:'Sin tipo'}); return '<span class="ic">'+rt.i+'</span><span class="lbl">'+t(rt.n)+'</span><span class="chev">▾</span>'; };
       cur.innerHTML=curHTML(r.type);
       var menu=document.createElement('div'); menu.className='rtmenu';
-      ROOMTYPES.forEach(function(t,i){
+      ROOMTYPES.forEach(function(rt,i){
         var o=document.createElement('div'); o.className='rtopt'+(i===typeIndex(r.type)?' sel':'');
-        o.innerHTML='<span class="ic">'+t.i+'</span>'+t.n;
+        o.innerHTML='<span class="ic">'+rt.i+'</span>'+t(rt.n);
         o.addEventListener('click',function(e){ e.stopPropagation();
-          r.type=t.id; ic.textContent=t.i; cur.innerHTML=curHTML(t.id);
+          r.type=rt.id; ic.textContent=rt.i; cur.innerHTML=curHTML(rt.id);
           menu.querySelectorAll('.rtopt').forEach(function(x){x.classList.remove('sel');}); o.classList.add('sel');
           tsel.classList.remove('open');
-          setRoomType(r.id,t.id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
+          setRoomType(r.id,rt.id); buildChips(); if(MAP&&!MAP.sample)renderRealMap();
         });
         menu.appendChild(o);
       });
@@ -1221,10 +1576,10 @@
       tsel.appendChild(cur); tsel.appendChild(menu);
       row.appendChild(tsel);
       // selector de SUELO
-      var slbl=document.createElement('div'); slbl.className='rmlbl'; slbl.textContent='Suelo'; row.appendChild(slbl);
+      var slbl=document.createElement('div'); slbl.className='rmlbl'; slbl.textContent=t('Suelo'); row.appendChild(slbl);
       var seg=document.createElement('div'); seg.className='seg';
       FLOORS.forEach(function(opt,i){
-        var b=document.createElement('button'); b.textContent=opt; b.dataset.v=i+1;
+        var b=document.createElement('button'); b.textContent=t(opt); b.dataset.v=i+1;
         if((r.material||1)===(i+1))b.setAttribute('aria-pressed','true');
         b.addEventListener('click',function(){
           seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);});
@@ -1241,20 +1596,20 @@
       .then(function(r){return r.json();});
   }
   function enterDraw(kind,btn){
-    if(!MAP||MAP.sample){ uiAlert('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).'); return; }
+    if(!MAP||MAP.sample){ uiAlert(t('El dibujo de zonas necesita el mapa real del robot (arranca en modo real y espera a que cargue el mapa).')); return; }
     if(typeof deselectZone==='function')deselectZone();   // salir de edición si había una zona seleccionada
     drawKind=kind;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.toggle('arming',b===btn);});
     var h=document.getElementById('zoneHint');
-    if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja un rectángulo de "'+ZK[kind].l+'" sobre el mapa (pulsa el botón otra vez para cancelar).'; }
+    if(h){ h.classList.add('armed'); h.textContent=t('✏️ Dibuja un rectángulo de "{k}" sobre el mapa (pulsa el botón otra vez para cancelar).',{k:t(ZK[kind].l)}); }
   }
   function exitDraw(){ drawKind=null; drawStart=null; drawRect=null; moveZoneId=null;
     document.querySelectorAll('.zadd').forEach(function(b){b.classList.remove('arming');});
-    var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent='Elige un tipo y dibuja un rectángulo sobre el mapa.'; } }
+    var h=document.getElementById('zoneHint'); if(h){ h.classList.remove('armed'); h.textContent=t('Elige un tipo y dibuja un rectángulo sobre el mapa.'); } }
   function enterMoveZone(z){
-    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert(t('Necesita el mapa real del robot.')); return; }
     moveZoneId=z.id; drawKind=z.kind; drawStart=null; drawRect=null;
-    var h=document.getElementById('zoneHint'); if(h){ h.classList.add('armed'); h.textContent='✏️ Dibuja el nuevo rectángulo para "'+(z.name||ZK[z.kind].l)+'" sobre el mapa.'; }
+    var h=document.getElementById('zoneHint'); if(h){ h.classList.add('armed'); h.textContent=t('✏️ Dibuja el nuevo rectángulo para "{name}" sobre el mapa.',{name:z.name||t(ZK[z.kind].l)}); }
   }
   document.querySelectorAll('.zadd').forEach(function(b){
     b.addEventListener('click',function(){ drawKind===b.dataset.kind ? exitDraw() : enterDraw(b.dataset.kind,b); });
@@ -1265,7 +1620,7 @@
   function roomEditHint(t){ var h=document.getElementById('roomEditHint'); if(h)h.textContent=t; }
   function exitRoomEdit(){ roomEdit=null; mergeSel=[]; splitStart=null; drawRect=null;
     document.getElementById('mergeBtn').classList.remove('arming'); document.getElementById('splitBtn').classList.remove('arming');
-    roomEditHint('Une dos habitaciones en una, o separa una dibujando una línea de corte sobre el mapa.');
+    roomEditHint(t('Une dos habitaciones en una, o separa una dibujando una línea de corte sobre el mapa.'));
     if(MAP&&!MAP.sample)renderRealMap();
   }
   function mergeTap(v){
@@ -1273,22 +1628,22 @@
     if(mergeSel.length>=2){
       var ids=mergeSel.slice(0,2);
       fetch(BASE+'api/rooms/merge',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rooms:ids})}).then(function(r){return r.json();});
-      roomEditHint('Uniendo '+roomName(ids[0])+' + '+roomName(ids[1])+'… el mapa se actualizará en unos segundos.');
+      roomEditHint(t('Uniendo {a} + {b}… el mapa se actualizará en unos segundos.',{a:roomName(ids[0]),b:roomName(ids[1])}));
       roomEdit=null; mergeSel=[]; document.getElementById('mergeBtn').classList.remove('arming');
-    } else { roomEditHint('«'+roomName(v)+'» seleccionada. Toca otra habitación para unirlas.'); }
+    } else { roomEditHint(t('«{name}» seleccionada. Toca otra habitación para unirlas.',{name:roomName(v)})); }
     if(MAP&&!MAP.sample)renderRealMap();
   }
   document.getElementById('mergeBtn').addEventListener('click',function(){
-    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert(t('Necesita el mapa real del robot.')); return; }
     if(roomEdit==='merge'){ exitRoomEdit(); return; }
     exitDraw(); exitRoomEdit(); roomEdit='merge'; this.classList.add('arming');
-    roomEditHint('Toca 2 habitaciones en el mapa para unirlas.');
+    roomEditHint(t('Toca 2 habitaciones en el mapa para unirlas.'));
   });
   document.getElementById('splitBtn').addEventListener('click',function(){
-    if(!MAP||MAP.sample){ uiAlert('Necesita el mapa real del robot.'); return; }
+    if(!MAP||MAP.sample){ uiAlert(t('Necesita el mapa real del robot.')); return; }
     if(roomEdit==='split'){ exitRoomEdit(); return; }
     exitDraw(); exitRoomEdit(); roomEdit='split'; this.classList.add('arming');
-    roomEditHint('Dibuja una línea de corte cruzando la habitación que quieras separar.');
+    roomEditHint(t('Dibuja una línea de corte cruzando la habitación que quieras separar.'));
   });
 
   var cvEl=document.getElementById('mapCanvas');
@@ -1350,9 +1705,9 @@
       var room=roomAlongLine(s,end);
       if(room>1&&room!==255&&(Math.abs(end[0]-s[0])>3||Math.abs(end[1]-s[1])>3)){
         fetch(BASE+'api/rooms/split',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({room:room,start:cellToWorld(s[0],s[1]),end:cellToWorld(end[0],end[1])})}).then(function(r){return r.json();});
-        roomEditHint('Separando «'+roomName(room)+'»… el mapa se actualizará en unos segundos.');
+        roomEditHint(t('Separando «{name}»… el mapa se actualizará en unos segundos.',{name:roomName(room)}));
         exitRoomEdit();
-      } else { roomEditHint('Dibuja una línea que CRUCE la habitación (puede salirse por los bordes).'); renderRealMap(); }
+      } else { roomEditHint(t('Dibuja una línea que CRUCE la habitación (puede salirse por los bordes).')); renderRealMap(); }
       return;
     }
     if(drawKind&&drawStart){
@@ -1423,18 +1778,18 @@
 
   function renderSchedules(){
     var el=document.getElementById('schedList'); if(!el)return; el.innerHTML='';
-    if(!SCHEDULES.length){ el.innerHTML='<p class="hint" style="opacity:.65">Aún no hay horarios.</p>'; return; }
+    if(!SCHEDULES.length){ el.innerHTML='<p class="hint" style="opacity:.65">'+t('Aún no hay horarios.')+'</p>'; return; }
     SCHEDULES.forEach(function(p){
-      var days=DAY_KEYS.map(function(d){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+d[1]+'</span>';}).join('');
-      var rooms=(p.rooms||[]).map(function(r,i){return '<span class="pr"><b>'+(i+1)+'. '+roomName(r.room)+'</b> · '+(r.fan||'')+(r.twice?' · x2':'')+'</span>';}).join('');
+      var days=DAY_KEYS.map(function(d,i){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+(CA_DAYLET[CA_LANG][i]||d[1])+'</span>';}).join('');
+      var rooms=(p.rooms||[]).map(function(r,i){return '<span class="pr"><b>'+(i+1)+'. '+roomName(r.room)+'</b> · '+t(r.fan||'')+(r.twice?' · x2':'')+'</span>';}).join('');
       var card=document.createElement('div'); card.className='sched';
       card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+(p.time||'')+'</span><button class="toggle sEn" style="margin-left:auto" aria-pressed="'+(p.enable?'true':'false')+'"></button></div>'+
         '<div class="days">'+days+'</div><div class="perroom">'+rooms+'</div>'+
-        '<div class="actions"><button class="btn ghost sEd">Editar</button><button class="btn ghost sDel">Borrar</button></div>';
+        '<div class="actions"><button class="btn ghost sEd">'+t('Editar')+'</button><button class="btn ghost sDel">'+t('Borrar')+'</button></div>';
       card.querySelector('.nm').textContent=p.name||p.id;
       card.querySelector('.sEn').addEventListener('click',function(){ var on=this.getAttribute('aria-pressed')!=='true'; this.setAttribute('aria-pressed',on); toggleSched(p.id,on); });
       card.querySelector('.sEd').addEventListener('click',function(){ openEditor(p); });
-      card.querySelector('.sDel').addEventListener('click',async function(){ if(await uiConfirm('¿Borrar el horario "'+(p.name||p.id)+'"?')) delSched(p.id); });
+      card.querySelector('.sDel').addEventListener('click',async function(){ if(await uiConfirm(t('¿Borrar el horario "{name}"?',{name:p.name||p.id}))) delSched(p.id); });
       el.appendChild(card);
     });
   }
@@ -1446,11 +1801,11 @@
     if(!SUGGESTED.length){ if(wrap)wrap.style.display='none'; return; }
     if(wrap)wrap.style.display='';
     SUGGESTED.forEach(function(p){
-      var days=DAY_KEYS.map(function(d){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+d[1]+'</span>';}).join('');
+      var days=DAY_KEYS.map(function(d,i){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+(CA_DAYLET[CA_LANG][i]||d[1])+'</span>';}).join('');
       var names=(p.rooms||[]).map(function(r){return roomName(r.room);}).join(', ');
       var card=document.createElement('div'); card.className='sched';
       card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+(p.time||'')+'</span>'+
-        '<button class="btn sAdd" style="margin-left:auto;padding:6px 14px;font-size:12px">+ Añadir</button></div>'+
+        '<button class="btn sAdd" style="margin-left:auto;padding:6px 14px;font-size:12px">'+t('+ Añadir')+'</button></div>'+
         '<div class="days">'+days+'</div><div class="perroom"><span class="pr">'+names+'</span></div>';
       card.querySelector('.nm').textContent=p.name;
       card.querySelector('.sAdd').addEventListener('click',function(){ addSuggested(p); });
@@ -1468,7 +1823,7 @@
   }
   function buildEditorDays(sel){
     var el=document.getElementById('sDays'); el.innerHTML='';
-    DAY_KEYS.forEach(function(d){ var s=document.createElement('span'); s.className='day'+(sel.indexOf(d[0])>=0?' on':''); s.textContent=d[1]; s.dataset.day=d[0];
+    DAY_KEYS.forEach(function(d,i){ var s=document.createElement('span'); s.className='day'+(sel.indexOf(d[0])>=0?' on':''); s.textContent=(CA_DAYLET[CA_LANG][i]||d[1]); s.dataset.day=d[0];
       s.addEventListener('click',function(){ s.classList.toggle('on'); }); el.appendChild(s); });
   }
   function buildEditorRooms(){
@@ -1496,7 +1851,7 @@
   function buildModeSeg(field,current,onChange){
     var seg=document.createElement('div'); seg.className='seg';
     MODE_OPTS[field].forEach(function(opt){
-      var b=document.createElement('button'); b.textContent=opt; b.dataset.v=opt;
+      var b=document.createElement('button'); b.textContent=t(opt); b.dataset.v=opt;
       if(opt===current)b.setAttribute('aria-pressed','true');
       b.addEventListener('click',function(){ seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);}); onChange(opt); });
       seg.appendChild(b);
@@ -1505,16 +1860,16 @@
   }
   function renderRoomModes(){
     var host=document.getElementById('roomModes'); host.innerHTML='';
-    if(!editorSel.length){ host.innerHTML='<p class="hint" style="opacity:.65">Elige habitaciones para configurar su modo.</p>'; return; }
+    if(!editorSel.length){ host.innerHTML='<p class="hint" style="opacity:.65">'+t('Elige habitaciones para configurar su modo.')+'</p>'; return; }
     editorSel.forEach(function(id){
       var mode=editorModes[id]||(editorModes[id]=Object.assign({},MODE_DEF));
       var card=document.createElement('div'); card.className='rmode';
       var head=document.createElement('div'); head.className='rmhead'; head.textContent=(editorSel.indexOf(id)+1)+'. '+roomName(id); card.appendChild(head);
       ['fan','water','mop'].forEach(function(field){
-        var lab=document.createElement('div'); lab.className='rmlbl'; lab.textContent=MODE_LBL[field]; card.appendChild(lab);
+        var lab=document.createElement('div'); lab.className='rmlbl'; lab.textContent=t(MODE_LBL[field]); card.appendChild(lab);
         card.appendChild(buildModeSeg(field,mode[field],function(v){mode[field]=v;}));
       });
-      var row=document.createElement('div'); row.className='rmx2'; row.innerHTML='<span>Doble pasada (x2)</span>';
+      var row=document.createElement('div'); row.className='rmx2'; row.innerHTML='<span>'+t('Doble pasada (x2)')+'</span>';
       var tog=document.createElement('button'); tog.className='toggle'; tog.setAttribute('aria-pressed',mode.twice?'true':'false');
       tog.addEventListener('click',function(){ var on=tog.getAttribute('aria-pressed')!=='true'; tog.setAttribute('aria-pressed',on); mode.twice=on; });
       row.appendChild(tog); card.appendChild(row);
@@ -1523,7 +1878,7 @@
   }
   function openEditor(plan){
     editingId=plan?plan.id:null;
-    document.getElementById('schedEditTitle').textContent=plan?'Editar horario':'Nuevo horario';
+    document.getElementById('schedEditTitle').textContent=plan?t('Editar horario'):t('Nuevo horario');
     document.getElementById('sName').value=plan?(plan.name||''):'';
     document.getElementById('sTime').value=plan?(plan.time||'22:30'):'22:30';
     buildEditorDays(plan?(plan.days||[]):['lun','mar','mie','jue','vie']);
@@ -1548,7 +1903,7 @@
   function collectPlan(){
     var days=Array.prototype.map.call(document.querySelectorAll('#sDays .day.on'),function(s){return s.dataset.day;});
     var ids=editorSel.slice();   // orden de selección = orden de limpieza
-    var p={name:document.getElementById('sName').value.trim()||'Horario',time:document.getElementById('sTime').value||'22:30',
+    var p={name:document.getElementById('sName').value.trim()||t('Horario'),time:document.getElementById('sTime').value||'22:30',
            days:days,rooms:ids.map(function(id){ var m=editorModes[id]||MODE_DEF; return {room:id,fan:m.fan,water:m.water,mop:m.mop,twice:!!m.twice}; }),enable:true};
     if(editingId)p.id=editingId;
     return p;
@@ -1557,8 +1912,8 @@
   document.getElementById('cancelSched').addEventListener('click',closeEditor);
   document.getElementById('saveSched').addEventListener('click',function(){
     var p=collectPlan();
-    if(!p.days.length){ uiAlert('Elige al menos un día.'); return; }
-    if(!p.rooms.length){ uiAlert('Elige al menos una habitación.'); return; }
+    if(!p.days.length){ uiAlert(t('Elige al menos un día.')); return; }
+    if(!p.rooms.length){ uiAlert(t('Elige al menos una habitación.')); return; }
     fetch(BASE+'api/schedules/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plan:p})})
       .then(function(r){return r.json();}).then(function(res){ SCHEDULES=res.schedules||[]; renderSchedules(); closeEditor(); });
   });
@@ -1568,28 +1923,28 @@
   // ---- horarios reales guardados en el robot (getOrder6090) ----
   function renderRobotOrders(){
     var el=document.getElementById('robotOrdersList'); if(!el)return; el.innerHTML='';
-    if(!ROBOT_ORDERS.length){ el.innerHTML='<p class="hint" style="opacity:.55">Sin datos. Pulsa «Consultar».</p>'; return; }
+    if(!ROBOT_ORDERS.length){ el.innerHTML='<p class="hint" style="opacity:.55">'+t('Sin datos. Pulsa «Consultar».')+'</p>'; return; }
     ROBOT_ORDERS.forEach(function(o){
       var mask=o.weekday||0, sat=(mask&64), rooms=(o.roomPer||[]).map(function(r){return roomName(r.room_id);});
-      var days=WD.map(function(d){return '<span class="day'+((mask&d[0])?' on':'')+'">'+d[1]+'</span>';}).join('');
+      var days=WD.map(function(d,i){return '<span class="day'+((mask&d[0])?' on':'')+'">'+(CA_DAYLET[CA_LANG][i]||d[1])+'</span>';}).join('');
       var card=document.createElement('div'); card.className='sched';
       card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+hhmm(o.day_time||0)+'</span>'+
         '<span class="chiplbl" style="margin-left:auto">'+(o.enable?'ON':'OFF')+'</span></div>'+
         '<div class="days">'+days+'</div>'+
-        '<div class="perroom"><span class="pr">Habitaciones: '+(rooms.join(', ')||'todas')+'</span></div>'+
-        '<div class="actions"><button class="btn ghost odel">Borrar del robot</button></div>';
-      card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">⚠ sábado</b>':'');
+        '<div class="perroom"><span class="pr">'+t('Habitaciones: {list}',{list:(rooms.join(', ')||t('todas'))})+'</span></div>'+
+        '<div class="actions"><button class="btn ghost odel">'+t('Borrar del robot')+'</button></div>';
+      card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">'+t('⚠ sábado')+'</b>':'');
       card.querySelector('.odel').addEventListener('click',async function(){
-        if(await uiConfirm('¿Borrar del robot el horario "'+(o.order_name||o.orderid)+'"? (orderid '+o.orderid+')'))
+        if(await uiConfirm(t('¿Borrar del robot el horario "{name}"? (orderid {id})',{name:(o.order_name||o.orderid),id:o.orderid})))
           fetch(BASE+'api/robot/orders/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderid:o.orderid})}).then(function(r){return r.json();});
       });
       el.appendChild(card);
     });
   }
   document.getElementById('refreshOrders').addEventListener('click',function(){
-    this.textContent='Consultando…';
+    this.textContent=t('Consultando…');
     var b=this; fetch(BASE+'api/robot/orders/refresh',{method:'POST'}).then(function(r){return r.json();})
-      .then(function(){ setTimeout(function(){b.textContent='Consultar';},1500); });
+      .then(function(){ setTimeout(function(){b.textContent=t('Consultar al robot');},1500); });
   });
 
   // ---- botones de orientación del mapa (girar / espejo) ----
@@ -1601,7 +1956,7 @@
   document.querySelectorAll('#linkSeg button').forEach(function(b){
     b.addEventListener('click',async function(){
       var mode=b.dataset.v; if(mode===LINKMODE)return;
-      if(mode==='cloud' && !(await uiConfirm('El robot pasará por la nube de Cecotec (la app oficial funcionará) y se reconectará. ¿Continuar?','Cloud + Local'))){
+      if(mode==='cloud' && !(await uiConfirm(t('El robot pasará por la nube de Cecotec (la app oficial funcionará) y se reconectará. ¿Continuar?'),'Cloud + Local'))){
         applyLinkSeg(); b.blur(); return;   // cancelado: no cambiar la selección
       }
       LINKMODE=mode; applyLinkSeg();
@@ -1620,20 +1975,20 @@
   var HISTORY=[];
   function renderHistory(){
     var el=document.getElementById('histList'); if(!el)return; el.innerHTML='';
-    if(!HISTORY.length){ el.innerHTML='<p class="hint" style="opacity:.6;margin:2px 0 12px">Aún no hay limpiezas registradas.</p>'; return; }
+    if(!HISTORY.length){ el.innerHTML='<p class="hint" style="opacity:.6;margin:2px 0 12px">'+t('Aún no hay limpiezas registradas.')+'</p>'; return; }
     HISTORY.forEach(function(h){
       var d=document.createElement('div'); d.className='hrow';
       if(h.kind==='fault'){                           // aviso/error del robot
         d.className='hrow fault'+(h.is_error?' err':'');
-        var txt=h.message?h.message:((h.is_error?'Error':'Aviso')+' (código '+h.code+')');
-        d.innerHTML='<div class="htop"><span class="hbadge '+(h.is_error?'err':'warn')+'">'+(h.is_error?'Error':'Aviso')+'</span>'+
-          '<span class="hwhen">'+h.day+' '+h.date+' · '+h.time_hm+'</span></div>'+
+        var txt=h.message?t(h.message):t((h.is_error?'Error':'Aviso')+' (código {code})',{code:h.code});
+        d.innerHTML='<div class="htop"><span class="hbadge '+(h.is_error?'err':'warn')+'">'+(h.is_error?t('Error'):t('Aviso'))+'</span>'+
+          '<span class="hwhen">'+t(h.day)+' '+h.date+' · '+h.time_hm+'</span></div>'+
           '<div class="hmid">⚠ '+txt+'</div>';
         el.appendChild(d); return;
       }
-      var badge=h.type==='programada'?('<span class="hbadge sched">Programada'+(h.sched?(' · '+h.sched):'')+'</span>'):'<span class="hbadge man">Manual</span>';
-      var rooms=(h.rooms&&h.rooms.length)?h.rooms.join(', '):'Toda la casa';
-      d.innerHTML='<div class="htop">'+badge+'<span class="hwhen">'+h.day+' '+h.date+' · '+h.time_hm+'</span></div>'+
+      var badge=h.type==='programada'?('<span class="hbadge sched">'+t('Programada')+(h.sched?(' · '+h.sched):'')+'</span>'):'<span class="hbadge man">'+t('Manual')+'</span>';
+      var rooms=(h.rooms&&h.rooms.length)?h.rooms.join(', '):t('Toda la casa');
+      d.innerHTML='<div class="htop">'+badge+'<span class="hwhen">'+t(h.day)+' '+h.date+' · '+h.time_hm+'</span></div>'+
         '<div class="hmid">'+rooms+'</div>'+
         '<div class="hbot">'+(h.area?h.area+' m²':'—')+' · '+(h.duration?h.duration+' min':'—')+(h.map_name?(' · '+h.map_name):'')+'</div>';
       el.appendChild(d);
@@ -1641,7 +1996,7 @@
   }
   fetch(BASE+'api/history').then(function(r){return r.json();}).then(function(d){HISTORY=d.history||[];renderHistory();});
   document.getElementById('histClear').addEventListener('click',async function(){
-    if(await uiConfirm('¿Vaciar el registro de actividad? No se puede deshacer.'))
+    if(await uiConfirm(t('¿Vaciar el registro de actividad? No se puede deshacer.')))
       fetch(BASE+'api/history/clear',{method:'POST'}).then(function(r){return r.json();}).then(function(res){HISTORY=res.history||[];renderHistory();});
   });
   // ---- mapas de la casa (Clean Assistant los va recordando) ----
@@ -1649,18 +2004,18 @@
   function renderMaps(){
     var ms=HOUSE_MAPS.maps||[];
     var act=ms.filter(function(m){return m.active;})[0];   // nombre del mapa activo (en la esquina del mapa)
-    var mt=document.getElementById('mapTitle'); if(mt)mt.textContent=act?act.name:'Sin mapa';
+    var mt=document.getElementById('mapTitle'); if(mt)mt.textContent=act?act.name:t('Sin mapa');
     var el=document.getElementById('mapsList'); if(!el)return; el.innerHTML='';
-    if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.</p>'; return; }
+    if(!ms.length){ el.innerHTML='<p class="hint" style="opacity:.55">'+t('Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.')+'</p>'; return; }
     ms.forEach(function(m){
       var d=document.createElement('div'); d.className='zrow';
       d.innerHTML='<span class="zdot" style="background:var('+(m.active?'--accent':'--faint')+')"></span>'+
-        '<div class="zt"><div class="n"></div><div class="k"><span class="mh" title="Toca para editar la casa" style="cursor:pointer;text-decoration:underline dotted"></span>'+(m.active?' · Activo':'')+'</div></div>'+
-        (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">Activar</button>')+
-        '<button class="iconbtn mRen" title="Renombrar mapa" aria-label="Renombrar">✎</button>'+
-        '<button class="iconbtn mDel" title="Borrar mapa del robot" aria-label="Borrar">✕</button>';
+        '<div class="zt"><div class="n"></div><div class="k"><span class="mh" title="'+t('Toca para editar la casa')+'" style="cursor:pointer;text-decoration:underline dotted"></span>'+(m.active?' · '+t('Activo'):'')+'</div></div>'+
+        (m.active?'':'<button class="btn ghost mSel" style="width:auto;padding:6px 12px;font-size:12px;box-shadow:none">'+t('Activar')+'</button>')+
+        '<button class="iconbtn mRen" title="'+t('Renombrar mapa')+'" aria-label="'+t('Renombrar')+'">✎</button>'+
+        '<button class="iconbtn mDel" title="'+t('Borrar mapa del robot')+'" aria-label="'+t('Borrar')+'">✕</button>';
       d.querySelector('.n').textContent=m.name;
-      var mh=d.querySelector('.mh'); mh.textContent=m.house||'(sin nombre)';
+      var mh=d.querySelector('.mh'); mh.textContent=m.house||t('(sin nombre)');
       mh.addEventListener('click',function(){
         inlineEdit(mh, m.house||'', function(nv){
           if(nv!==null) fetch(BASE+'api/maps/rename',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id,house:nv})}).then(function(r){return r.json();}).then(function(res){HOUSE_MAPS={maps:res.maps||[],active:res.active};renderMaps();});
@@ -1669,7 +2024,7 @@
       });
       var sel=d.querySelector('.mSel');
       if(sel) sel.addEventListener('click',async function(){
-        if(await uiConfirm('¿Cambiar al mapa "'+m.name+'"? El robot cargará ese mapa.')){
+        if(await uiConfirm(t('¿Cambiar al mapa "{name}"? El robot cargará ese mapa.',{name:m.name}))){
           HOUSE_MAPS.maps.forEach(function(x){x.active=(x.id===m.id);}); HOUSE_MAPS.active=m.id; renderMaps();   // feedback inmediato
           fetch(BASE+'api/maps/select',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})}).then(function(r){return r.json();});
         }
@@ -1678,10 +2033,10 @@
       if(del) del.addEventListener('click',async function(){
         var last=(HOUSE_MAPS.maps||[]).length<=1;
         var msg=last
-          ? '¿Borrar el último mapa "'+m.name+'"? El robot se quedará SIN mapa; tendrás que crear uno nuevo (remapear) para empezar de cero. No se puede deshacer.'
+          ? t('¿Borrar el último mapa "{name}"? El robot se quedará SIN mapa; tendrás que crear uno nuevo (remapear) para empezar de cero. No se puede deshacer.',{name:m.name})
           : (m.active
-            ? '¿Borrar el mapa activo "'+m.name+'"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.'
-            : '¿Borrar del robot el mapa "'+m.name+'"? No se puede deshacer.');
+            ? t('¿Borrar el mapa activo "{name}"? Se cambiará a otro mapa y se borrará (tarda unos segundos). No se puede deshacer.',{name:m.name})
+            : t('¿Borrar del robot el mapa "{name}"? No se puede deshacer.',{name:m.name}));
         if(!(await uiConfirm(msg)))return;
         del.disabled=true; del.textContent='…';
         fetch(BASE+'api/maps/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:m.id})})
@@ -1705,27 +2060,27 @@
   setTimeout(maybeWizard, 3000);   // tras dar tiempo a que lleguen los mapas del robot (WS)
   document.getElementById('newMapBtn').addEventListener('click',function(){ var f=document.getElementById('newMapForm'); f.style.display=(f.style.display==='none'?'block':'none'); });
   document.getElementById('wipeMapsBtn').addEventListener('click',async function(){
-    if(!(await uiConfirm('¿Borrar TODOS los mapas del robot y de Clean Assistant? El robot se quedará sin mapa y tendrás que crear uno nuevo. Útil para empezar de cero o limpiar mapas fantasma. No se puede deshacer.'))) return;
-    var b=this; b.disabled=true; b.textContent='Borrando…';
+    if(!(await uiConfirm(t('¿Borrar TODOS los mapas del robot y de Clean Assistant? El robot se quedará sin mapa y tendrás que crear uno nuevo. Útil para empezar de cero o limpiar mapas fantasma. No se puede deshacer.')))) return;
+    var b=this; b.disabled=true; b.textContent=t('Borrando…');
     fetch(BASE+'api/maps/wipe',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})
-      .then(function(r){return r.json();}).then(function(res){ b.disabled=false; b.textContent='Borrar todos';
-        uiAlert('Borrados '+(res.wiped||0)+' mapa(s). El robot está sin mapa; crea uno nuevo con «Crear mapa nuevo».'); })
-      .catch(function(){ b.disabled=false; b.textContent='Borrar todos'; });
+      .then(function(r){return r.json();}).then(function(res){ b.disabled=false; b.textContent=t('Borrar todos');
+        uiAlert(t('Borrados {n} mapa(s). El robot está sin mapa; crea uno nuevo con «Crear mapa nuevo».',{n:(res.wiped||0)})); })
+      .catch(function(){ b.disabled=false; b.textContent=t('Borrar todos'); });
   });
   document.getElementById('nmCancel').addEventListener('click',function(){ document.getElementById('newMapForm').style.display='none'; });
   document.getElementById('nmCreate').addEventListener('click',async function(){
     var name=document.getElementById('nmName').value.trim(), house=document.getElementById('nmHouse').value.trim();
-    if(!name){ uiAlert('Ponle un nombre al mapa.'); return; }
+    if(!name){ uiAlert(t('Ponle un nombre al mapa.')); return; }
     var wipe=((HOUSE_MAPS.maps||[]).length===0);   // primer mapa: se borran los previos del robot
     var msg=wipe
-      ? '¿Crear el mapa "'+name+'"? Se borrarán los mapas, zonas y horarios que el robot tenga ahora y empezará a mapear la casa de cero.'
-      : '¿Crear el mapa "'+name+'"? El robot empezará a recorrer la casa para mapearla (se añadirá a los mapas que ya tienes).';
+      ? t('¿Crear el mapa "{name}"? Se borrarán los mapas, zonas y horarios que el robot tenga ahora y empezará a mapear la casa de cero.',{name:name})
+      : t('¿Crear el mapa "{name}"? El robot empezará a recorrer la casa para mapearla (se añadirá a los mapas que ya tienes).',{name:name});
     if(!(await uiConfirm(msg))) return;
     fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:house})})
       .then(function(r){return r.json();}).then(function(){
         document.getElementById('newMapForm').style.display='none';
         document.getElementById('nmName').value=''; document.getElementById('nmHouse').value='';
-        uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
+        uiAlert(t('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.'));
       });
   });
 
@@ -1733,15 +2088,15 @@
   var _wizShown=false;
   function updateWizConn(){
     var el=document.getElementById('wizConn'); if(!el)return;
-    if(st && st.online){ el.textContent='✓ Robot conectado — el DNS ya apunta aquí'; el.classList.add('ok'); }
-    else{ el.textContent='⏳ Esperando a que el robot conecte… (revisa el DNS y reinicia el robot)'; el.classList.remove('ok'); }
+    if(st && st.online){ el.textContent=t('✓ Robot conectado — el DNS ya apunta aquí'); el.classList.add('ok'); }
+    else{ el.textContent=t('⏳ Esperando a que el robot conecte… (revisa el DNS y reinicia el robot)'); el.classList.remove('ok'); }
   }
   function _copyOnClick(el){
     if(!el)return;
     el.addEventListener('click',function(){
       var t=el.textContent||'';
       if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(function(){});
-      var old=el.textContent; el.textContent='¡copiado!'; setTimeout(function(){el.textContent=old;},900);
+      var old=el.textContent; el.textContent=window.t('¡copiado!'); setTimeout(function(){el.textContent=old;},900);
     });
   }
   function robotBusyMapping(){
@@ -1757,7 +2112,7 @@
     _wizShown=true; ov.hidden=false; updateWizConn();
     fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
       if(d.dns_host){ document.getElementById('wizHost').textContent=d.dns_host; }
-      document.getElementById('wizIP').textContent=d.server_ip||'(IP no detectada)';
+      document.getElementById('wizIP').textContent=d.server_ip||t('(IP no detectada)');
       renderDnsExtra(document.getElementById('wizHostsExtra'), d.dns_hosts);
     }).catch(function(){});
   }
@@ -1765,11 +2120,11 @@
   function renderDnsExtra(el, hosts){
     if(!el) return;
     el.innerHTML='';
-    var roleName={ota:'OTA (arranque)',historial:'historial'};
+    var roleName={ota:t('OTA (arranque)'),historial:t('historial')};
     (hosts||[]).filter(function(h){return h.role!=='control';}).forEach(function(h){
       var row=document.createElement('div'); row.className='wizdns-row';
       var k=document.createElement('span'); k.className='wizdns-k'; k.textContent=roleName[h.role]||h.role;
-      var c=document.createElement('code'); c.title='Toca para copiar'; c.textContent=h.host; _copyOnClick(c);
+      var c=document.createElement('code'); c.title=t('Toca para copiar'); c.textContent=h.host; _copyOnClick(c);
       row.appendChild(k); row.appendChild(c); el.appendChild(row);
     });
   }
@@ -1783,25 +2138,25 @@
     document.getElementById('wizCreate').addEventListener('click',function(){
       var name=(document.getElementById('wizName').value||'Planta baja').trim()||'Planta baja';
       var house=(document.getElementById('wizHouse').value||'Mi casa').trim()||'Mi casa';
-      var b=this; b.disabled=true; b.textContent='Iniciando…';
+      var b=this; b.disabled=true; b.textContent=t('Iniciando…');
       fetch(BASE+'api/maps/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,house:house,wipe:true})})
         .then(function(r){return r.json();}).then(function(){
-          localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true; b.disabled=false; b.textContent='Crear y mapear';
-          uiAlert('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.');
-        }).catch(function(){ b.disabled=false; b.textContent='Crear y mapear'; });
+          localStorage.setItem('ca_wizard_dismissed','1'); ov.hidden=true; b.disabled=false; b.textContent=t('Crear y mapear');
+          uiAlert(t('Mapeo iniciado: el robot está recorriendo la casa. El mapa aparecerá cuando termine.'));
+        }).catch(function(){ b.disabled=false; b.textContent=t('Crear y mapear'); });
     });
   })();
   // ---- configuración de red (DNS) en Ajustes (misma info que el asistente) ----
   function updateNetConn(){
     var el=document.getElementById('netConn'); if(!el)return;
-    if(st && st.online){ el.textContent='✓ Robot conectado — el DNS apunta aquí'; el.classList.add('ok'); }
-    else{ el.textContent='⏳ El robot no está conectado (revisa el DNS y reinicia el robot)'; el.classList.remove('ok'); }
+    if(st && st.online){ el.textContent=t('✓ Robot conectado — el DNS apunta aquí'); el.classList.add('ok'); }
+    else{ el.textContent=t('⏳ El robot no está conectado (revisa el DNS y reinicia el robot)'); el.classList.remove('ok'); }
   }
   (function initNetCfg(){
     var h=document.getElementById('netHost'), ip=document.getElementById('netIP');
     if(!h||!ip)return;
     fetch(BASE+'api/setup').then(function(r){return r.json();}).then(function(d){
-      if(d.dns_host)h.textContent=d.dns_host; ip.textContent=d.server_ip||'(IP no detectada)';
+      if(d.dns_host)h.textContent=d.dns_host; ip.textContent=d.server_ip||t('(IP no detectada)');
       renderDnsExtra(document.getElementById('netHostsExtra'), d.dns_hosts);
     }).catch(function(){});
     _copyOnClick(h); _copyOnClick(ip); updateNetConn();
@@ -1816,19 +2171,19 @@
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
         a.download='clean-assistant-config.json'; document.body.appendChild(a); a.click();
         setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
-      }).catch(function(){ uiAlert('No se pudo exportar.'); });
+      }).catch(function(){ uiAlert(t('No se pudo exportar.')); });
     });
     im.addEventListener('click',function(){ fi.click(); });
     fi.addEventListener('change',function(e){
       var f=e.target.files[0]; if(!f)return; var rd=new FileReader();
       rd.onload=async function(){
-        var data; try{ data=JSON.parse(rd.result); }catch(_){ uiAlert('El archivo no es un JSON válido.'); return; }
-        if(!(await uiConfirm('Importar reemplazará los mapas, zonas y horarios actuales de Clean Assistant por los del archivo. ¿Continuar?'))) return;
+        var data; try{ data=JSON.parse(rd.result); }catch(_){ uiAlert(t('El archivo no es un JSON válido.')); return; }
+        if(!(await uiConfirm(t('Importar reemplazará los mapas, zonas y horarios actuales de Clean Assistant por los del archivo. ¿Continuar?')))) return;
         fetch(BASE+'api/config/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
           .then(function(r){return r.json();}).then(function(res){
-            if(res.ok) uiAlert('Importado: '+res.maps+' mapa(s), '+res.zones+' zona(s), '+res.schedules+' horario(s). Se han enviado al robot los del mapa activo.');
-            else uiAlert(res.error||'No se pudo importar.');
-          }).catch(function(){ uiAlert('No se pudo importar.'); });
+            if(res.ok) uiAlert(t('Importado: {maps} mapa(s), {zones} zona(s), {schedules} horario(s). Se han enviado al robot los del mapa activo.',{maps:res.maps,zones:res.zones,schedules:res.schedules}));
+            else uiAlert(res.error||t('No se pudo importar.'));
+          }).catch(function(){ uiAlert(t('No se pudo importar.')); });
       };
       rd.readAsText(f); e.target.value='';
     });
@@ -1839,24 +2194,24 @@
     if(!ex||!im||!fi)return;
     ex.addEventListener('click',function(){
       fetch(BASE+'api/identity/export').then(function(r){return r.json();}).then(function(d){
-        if(d.ok===false){ uiAlert(d.error||'No se pudo exportar.'); return; }
+        if(d.ok===false){ uiAlert(d.error||t('No se pudo exportar.')); return; }
         var blob=new Blob([JSON.stringify(d,null,1)],{type:'application/json'});
         var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
         a.download='clean-assistant-robot-identity.json'; document.body.appendChild(a); a.click();
         setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1000);
-      }).catch(function(){ uiAlert('No se pudo exportar.'); });
+      }).catch(function(){ uiAlert(t('No se pudo exportar.')); });
     });
     im.addEventListener('click',function(){ fi.click(); });
     fi.addEventListener('change',function(e){
       var f=e.target.files[0]; if(!f)return; var rd=new FileReader();
       rd.onload=async function(){
-        var data; try{ data=JSON.parse(rd.result); }catch(_){ uiAlert('El archivo no es un JSON válido.'); return; }
-        if(!(await uiConfirm('Restaurar la identidad del robot desde el archivo y reconectar. ¿Continuar?'))) return;
+        var data; try{ data=JSON.parse(rd.result); }catch(_){ uiAlert(t('El archivo no es un JSON válido.')); return; }
+        if(!(await uiConfirm(t('Restaurar la identidad del robot desde el archivo y reconectar. ¿Continuar?')))) return;
         fetch(BASE+'api/identity/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
           .then(function(r){return r.json();}).then(function(res){
-            if(res.ok) uiAlert('Identidad restaurada (DID '+res.did+'). El robot se reconectará con ella.');
-            else uiAlert(res.error||'No se pudo importar.');
-          }).catch(function(){ uiAlert('No se pudo importar.'); });
+            if(res.ok) uiAlert(t('Identidad restaurada (DID {did}). El robot se reconectará con ella.',{did:res.did}));
+            else uiAlert(res.error||t('No se pudo importar.'));
+          }).catch(function(){ uiAlert(t('No se pudo importar.')); });
       };
       rd.readAsText(f); e.target.value='';
     });

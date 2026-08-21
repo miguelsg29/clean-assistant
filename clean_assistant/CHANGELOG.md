@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.17.0
+- **Multiidioma (i18n): español, inglés, portugués y francés.** Toda la interfaz se traduce,
+  con un selector de idioma en la cabecera (arriba a la derecha). Detecta el idioma del
+  navegador la primera vez y recuerda tu elección. Los datos tuyos (nombres de habitaciones,
+  mapas y horarios) no se traducen; los avisos del robot y los días del historial, sí.
+  - Gracias a la idea de @m-l (fork *conga-8090-home-assistant-EN-PL*) de añadir más idiomas.
+- Detalle técnico: las cadenas se traducen por texto-origen en español (fuente de la verdad);
+  los valores de los comandos van desacoplados de la etiqueta visible (`data-v`), así que
+  traducir la interfaz nunca cambia lo que se le manda al robot.
+
 ## 0.16.35
 - Horarios: arreglado que las limpiezas programadas se disparaban con DESFASE (p. ej. 2 h más
   tarde en verano). Causa: la imagen del add-on (Alpine) no incluía `tzdata`, así que aplicar la
