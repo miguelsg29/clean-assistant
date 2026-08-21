@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.1
+- **Añadido el polaco (pl)** a la interfaz multiidioma: ahora son **5 idiomas** (español,
+  inglés, portugués, francés y polaco), seleccionables desde la cabecera. Cumple la petición
+  de @m-l (fork *conga-8090-home-assistant-EN-PL*), que ya había traducido al polaco.
+
 ## 0.17.0
 - **Multiidioma (i18n): español, inglés, portugués y francés.** Toda la interfaz se traduce,
   con un selector de idioma en la cabecera (arriba a la derecha). Detecta el idioma del
