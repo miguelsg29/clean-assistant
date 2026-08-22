@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.17.4
+- Arreglado el build de CI para **armv7** (el builder oficial de HA está obsoleto y rechazaba esa
+  arquitectura). Ahora la imagen se compila con **docker buildx** para las 3 arquitecturas
+  (aarch64/amd64/armv7). Sin cambios de funcionamiento.
+
 ## 0.17.3
 - **Actualizaciones más rápidas y con barra de progreso.** El add-on ahora usa una **imagen
   precompilada** (GitHub Actions la construye para cada arquitectura y la publica en GHCR), en
