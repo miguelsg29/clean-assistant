@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 # horarios se disparan con desfase (p. ej. 2 h en verano). Ver backend/app.py _apply_host_timezone.
 RUN apk add --no-cache python3 py3-pip openssl jq git curl tzdata
 
-ARG CA_REF=v0.17.1
+ARG CA_REF=v0.17.2
 RUN git clone --depth 1 --branch ${CA_REF} https://github.com/miguelsg29/clean-assistant /app \
     && pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 

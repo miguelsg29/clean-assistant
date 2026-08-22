@@ -136,6 +136,9 @@ def _apply_first_run_defaults():
         robot.state.auto_upgrade = 0
         robot.command(cmd.dust_freq(0))          # vaciar tras cada limpieza
         robot.state.collect_freq = 0
+        if robot.state.base_type is None:
+            robot.state.base_type = "Colector automático"   # base por defecto del 8090 Ultra
+        _save_prefs()
         print("[firstrun] defaults aplicados: OTA off + vaciado tras cada limpieza")
     except Exception:
         pass
@@ -175,6 +178,42 @@ def _save_view():
             json.dump(view_settings, f)
     except Exception:
         pass
+
+
+# Preferencias locales que el robot NO reenvía en report_data y que además no siempre responde
+# al consultarlas (frecuencia de autovaciado, ctrltype 16; tipo de base, ctrltype 17). Se guardan
+# aquí para no perderlas al reiniciar/actualizar el add-on: el robot conserva su propio ajuste,
+# esto solo conserva lo que mostramos (y sirve de valor por defecto). Si el robot SÍ responde
+# get_pref(16) al conectar, ese valor manda y sobrescribe al guardado.
+PREFS_PATH = _data("prefs.json")
+
+
+def _load_prefs():
+    try:
+        with open(PREFS_PATH, encoding="utf-8") as f:
+            p = json.load(f)
+    except Exception:
+        return
+    cf = p.get("collect_freq")
+    if cf is not None:
+        try:
+            robot.state.collect_freq = int(cf)
+        except (TypeError, ValueError):
+            pass
+    if p.get("base_type"):
+        robot.state.base_type = p["base_type"]
+
+
+def _save_prefs():
+    try:
+        with open(PREFS_PATH, "w", encoding="utf-8") as f:
+            json.dump({"collect_freq": robot.state.collect_freq,
+                       "base_type": robot.state.base_type}, f)
+    except Exception:
+        pass
+
+
+_load_prefs()
 
 
 # caché del último mapa: se muestra al arrancar (aunque el robot esté en la base) y se
@@ -442,6 +481,10 @@ def _optimistic_state(action: str, p: dict):
         s.auto_upgrade = 1 if p.get("value") else 0
     elif action == "dust_freq":
         s.collect_freq = int(p.get("value"))
+        _save_prefs()                                # persiste para que no se pierda al actualizar
+    elif action == "base_type":
+        s.base_type = p.get("value")
+        _save_prefs()
     elif action == "quiet":
         s.quiet = {"is_open": 1 if p.get("is_open") else 0,
                    "begin_time": int(p.get("begin", 1320)), "end_time": int(p.get("end", 420))}
@@ -815,7 +858,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.17.1", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.17.2", lifespan=lifespan)
 
 
 @app.get("/api/state")

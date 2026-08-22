@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.2
+- Arreglada la **frecuencia de vaciado** («Después de cada limpieza», etc.), que se perdía cada
+  vez que se actualizaba el add-on. El robot no siempre responde a la consulta de este ajuste, así
+  que ahora se **guarda en local** (`prefs.json`) y se restaura al arrancar (el robot conserva su
+  propio ajuste; esto conserva lo que se muestra). Lo mismo para el **tipo de base**.
+- Nuevo **valor por defecto** de la frecuencia de vaciado: **«Después de cada limpieza»** cuando
+  hay **colector automático** (y «Nunca» con base de carga simple), en vez de quedar en «Nunca».
+
 ## 0.17.1
 - **Añadido el polaco (pl)** a la interfaz multiidioma: ahora son **5 idiomas** (español,
   inglés, portugués, francés y polaco), seleccionables desde la cabecera. Cumple la petición
