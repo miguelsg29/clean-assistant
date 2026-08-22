@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.17.3
+- **Actualizaciones más rápidas y con barra de progreso.** El add-on ahora usa una **imagen
+  precompilada** (GitHub Actions la construye para cada arquitectura y la publica en GHCR), en
+  vez de compilarse en tu Raspberry en cada actualización. Home Assistant la **descarga** →
+  updates en segundos, con progreso real, y sin fallos de compilación en el dispositivo.
+- Sin cambios de funcionamiento respecto a 0.17.2.
+
 ## 0.17.2
 - Arreglada la **frecuencia de vaciado** («Después de cada limpieza», etc.), que se perdía cada
   vez que se actualizaba el add-on. El robot no siempre responde a la consulta de este ajuste, así

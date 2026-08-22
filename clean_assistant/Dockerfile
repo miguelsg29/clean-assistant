@@ -1,16 +1,21 @@
-# Add-on de Clean Assistant para Home Assistant.
-# Instala la app desde el repo publicado (no se duplica el código aquí).
-# Para producción, fija CA_REF a un tag de release (p. ej. v0.2.0).
-FROM alpine:3.20
+# App (add-on) de Clean Assistant para Home Assistant.
+# La imagen se PRECOMPILA en GitHub Actions (multi-arquitectura) y se publica en GHCR
+# (ver .github/workflows/build.yml). Home Assistant la DESCARGA en vez de compilarla en el
+# dispositivo -> actualizaciones rápidas y con barra de progreso real.
+#
+# BUILD_FROM y BUILD_VERSION los inyecta home-assistant/builder:
+#   - BUILD_FROM: imagen base por arquitectura (definida en build.yaml).
+#   - BUILD_VERSION: la versión de config.yaml -> se clona el tag vX.Y.Z del repo.
+ARG BUILD_FROM
+FROM ${BUILD_FROM}
 
 ENV PYTHONUNBUFFERED=1
 # tzdata es imprescindible: sin la base de zonas horarias, poner TZ + time.tzset() no surte
-# efecto en Alpine y el contenedor se queda en UTC -> el reloj del robot se pone en UTC y los
-# horarios se disparan con desfase (p. ej. 2 h en verano). Ver backend/app.py _apply_host_timezone.
+# efecto en Alpine y los horarios se disparan con desfase. Ver backend/app.py _apply_host_timezone.
 RUN apk add --no-cache python3 py3-pip openssl jq git curl tzdata
 
-ARG CA_REF=v0.17.2
-RUN git clone --depth 1 --branch ${CA_REF} https://github.com/miguelsg29/clean-assistant /app \
+ARG BUILD_VERSION
+RUN git clone --depth 1 --branch "v${BUILD_VERSION}" https://github.com/miguelsg29/clean-assistant /app \
     && pip3 install --no-cache-dir --break-system-packages -r /app/requirements.txt
 
 COPY run.sh /run.sh
