@@ -1,5 +1,5 @@
 name: "Clean Assistant"
-version: "0.17.4"
+version: "0.17.5"
 slug: "clean_assistant"
 description: "Interfaz local (sin nube) para el Conga 8090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
 url: "https://github.com/miguelsg29/clean-assistant"
@@ -10,7 +10,6 @@ image: "ghcr.io/miguelsg29/clean-assistant-{arch}"
 arch:
   - aarch64
   - amd64
-  - armv7
 init: false
 # Acceso a la API del Supervisor: para leer la IP LAN del host (para las instrucciones de
 # DNS, no la IP interna de Docker) y la zona horaria de Home Assistant (para que los

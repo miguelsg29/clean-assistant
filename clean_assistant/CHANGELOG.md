@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.5
+- La imagen precompilada se publica para **aarch64 y amd64** (las de Home Assistant OS en
+  Raspberry Pi 3/4/5 y equipos x86). Se retira **armv7** (ARM de 32 bits): sus dependencias
+  (pydantic-core en Rust, uvloop…) no tienen binarios para esa arquitectura y habría que
+  compilarlas desde fuente, algo que tampoco funcionaba bien en el modelo anterior.
+
 ## 0.17.4
 - Arreglado el build de CI para **armv7** (el builder oficial de HA está obsoleto y rechazaba esa
   arquitectura). Ahora la imagen se compila con **docker buildx** para las 3 arquitecturas
