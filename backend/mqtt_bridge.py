@@ -11,12 +11,26 @@ por lo que el modo de desarrollo (mock, sin broker) sigue funcionando igual.
 """
 from __future__ import annotations
 import json
+import re
 import time
 
 from conga_core import commands as cmd
 
 # Estados válidos del esquema 'state' de la entidad vacuum de HA.
 _VACUUM_STATES = {"cleaning", "docked", "paused", "idle", "returning", "error"}
+
+# Frecuencia de autovaciado: nombre visible en HA <-> valor del robot (set_preference 16).
+DUST_FREQ = {"Nunca": -1, "Después de cada limpieza": 0, "Cada 30 minutos": 30,
+             "Cada 60 minutos": 60, "Cada 90 minutos": 90, "Cada 2 horas": 120}
+DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
+
+
+def _safe_id(s) -> str:
+    """El object_id de los topics de descubrimiento MQTT solo admite [a-zA-Z0-9_-]; HA rechaza
+    'ñ', tildes o espacios (p. ej. un horario llamado 'Baño matrimonio'). Sustituye lo no
+    permitido por '_'. Se usa SOLO en el segmento del topic de descubrimiento; los topics de
+    comando/estado pueden llevar el id real."""
+    return re.sub(r"[^a-zA-Z0-9_-]", "_", str(s))
 
 
 def _min_to_hhmm(mins) -> str:
@@ -36,12 +50,14 @@ class MqttBridge:
     """Puente Home Assistant. `rooms_provider` devuelve {room_id: {'name': ...}}
     (habitaciones del mapa vivo); `map_head_id` es un callable -> int."""
 
-    def __init__(self, robot, schedules, env, map_head_id, rooms_provider, log=print):
+    def __init__(self, robot, schedules, env, map_head_id, rooms_provider, log=print,
+                 persist=None):
         self.robot = robot
         self.schedules = schedules
         self._map_head_id = map_head_id
         self._rooms = rooms_provider
         self.log = log
+        self._persist = persist        # callback opcional para persistir prefs (frecuencia/base)
         self.host = env("MQTT_HOST")
         self.port = int(env("MQTT_PORT", "1883") or 1883)
         self.user = env("MQTT_USER")
@@ -230,11 +246,25 @@ class MqttBridge:
             "command_topic": f"conga/{node}/dust_action", "payload_press": "1",
             "icon": "mdi:delete-empty"})
 
-        # horarios: un switch por plan (activar/desactivar)
-        for p in self.schedules.plans:
+        # select: frecuencia de autovaciado (igual que en la web)
+        self._disc("select", f"{uid}_dust_freq", {
+            "name": "Conga Frecuencia de vaciado", "unique_id": f"{uid}_dust_freq",
+            "command_topic": f"conga/{node}/dust_freq/set",
+            "state_topic": f"conga/{node}/dust_freq",
+            "options": list(DUST_FREQ), "icon": "mdi:delete-clock"})
+        self._pub_dust_freq()
+
+        # horarios: un switch por plan del MAPA ACTIVO (igual que la web). El object_id del topic
+        # de descubrimiento se SANEA (HA no admite ñ/tildes/espacios); los topics de comando y
+        # estado llevan el id real. Los horarios de otros mapas / ya borrados se retiran de HA
+        # en _sweep_stale() (barrido de configs retenidas al conectar).
+        active = getattr(self.robot.state, "map_head_id", None)
+        active_plans = self.schedules.for_map(active)
+        for p in active_plans:
             pid = p["id"]
-            self._disc("switch", f"{uid}_sched_{pid}", {
-                "name": f"Horario {p.get('name', pid)}", "unique_id": f"{uid}_sched_{pid}",
+            obj = f"{uid}_sched_{_safe_id(pid)}"
+            self._disc("switch", obj, {
+                "name": f"Horario {p.get('name', pid)}", "unique_id": obj,
                 "command_topic": f"conga/{node}/sched/{pid}/set",
                 "state_topic": f"conga/{node}/sched/{pid}",
                 "payload_on": "on", "payload_off": "off", "icon": "mdi:calendar-clock"})
@@ -242,14 +272,15 @@ class MqttBridge:
 
         self.publish_state()
         self.log(f"[MQTT] autodiscovery publicado ({len(self._rooms() or {})} hab., "
-                 f"{len(self.schedules.plans)} horario(s))")
+                 f"{len(active_plans)} horario(s) del mapa activo)")
 
     def _clear_discovery(self, uid: str):
         """Borra el descubrimiento retenido de un dispositivo viejo (uid distinto al
         actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
                 ("sensor", f"{uid}_time"), ("number", f"{uid}_volume"),
-                ("button", f"{uid}_dust"), ("binary_sensor", f"{uid}_low_water")]
+                ("button", f"{uid}_dust"), ("select", f"{uid}_dust_freq"),
+                ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
             objs.append(("sensor", f"{uid}_cons_{key}"))
             objs.append(("button", f"{uid}_creset_{key}"))   # botones de reset (faltaban -> dejaban un device fantasma)
@@ -262,7 +293,7 @@ class MqttBridge:
         for part in ("begin", "end"):
             objs.append(("text", f"{uid}_quiet_{part}"))
         for p in self.schedules.plans:
-            objs.append(("switch", f"{uid}_sched_{p['id']}"))
+            objs.append(("switch", f"{uid}_sched_{_safe_id(p['id'])}"))
         for comp, obj in objs:
             self._pub(f"{self.disc}/{comp}/{obj}/config", "")
         self.log(f"[MQTT] retirado descubrimiento duplicado ({uid})")
@@ -281,6 +312,18 @@ class MqttBridge:
         elif action == "carpet_turbo":
             self.prefs["turbo_carpet"] = bool(v)
             self._pub(f"conga/{node}/turbo_carpet", "on" if v else "off")
+        elif action == "dust_freq":
+            self._pub_dust_freq()   # el estado ya está en robot.state.collect_freq
+
+    def _pub_dust_freq(self):
+        """Publica el estado del select de frecuencia de vaciado según robot.state.collect_freq."""
+        cf = getattr(self.robot.state, "collect_freq", None)
+        try:
+            name = DUST_FREQ_REV.get(int(cf)) if cf is not None else None
+        except (TypeError, ValueError):
+            name = None
+        if name:
+            self._pub(f"conga/{self.node}/dust_freq", name)
 
     def reflect_schedule(self, plan):
         """Refleja el estado on/off de un horario en HA (sin republicar todo)."""
@@ -288,8 +331,9 @@ class MqttBridge:
                   "on" if plan.get("enable", True) else "off")
 
     def forget_schedule(self, pid):
-        """Retira de HA el switch de un horario borrado (discovery vacío)."""
-        self._pub(f"{self.disc}/switch/{self.uid}_sched_{pid}/config", "")
+        """Retira de HA el switch de un horario borrado (discovery vacío). El object_id del topic
+        de descubrimiento va saneado (igual que al publicarlo)."""
+        self._pub(f"{self.disc}/switch/{self.uid}_sched_{_safe_id(pid)}/config", "")
         self._pub(f"conga/{self.node}/sched/{pid}", "")
 
     # ---------------- reflejo de estado ----------------
@@ -321,6 +365,7 @@ class MqttBridge:
             self._pub(f"conga/{self.node}/voice_volume", str(s.voice.get("volume", 10)))
         if s.auto_upgrade is not None:
             self._pub(f"conga/{self.node}/ota", "on" if s.auto_upgrade else "off")
+        self._pub_dust_freq()
         if s.consumables:
             for key in ("main_brush", "side_brush", "filter", "dishcloth"):
                 if s.consumables.get(key) is not None:
@@ -337,12 +382,14 @@ class MqttBridge:
         client.publish(self.t_cmd, "", retain=True)      # limpia comandos retained viejos
         for sub in (self.t_cmd, "homeassistant/status",
                     f"conga/{node}/room_command", f"conga/{node}/dust_action",
-                    f"conga/{node}/consumable/+/reset",
+                    f"conga/{node}/consumable/+/reset", f"conga/{node}/dust_freq/set",
                     f"conga/{node}/pref/+/set", f"conga/{node}/sched/+/set",
                     f"conga/{node}/twice/set", f"conga/{node}/turbo_carpet/set",
                     f"conga/{node}/ota/set", f"conga/{node}/quiet/set",
                     f"conga/{node}/quiet_begin/set", f"conga/{node}/quiet_end/set",
-                    f"conga/{node}/voice/set", f"conga/{node}/voice_volume/set"):
+                    f"conga/{node}/voice/set", f"conga/{node}/voice_volume/set",
+                    # barrido de configs retenidas: para retirar habitaciones/horarios obsoletos
+                    f"{self.disc}/switch/+/config", f"{self.disc}/button/+/config"):
             client.subscribe(sub)
         self.publish_discovery()
 
@@ -353,11 +400,40 @@ class MqttBridge:
         except Exception as e:
             self.log(f"  [MQTT] error enviando al robot: {e}")
 
+    def _sweep_stale_config(self, topic):
+        """Recibe un config de descubrimiento retenido (homeassistant/{comp}/{obj}/config) y, si
+        es un botón de habitación o un switch de horario de ESTE dispositivo que ya no existe, lo
+        retira (publica config vacío). Así se auto-limpian habitaciones de mapas viejos y horarios
+        de otros mapas / borrados, sin dejar entidades fantasma en HA."""
+        parts = topic.split("/")
+        if len(parts) != 4:
+            return
+        obj = parts[2]
+        uid = self.uid
+        if obj.startswith(f"{uid}_room_"):
+            rid = obj[len(f"{uid}_room_"):]
+            if rid not in {str(r) for r in (self._rooms() or {})}:
+                self._pub(topic, "")
+                self.log(f"[MQTT] retirada habitación obsoleta de HA ({obj})")
+        elif obj.startswith(f"{uid}_sched_"):
+            active = getattr(self.robot.state, "map_head_id", None)
+            current = {_safe_id(p["id"]) for p in self.schedules.for_map(active)}
+            if obj[len(f"{uid}_sched_"):] not in current:
+                self._pub(topic, "")
+                self.log(f"[MQTT] retirado horario obsoleto de HA ({obj})")
+
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
         payload = msg.payload.decode("utf-8", "replace").strip()
         node = self.node
         try:
+            # barrido de descubrimiento retenido: retira de HA botones de habitación u horarios
+            # que ya no existen (mapas de prueba, planes de otros mapas, nombres cambiados…).
+            if topic.startswith(f"{self.disc}/") and topic.endswith("/config"):
+                if payload:
+                    self._sweep_stale_config(topic)
+                return
+
             if topic == "homeassistant/status":
                 if payload == "online":
                     time.sleep(1)
@@ -384,8 +460,21 @@ class MqttBridge:
                     self._cmd(cmd.select_mode(payload))
                 elif key == "base_type":
                     self.prefs["base_type"] = payload
+                    self.robot.state.base_type = payload
                     self._cmd(cmd.base_type(payload))
+                    if self._persist:
+                        self._persist()
                 self._pub(f"conga/{node}/pref/{key}", payload)
+                return
+
+            if topic == f"conga/{node}/dust_freq/set":
+                val = DUST_FREQ.get(payload)
+                if val is not None:
+                    self._cmd(cmd.dust_freq(val))
+                    self.robot.state.collect_freq = val
+                    if self._persist:
+                        self._persist()
+                    self._pub(f"conga/{node}/dust_freq", payload)
                 return
 
             if topic == f"conga/{node}/twice/set":

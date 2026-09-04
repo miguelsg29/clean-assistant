@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.7
+- **Arreglado (issue #1, gracias @teosoft0):** los horarios con **ñ, tildes o espacios** en el
+  nombre generaban un topic de descubrimiento MQTT ilegal y Home Assistant lo **rechazaba**
+  («Received message on illegal discovery topic … contains non allowed characters»). Ahora el
+  identificador del topic se **sanea** (`[a-zA-Z0-9_-]`); el nombre visible del horario no cambia.
+- **Home Assistant: nueva "Frecuencia de vaciado"** (selector), igual que en la web
+  (Nunca / Después de cada limpieza / Cada 30·60·90 min / Cada 2 h).
+- **Home Assistant: se publican solo los horarios del MAPA ACTIVO** (como la web) y se **retiran
+  automáticamente** los botones de habitación y switches de horario **obsoletos** (de mapas de
+  prueba, de otros mapas o de nombres cambiados) que antes quedaban como entidades fantasma.
+
 ## 0.17.6
 - Arreglado el **"Conga fantasma"** en Home Assistant: aparecía un segundo dispositivo *Conga
   8090* con solo los 4 botones de *Restablecer* consumibles. Causa: al aprender el DID real del

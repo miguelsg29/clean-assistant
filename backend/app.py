@@ -436,7 +436,7 @@ def _ingest_report(rep: dict):
 
 # Puente MQTT opcional para Home Assistant (montado sobre el mismo robot). Solo se
 # activa si MQTT_HOST está definido; si no, todos sus métodos son no-ops.
-mqtt = MqttBridge(robot, schedules, env, _map_head_id, _rooms_meta)
+mqtt = MqttBridge(robot, schedules, env, _map_head_id, _rooms_meta, persist=_save_prefs)
 
 
 def _send_zone_group(group: str):
@@ -858,7 +858,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.17.6", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.17.7", lifespan=lifespan)
 
 
 @app.get("/api/state")
