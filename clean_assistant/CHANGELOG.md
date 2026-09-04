@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.10
+- Pie de la app: el enlace **☕ Ko-fi** pasa a su **propia línea** (antes se descuadraba/partía en
+  móvil). Sigue traducido en todos los idiomas.
+
 ## 0.17.9
 - **Arreglado:** las **actualizaciones automáticas (OTA)** volvían a activarse tras cada
   actualización del add-on. El robot las reactiva al reconectar; ahora Clean Assistant **guarda tu
