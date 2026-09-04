@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.17.11
+- Home Assistant muestra ahora el **modelo real** del robot (según su `project_type`, aprendido
+  del propio robot): **Conga 8090 Ultra**, **Conga 4690 Ultra**, etc., en vez de siempre
+  «Conga 8090». Atiende parte del issue #1 (gracias @teosoft0, que tiene un 4690). Otros modelos
+  no mapeados aún aparecen como «Conga» con su project_type.
+
 ## 0.17.10
 - Pie de la app: el enlace **☕ Ko-fi** pasa a su **propia línea** (antes se descuadraba/partía en
   móvil). Sigue traducido en todos los idiomas.

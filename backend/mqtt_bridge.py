@@ -25,6 +25,14 @@ DUST_FREQ = {"Nunca": -1, "Después de cada limpieza": 0, "Cada 30 minutos": 30,
 DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
 
 
+# Modelo del robot para Home Assistant, según el project_type (aprendido del propio robot por
+# auto-provisión, o el configurado). (nombre corto, modelo). Amplía el mapa según se confirmen.
+CONGA_MODELS = {
+    "CECOTECCRL350-1001": ("Conga 8090", "Conga 8090 Ultra"),
+    "CCECOTECCRL300-1001": ("Conga 4690", "Conga 4690 Ultra"),   # confirmado por @teosoft0 (issue #1)
+}
+
+
 def _safe_id(s) -> str:
     """El object_id de los topics de descubrimiento MQTT solo admite [a-zA-Z0-9_-]; HA rechaza
     'ñ', tildes o espacios (p. ej. un horario llamado 'Baño matrimonio'). Sustituye lo no
@@ -88,6 +96,14 @@ class MqttBridge:
             did = self._env_did
         return f"conga_{did}"
 
+    def _model_names(self):
+        """(nombre, modelo) del dispositivo para HA según el project_type del robot. Para modelos
+        no mapeados usa un nombre genérico 'Conga' e incluye el project_type crudo en el modelo."""
+        pt = (getattr(getattr(self.robot, "cfg", None), "project_type", "") or "").strip()
+        if pt in CONGA_MODELS:
+            return CONGA_MODELS[pt]
+        return ("Conga", f"Conga ({pt})" if pt else "Conga")
+
     def enabled(self) -> bool:
         return bool(self.host)
 
@@ -150,10 +166,11 @@ class MqttBridge:
             self._legacy_cleaned = True
             for legacy in {"conga_0", "conga_123456", f"conga_{self._env_did}"} - {uid}:
                 self._clear_discovery(legacy)
-        device = {"identifiers": [uid], "name": "Conga 8090", "manufacturer": "Cecotec",
-                  "model": "Conga 8090 Ultra", "sw_version": "clean-assistant"}
+        dev_name, dev_model = self._model_names()
+        device = {"identifiers": [uid], "name": dev_name, "manufacturer": "Cecotec",
+                  "model": dev_model, "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
-            "name": "Conga 8090", "unique_id": uid, "schema": "state",
+            "name": dev_name, "unique_id": uid, "schema": "state",
             "supported_features": ["start", "pause", "stop", "return_home",
                                    "status", "locate"],
             "command_topic": self.t_cmd, "state_topic": self.t_state, "device": device})
