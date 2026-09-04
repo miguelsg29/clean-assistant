@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.17.8
+- Enlace de apoyo **☕ Ko-fi** en el pie de la app (junto al de GitHub), traducido a todos los
+  idiomas, y botón **Sponsor** en el repositorio (`.github/FUNDING.yml`). Totalmente opcional.
+
 ## 0.17.7
 - **Arreglado (issue #1, gracias @teosoft0):** los horarios con **ñ, tildes o espacios** en el
   nombre generaban un topic de descubrimiento MQTT ilegal y Home Assistant lo **rechazaba**
