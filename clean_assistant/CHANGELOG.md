@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.9
+- **Arreglado:** las **actualizaciones automáticas (OTA)** volvían a activarse tras cada
+  actualización del add-on. El robot las reactiva al reconectar; ahora Clean Assistant **guarda tu
+  preferencia y la reaplica** automáticamente. Por defecto quedan **OFF** (recomendado en local);
+  si las activas tú, se respetan. (La protección real ya existía: el servidor OTA local siempre
+  responde «sin actualización», así que el robot nunca se actualizaba de todos modos.)
+- Añadida la **licencia MIT** del proyecto (`LICENSE`), con aviso de ingeniería inversa
+  independiente (no afiliado a Cecotec/3irobotix).
+
 ## 0.17.8
 - Enlace de apoyo **☕ Ko-fi** en el pie de la app (junto al de GitHub), traducido a todos los
   idiomas, y botón **Sponsor** en el repositorio (`.github/FUNDING.yml`). Totalmente opcional.

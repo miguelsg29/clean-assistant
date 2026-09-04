@@ -590,7 +590,17 @@ class RealRobot:
                                       ("main_brush", "side_brush", "filter", "dishcloth")}
             changed = True
         elif ctrl == "get_upgrade_config":
-            self.state.auto_upgrade = 1 if data.get("auto_upgrade") else 0
+            reported = 1 if data.get("auto_upgrade") else 0
+            # el robot tiende a REACTIVAR las actualizaciones automáticas al reconectar; si difieren
+            # de la preferencia (ota_enforce, la fija app.py; por defecto OFF), se reaplican.
+            enforce = getattr(self, "ota_enforce", None)
+            if enforce is not None and reported != enforce:
+                self.command(cmd.set_upgrade(bool(enforce)))
+                self.state.auto_upgrade = enforce
+                self.log(f"  [robot] OTA reaplicado a {'ON' if enforce else 'OFF'} "
+                         f"(el robot lo había puesto en {'ON' if reported else 'OFF'})")
+            else:
+                self.state.auto_upgrade = reported
             changed = True
         elif ctrl == "getOrder6090":
             self.orders = data.get("orders", []) or []

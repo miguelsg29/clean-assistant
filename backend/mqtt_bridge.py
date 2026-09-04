@@ -518,6 +518,9 @@ class MqttBridge:
                 on = (payload == "on")
                 self._cmd(cmd.set_upgrade(on))
                 self.robot.state.auto_upgrade = 1 if on else 0
+                self.robot.ota_enforce = 1 if on else 0   # respeta la elección en reconexiones
+                if self._persist:
+                    self._persist()
                 self._pub(f"conga/{node}/ota", payload)
                 return
 

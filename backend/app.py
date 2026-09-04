@@ -202,17 +202,28 @@ def _load_prefs():
             pass
     if p.get("base_type"):
         robot.state.base_type = p["base_type"]
+    if "ota" in p:
+        try:
+            robot.ota_enforce = 1 if int(p["ota"]) else 0
+        except (TypeError, ValueError):
+            robot.ota_enforce = 0
+        robot.state.auto_upgrade = robot.ota_enforce
 
 
 def _save_prefs():
     try:
         with open(PREFS_PATH, "w", encoding="utf-8") as f:
             json.dump({"collect_freq": robot.state.collect_freq,
-                       "base_type": robot.state.base_type}, f)
+                       "base_type": robot.state.base_type,
+                       "ota": getattr(robot, "ota_enforce", 0)}, f)
     except Exception:
         pass
 
 
+# Actualizaciones automáticas (OTA) OFF por defecto: el robot las reactiva al reconectar, así que
+# se guarda la preferencia y robot.py la reaplica. Solo cambia si el usuario la activa a mano.
+robot.ota_enforce = 0
+robot.state.auto_upgrade = 0
 _load_prefs()
 
 
@@ -479,6 +490,8 @@ def _optimistic_state(action: str, p: dict):
                    "volume": int(vol if vol is not None else (s.voice or {}).get("volume", 10))}
     elif action == "ota":
         s.auto_upgrade = 1 if p.get("value") else 0
+        robot.ota_enforce = s.auto_upgrade      # respeta la elección del usuario en reconexiones
+        _save_prefs()
     elif action == "dust_freq":
         s.collect_freq = int(p.get("value"))
         _save_prefs()                                # persiste para que no se pierda al actualizar
@@ -858,7 +871,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.17.8", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.17.9", lifespan=lifespan)
 
 
 @app.get("/api/state")
