@@ -2,11 +2,12 @@
 
 # Clean Assistant
 
-A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** robot vacuum:
-live map, per-room cleaning, zones, schedules, history and every setting, with its own
-polished web interface. In the spirit of Valetudo/Congatudo, but for the 8000
-generation (which uses TLS + WebSocket + JSON + Protobuf, not supported by those
-projects).
+A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** — and other Conga
+models on the same platform (e.g. the **4690 Ultra**, confirmed by a user): live map,
+per-room cleaning, zones, schedules, history and every setting, in its own polished web
+interface, **available in 5 languages** (Spanish, English, Portuguese, French, Polish).
+In the spirit of Valetudo/Congatudo, but for the 8000 generation (which uses TLS +
+WebSocket + JSON + Protobuf, not supported by those projects).
 
 > Built on the reverse engineering from the documentation repo:
 > [conga_8090_mqtt_bridge](https://github.com/miguelsg29/conga_8090_mqtt_bridge).
@@ -70,8 +71,8 @@ login.
    controls. 🎉
 6. *(Optional)* **Entities in Home Assistant (MQTT):** if you have the **Mosquitto
    broker** app, Clean Assistant picks up host/user/password **automatically**. A
-   **Conga 8090** device will appear with vacuum, battery, per-room buttons, selectors,
-   schedules… Only fill in the `MQTT_*` fields by hand if you use a broker external to
+   **Conga** device (named after your real model — 8090 Ultra, 4690 Ultra…) will appear
+   with vacuum, battery, per-room buttons, selectors, schedules… Only fill in the `MQTT_*` fields by hand if you use a broker external to
    Home Assistant.
 
 ## What it offers
@@ -142,13 +143,20 @@ develop the interface without a Conga.
   another server.
 
 ### 📱 Home Assistant and mobile
-- **MQTT bridge** (autodiscovery): a **Conga 8090** device with vacuum,
-  battery/area/time, consumables, a button per room, selectors for
-  power/water/mop/mode/dock, switches for do-not-disturb/voice/OTA/turbo/double-pass,
-  volume, a "Low water" sensor and a switch per schedule. Mounted **on top of** the same
+- **MQTT bridge** (autodiscovery): a **Conga** device (shown with your real model:
+  8090 Ultra, 4690 Ultra…) with vacuum, battery/area/time, consumables, a button per room,
+  selectors for power/water/mop/mode/dock/**emptying frequency**, switches for
+  do-not-disturb/voice/OTA/turbo/double-pass, volume, a "Low water" sensor and a switch
+  per schedule. Mounted **on top of** the same
   robot (no second server). Activates on its own with HA's broker.
 - **Touch** interface: draw zones, split/merge rooms and select rooms by hand, without
   the page scrolling.
+
+### 🌍 Languages & easy updates
+- Interface **in 5 languages** — Spanish, English, Portuguese, French and Polish. Pick it
+  from the header; it auto-detects your browser language.
+- The Home Assistant add-on ships as a **prebuilt image**, so **updates are fast**
+  (downloaded, not built on your device) and show a real progress bar.
 
 ## Architecture
 
@@ -222,8 +230,12 @@ This repository **is also a Home Assistant Apps repository** (add-ons; see "Home
 Assistant install"). The interface opens from the sidebar (ingress, with the HA
 session). The app reads the **time zone** and the host's **LAN IP** from the Supervisor
 (for the DNS instructions), picks up HA's **MQTT** broker on its own, and opens the
-robot's ports (9090/8001/8002/8006). Install the app from this repo without duplicating
-code; to pin a version, set `CA_REF` to a release tag in its `Dockerfile`.
+robot's ports (9090/8001/8002/8006).
+
+The add-on ships as a **prebuilt multi-arch image** (aarch64/amd64), built by GitHub
+Actions and published to GHCR on every release. Home Assistant **downloads** it instead of
+building it on your device, so **updates are fast and show a real progress bar** — no
+on-device compilation.
 
 ## Structure
 
@@ -263,3 +275,23 @@ clean-assistant/
 **100% locally** (control + OTA + history impersonated) and **self-configures without
 the cloud** from the first boot. See [`clean_assistant/CHANGELOG.md`](clean_assistant/CHANGELOG.md)
 for what's new in each version.
+
+## Supported robots
+
+Built and verified end to end with a **Conga 8090 Ultra**. Because these robots share the
+same cloud stack (3irobotix: TLS + WebSocket + JSON), **other Conga models on that platform
+also work** — the **4690 Ultra** is confirmed by a community user. Home Assistant shows the
+real model (from the robot's `project_type`). If you try another model, please
+[open an issue](https://github.com/miguelsg29/clean-assistant/issues) with your
+`PROJECT_TYPE` and what does/doesn't work.
+
+## Support
+
+Clean Assistant is free and 100% local. If it's useful to you, you can support development
+(and buying more robots to add support for): ☕ **[ko-fi.com/miguelsg29](https://ko-fi.com/miguelsg29)** — completely optional, and thank you!
+
+## License
+
+[MIT](LICENSE). Independent reverse-engineering project for interoperability and personal
+use — **not affiliated with or endorsed by Cecotec or 3irobotix**. "Conga" and "Cecotec"
+are trademarks of their respective owners.
