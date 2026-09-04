@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.17.6
+- Arreglado el **"Conga fantasma"** en Home Assistant: aparecía un segundo dispositivo *Conga
+  8090* con solo los 4 botones de *Restablecer* consumibles. Causa: al aprender el DID real del
+  robot (auto-provisión), la limpieza del dispositivo antiguo no retiraba esos botones de reset.
+  Ahora se limpian, y al arrancar se eliminan las identidades antiguas (conga_0/123456/entorno).
+  Tras actualizar y reconectar, el dispositivo duplicado desaparece solo.
+- El pie de la interfaz enlaza al **repositorio de GitHub** (github.com/miguelsg29/clean-assistant).
+
 ## 0.17.5
 - La imagen precompilada se publica para **aarch64 y amd64** (las de Home Assistant OS en
   Raspberry Pi 3/4/5 y equipos x86). Se retira **armv7** (ARM de 32 bits): sus dependencias

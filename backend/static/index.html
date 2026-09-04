@@ -288,7 +288,9 @@
   .cons .track i.crit{background:var(--critical)}
   .cons .pct{width:54px;text-align:right;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
   .cons .pct.crit{color:var(--critical)}
-  footer{max-width:1140px;margin:22px auto 0;text-align:center;color:var(--faint);font-size:12px}
+  footer{max-width:1140px;margin:22px auto 0;text-align:center;color:var(--faint);font-size:12px;line-height:1.7}
+  footer a{color:inherit;text-decoration:none;border-bottom:1px dotted currentColor}
+  footer a:hover{color:var(--accent-ink)}
   @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
 </style>
@@ -526,7 +528,7 @@
     </section>
   </div>
 
-  <footer>Clean Assistant v0.17 · <span>100% local, sin nube</span> · <span id="modeTag">robot simulado</span></footer>
+  <footer>Clean Assistant v0.17 · <span>100% local, sin nube</span> · <span id="modeTag">robot simulado</span><br><a href="https://github.com/miguelsg29/clean-assistant" target="_blank" rel="noopener noreferrer">github.com/miguelsg29/clean-assistant</a></footer>
 </div>
 
 <div class="modal-ov" id="modalOv" hidden>

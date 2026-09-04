@@ -50,6 +50,7 @@ class MqttBridge:
         self.node = "conga8090"
         self.uid = self._current_uid()
         self._published_uid = None
+        self._legacy_cleaned = False   # limpieza única de "Congas fantasma" de identidades antiguas
         self.disc = "homeassistant"
         self.client = None
         # preferencias "para la próxima limpieza" (sombra local: el robot no las reporta)
@@ -126,6 +127,13 @@ class MqttBridge:
             self._clear_discovery(self._published_uid)
         self.uid = uid
         self._published_uid = uid
+        # elimina "Congas fantasma" de identidades antiguas: antes de la auto-provisión el DID
+        # podía ser 0/123456/el del entorno. Una versión previa no retiraba sus botones de reset
+        # y dejaba un segundo dispositivo con solo esos 4 botones. Se limpia una vez por arranque.
+        if not self._legacy_cleaned:
+            self._legacy_cleaned = True
+            for legacy in {"conga_0", "conga_123456", f"conga_{self._env_did}"} - {uid}:
+                self._clear_discovery(legacy)
         device = {"identifiers": [uid], "name": "Conga 8090", "manufacturer": "Cecotec",
                   "model": "Conga 8090 Ultra", "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
@@ -244,6 +252,7 @@ class MqttBridge:
                 ("button", f"{uid}_dust"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
             objs.append(("sensor", f"{uid}_cons_{key}"))
+            objs.append(("button", f"{uid}_creset_{key}"))   # botones de reset (faltaban -> dejaban un device fantasma)
         for rid in (self._rooms() or {}):
             objs.append(("button", f"{uid}_room_{rid}"))
         for key in ("fan", "water", "mop", "mode", "base_type"):
