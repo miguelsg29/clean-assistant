@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.0
+- **Muchísimas menos escrituras en la base de datos de Home Assistant.** El Conga cierra y reabre
+  la conexión de control con frecuencia; en cada reconexión las ~35 entidades pasaban a «no
+  disponible» y de nuevo a «disponible», generando **miles de filas** en el recorder (cientos de
+  miles con el tiempo). Ahora la disponibilidad tiene un **margen (debounce) de 120 s**: un corte
+  breve ya no la hace parpadear, así que el estado se mantiene estable y solo se registran los
+  cambios reales.
+  - Para vaciar lo ya acumulado: en *Ajustes → Sistema → Almacenamiento* (o el panel del recorder),
+    pulsa **Purge**, o llama al servicio `recorder.purge` / `recorder.purge_entities`.
+
 ## 0.17.11
 - Home Assistant muestra ahora el **modelo real** del robot (según su `project_type`, aprendido
   del propio robot): **Conga 8090 Ultra**, **Conga 4690 Ultra**, etc., en vez de siempre

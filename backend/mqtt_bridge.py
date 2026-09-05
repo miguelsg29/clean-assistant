@@ -12,7 +12,14 @@ por lo que el modo de desarrollo (mock, sin broker) sigue funcionando igual.
 from __future__ import annotations
 import json
 import re
+import threading
 import time
+
+# Margen antes de anunciar "offline" en HA. El Conga cierra y reabre la conexión de control muy a
+# menudo; sin este margen cada reconexión marcaría las ~35 entidades como no disponibles y otra vez
+# disponibles, generando MILES de escrituras en la BD del recorder. Con el margen, un hueco corto no
+# hace parpadear la disponibilidad.
+AVAIL_OFFLINE_GRACE_S = 120.0
 
 from conga_core import commands as cmd
 
@@ -75,6 +82,8 @@ class MqttBridge:
         self.uid = self._current_uid()
         self._published_uid = None
         self._legacy_cleaned = False   # limpieza única de "Congas fantasma" de identidades antiguas
+        self._avail_state = None        # disponibilidad publicada ("online"/"offline")
+        self._avail_timer = None        # temporizador de gracia antes de anunciar offline
         self.disc = "homeassistant"
         self.client = None
         # preferencias "para la próxima limpieza" (sombra local: el robot no las reporta)
@@ -127,6 +136,9 @@ class MqttBridge:
         self.log(f"[MQTT] puente HA activo -> {self.host}:{self.port}")
 
     def stop(self):
+        if self._avail_timer is not None:
+            self._avail_timer.cancel()
+            self._avail_timer = None
         if self.client:
             try:
                 self.client.publish(self.t_avail, "offline", retain=True)
@@ -342,6 +354,28 @@ class MqttBridge:
         if name:
             self._pub(f"conga/{self.node}/dust_freq", name)
 
+    def _update_availability(self, online):
+        """Disponibilidad con debounce: 'online' inmediato; 'offline' SOLO si el robot lleva
+        desconectado más de AVAIL_OFFLINE_GRACE_S. El Conga cierra/reabre la conexión a menudo, así
+        que sin esto la disponibilidad parpadearía y llenaría el recorder de HA de escrituras."""
+        if online:
+            if self._avail_timer is not None:
+                self._avail_timer.cancel()
+                self._avail_timer = None
+            if self._avail_state != "online":
+                self._avail_state = "online"
+                self._pub(self.t_avail, "online")
+        else:
+            if self._avail_state == "offline" or self._avail_timer is not None:
+                return                       # ya offline, o ya contando el margen
+            def _go_offline():
+                self._avail_timer = None
+                self._avail_state = "offline"
+                self._pub(self.t_avail, "offline")
+            self._avail_timer = threading.Timer(AVAIL_OFFLINE_GRACE_S, _go_offline)
+            self._avail_timer.daemon = True
+            self._avail_timer.start()
+
     def reflect_schedule(self, plan):
         """Refleja el estado on/off de un horario en HA (sin republicar todo)."""
         self._pub(f"conga/{self.node}/sched/{plan['id']}",
@@ -358,7 +392,7 @@ class MqttBridge:
         if not self.client:
             return
         s = self.robot.state
-        self._pub(self.t_avail, "online" if s.online else "offline")
+        self._update_availability(bool(s.online))
         state = s.state if s.state in _VACUUM_STATES else "idle"
         payload = {"state": state}
         if s.battery is not None:
