@@ -528,6 +528,7 @@ async def broadcast_pose():
     pose = getattr(robot, "pose", None)
     if not pose:
         return
+    mqtt.publish_pose()                       # expone x/y/ángulo por MQTT (floorplans externos)
     msg = json.dumps({"type": "pose", "pose": pose})
     for ws in list(clients):
         try:
@@ -871,7 +872,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.18.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.18.1", lifespan=lifespan)
 
 
 @app.get("/api/state")

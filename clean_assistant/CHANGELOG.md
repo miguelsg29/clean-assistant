@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.18.1
+- **Posición del robot por MQTT** (issue #2, gracias @miajed): nuevo sensor **«Conga Posición»**
+  con `x`, `y` y `angle` (en celdas del mapa) como atributos, publicado en
+  `conga/conga8090/pose`. Útil para floorplans o tarjetas propias en Home Assistant. Solo cambia
+  mientras el robot se mueve (limpiando). El **mapa completo** ya estaba disponible en
+  `GET /api/map` (cells_b64, rooms, bbox, robot, charger…).
+
 ## 0.18.0
 - **Muchísimas menos escrituras en la base de datos de Home Assistant.** El Conga cierra y reabre
   la conexión de control con frecuencia; en cada reconexión las ~35 entidades pasaban a «no

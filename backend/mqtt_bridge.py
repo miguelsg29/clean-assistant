@@ -200,6 +200,14 @@ class MqttBridge:
             if dclass:
                 cfg["device_class"] = dclass
             self._disc("sensor", f"{uid}_{sid}", cfg)
+        # posición del robot (x/y/ángulo en celdas del mapa) para floorplans/tarjetas externas.
+        # El estado es "x,y"; x, y y angle van también como atributos (json_attributes_topic).
+        self._disc("sensor", f"{uid}_pose", {
+            "name": "Conga Posición", "unique_id": f"{uid}_pose",
+            "state_topic": f"conga/{node}/pose",
+            "value_template": "{{ value_json.x }},{{ value_json.y }}",
+            "json_attributes_topic": f"conga/{node}/pose", "icon": "mdi:crosshairs-gps"})
+        self.publish_pose()
         # aviso de falta de agua (faultCode 525) como binary_sensor
         self._disc("binary_sensor", f"{uid}_low_water", {
             "name": "Conga Falta agua", "unique_id": f"{uid}_low_water",
@@ -307,9 +315,9 @@ class MqttBridge:
         """Borra el descubrimiento retenido de un dispositivo viejo (uid distinto al
         actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
-                ("sensor", f"{uid}_time"), ("number", f"{uid}_volume"),
-                ("button", f"{uid}_dust"), ("select", f"{uid}_dust_freq"),
-                ("binary_sensor", f"{uid}_low_water")]
+                ("sensor", f"{uid}_time"), ("sensor", f"{uid}_pose"),
+                ("number", f"{uid}_volume"), ("button", f"{uid}_dust"),
+                ("select", f"{uid}_dust_freq"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
             objs.append(("sensor", f"{uid}_cons_{key}"))
             objs.append(("button", f"{uid}_creset_{key}"))   # botones de reset (faltaban -> dejaban un device fantasma)
@@ -353,6 +361,18 @@ class MqttBridge:
             name = None
         if name:
             self._pub(f"conga/{self.node}/dust_freq", name)
+
+    def publish_pose(self):
+        """Publica la posición del robot {x, y, angle} (celdas del mapa) en conga/<node>/pose,
+        para tarjetas/floorplans externos en Home Assistant. Retenido: la última posición queda
+        disponible al recargar. Solo cambia mientras el robot se mueve (limpiando)."""
+        if not self.client:
+            return
+        p = getattr(self.robot, "pose", None)
+        if not p or p.get("x") is None:
+            return
+        self._pub(f"conga/{self.node}/pose",
+                  json.dumps({"x": p.get("x"), "y": p.get("y"), "angle": p.get("angle")}))
 
     def _update_availability(self, online):
         """Disponibilidad con debounce: 'online' inmediato; 'offline' SOLO si el robot lleva
