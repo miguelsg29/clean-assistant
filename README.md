@@ -5,7 +5,7 @@
 A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** — and other Conga
 models on the same platform (e.g. the **4690 Ultra**, confirmed by a user): live map,
 per-room cleaning, zones, schedules, history and every setting, in its own polished web
-interface, **available in 5 languages** (Spanish, English, Portuguese, French, Polish).
+interface, **available in 9 languages** (Spanish, English, German, Italian, French, Portuguese, Dutch, Catalan, Polish).
 In the spirit of Valetudo/Congatudo, but for the 8000 generation (which uses TLS +
 WebSocket + JSON + Protobuf, not supported by those projects).
 
@@ -153,8 +153,8 @@ develop the interface without a Conga.
   the page scrolling.
 
 ### 🌍 Languages & easy updates
-- Interface **in 5 languages** — Spanish, English, Portuguese, French and Polish. Pick it
-  from the header; it auto-detects your browser language.
+- Interface **in 9 languages** — Spanish, English, German, Italian, French, Portuguese, Dutch,
+  Catalan and Polish. Pick it from the header; it auto-detects your browser language.
 - The Home Assistant add-on ships as a **prebuilt image**, so **updates are fast**
   (downloaded, not built on your device) and show a real progress bar.
 

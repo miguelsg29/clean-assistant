@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.20.0
+- **Cuatro idiomas nuevos en la interfaz: Alemán, Italiano, Neerlandés y Catalán.** Con estos, Clean
+  Assistant habla ya **9 idiomas** (ES/EN/DE/IT/FR/PT/NL/CA/PL). Se eligen desde el selector de la
+  cabecera y se detecta el del navegador automáticamente. Las traducciones son un primer aporte
+  (revisión de hablantes nativos muy bienvenida — abre un issue o PR si ves algo mejorable).
+
 ## 0.19.1
 - **Diagnóstico de códigos de error.** El registro del add-on ahora anota cada `faultCode` nuevo del
   robot: los conocidos con su mensaje (525 = depósito de agua bajo, 512 = error al volver a la base)

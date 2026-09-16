@@ -5,8 +5,8 @@
 Aplicación **local y sin nube** para gestionar el robot aspirador **Cecotec Conga
 8090 Ultra** — y otros modelos Conga de la misma plataforma (p. ej. el **4690 Ultra**,
 confirmado por un usuario): mapa en vivo, limpieza por habitaciones, zonas, horarios,
-historial y todos los ajustes, con una interfaz web propia y bonita, **disponible en 5
-idiomas** (español, inglés, portugués, francés y polaco). En la línea de
+historial y todos los ajustes, con una interfaz web propia y bonita, **disponible en 9
+idiomas** (español, inglés, alemán, italiano, francés, portugués, neerlandés, catalán y polaco). En la línea de
 Valetudo/Congatudo, pero para la generación 8000 (que usa TLS + WebSocket + JSON +
 Protobuf, no soportada por aquellos proyectos).
 
@@ -153,8 +153,8 @@ para desarrollar la interfaz sin un Conga.
   habitaciones a dedo, sin que la página haga scroll.
 
 ### 🌍 Idiomas y actualizaciones fáciles
-- Interfaz **en 5 idiomas** — español, inglés, portugués, francés y polaco. Se elige en la
-  cabecera; detecta el idioma del navegador automáticamente.
+- Interfaz **en 9 idiomas** — español, inglés, alemán, italiano, francés, portugués, neerlandés,
+  catalán y polaco. Se elige en la cabecera; detecta el idioma del navegador automáticamente.
 - El add-on de Home Assistant se distribuye como **imagen precompilada**, así que las
   **actualizaciones son rápidas** (se descargan, no se compilan en tu equipo) y con barra
   de progreso real.
