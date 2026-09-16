@@ -1,7 +1,7 @@
 name: "Clean Assistant"
 version: "0.20.0"
 slug: "clean_assistant"
-description: "Interfaz local (sin nube) para el Conga 8090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
+description: "Interfaz local (sin nube) para Cecotec Conga 8090 / 4690 / 9090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
 url: "https://github.com/miguelsg29/clean-assistant"
 # Imagen PRECOMPILADA (GitHub Actions -> GHCR). Con esto Home Assistant DESCARGA la imagen en vez
 # de compilarla en el dispositivo: actualizaciones rápidas y con barra de progreso. La publica el
