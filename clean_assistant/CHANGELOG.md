@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.19.0
+- **Ejecutar un plan guardado bajo demanda** (issue #2, sugerido por @miajed): cada horario
+  aparece en Home Assistant también como **botón «Ejecutar …»** que lanza **ya** las habitaciones
+  de ese plan, sin esperar a su hora. También por REST: `POST /api/schedules/run {"id":"…"}`. Así
+  puedes crear los planes en Clean Assistant y dispararlos desde HA sin rehacer la lógica de
+  habitaciones. *Nota:* `setRoomClean` no admite ajustes por habitación en una sola orden, así que
+  la ejecución bajo demanda aplica la potencia/agua/mopa de la **primera** habitación del plan al
+  conjunto; los ajustes por habitación se respetan cuando el horario salta a su **hora**.
+- **Habitación actual** (issue #2, sugerido por @miajed): nuevo sensor **«Conga Habitación actual»**
+  con el **nombre** de la habitación que el robot está limpiando en ese momento (de
+  `cleaning_roomId`). Evita tener que deducirla desde la posición y el mapa.
+
 ## 0.18.2
 - **Conga 9090 compatible** (issue #3, gracias @serra410): en el 9090 (`project_type`
   `CECOTECCRL350-2001`), iniciar una limpieza reporta `workMode=1`, que el add-on tomaba por

@@ -186,3 +186,22 @@ class ScheduleStore:
 
     def delete_command(self, plan: dict):
         return cmd.delete_order(cmd._order_id(plan))
+
+
+def run_controls(plan: dict) -> list[dict]:
+    """Comandos para ejecutar YA (bajo demanda) las habitaciones de un plan guardado, sin
+    esperar a su hora. setRoomClean no admite ajustes por habitación en una sola orden, así
+    que se aplica la potencia/agua/mopa de la PRIMERA habitación del plan a toda la limpieza;
+    los ajustes por habitación solo se respetan cuando el horario salta a su hora (limitación
+    del robot). Devuelve [] si el plan no tiene habitaciones."""
+    rooms = [r for r in (plan.get("rooms") or []) if r.get("room") is not None]
+    if not rooms:
+        return []
+    first = rooms[0]
+    controls = []
+    if first.get("fan") in cmd.FAN:     controls.append(cmd.fan(first["fan"]))
+    if first.get("water") in cmd.WATER: controls.append(cmd.water(first["water"]))
+    if first.get("mop") in cmd.MOP:     controls.append(cmd.mop(first["mop"]))
+    controls.append(cmd.clean_rooms([r["room"] for r in rooms],
+                                    any(r.get("twice") for r in rooms)))
+    return controls

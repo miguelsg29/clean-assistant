@@ -212,6 +212,11 @@ class MqttBridge:
             "value_template": "{{ value_json.x }},{{ value_json.y }}",
             "json_attributes_topic": f"conga/{node}/pose", "icon": "mdi:crosshairs-gps"})
         self.publish_pose()
+        # habitación que el robot está limpiando ahora (nombre), para tarjetas/automatizaciones.
+        self._disc("sensor", f"{uid}_room_now", {
+            "name": "Conga Habitación actual", "unique_id": f"{uid}_room_now",
+            "state_topic": f"conga/{node}/room_now", "icon": "mdi:home-map-marker"})
+        self._pub(f"conga/{node}/room_now", self._current_room_name())
         # aviso de falta de agua (faultCode 525) como binary_sensor
         self._disc("binary_sensor", f"{uid}_low_water", {
             "name": "Conga Falta agua", "unique_id": f"{uid}_low_water",
@@ -310,6 +315,12 @@ class MqttBridge:
                 "state_topic": f"conga/{node}/sched/{pid}",
                 "payload_on": "on", "payload_off": "off", "icon": "mdi:calendar-clock"})
             self._pub(f"conga/{node}/sched/{pid}", "on" if p.get("enable", True) else "off")
+            # botón "Ejecutar": lanza YA las habitaciones del plan (sin esperar a su hora).
+            run_obj = f"{uid}_planrun_{_safe_id(pid)}"
+            self._disc("button", run_obj, {
+                "name": f"Ejecutar {p.get('name', pid)}", "unique_id": run_obj,
+                "command_topic": f"conga/{node}/plan_run", "payload_press": pid,
+                "icon": "mdi:play-box-multiple"})
 
         self.publish_state()
         self.log(f"[MQTT] autodiscovery publicado ({len(self._rooms() or {})} hab., "
@@ -320,6 +331,7 @@ class MqttBridge:
         actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
                 ("sensor", f"{uid}_time"), ("sensor", f"{uid}_pose"),
+                ("sensor", f"{uid}_room_now"),
                 ("number", f"{uid}_volume"), ("button", f"{uid}_dust"),
                 ("select", f"{uid}_dust_freq"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
@@ -335,6 +347,7 @@ class MqttBridge:
             objs.append(("text", f"{uid}_quiet_{part}"))
         for p in self.schedules.plans:
             objs.append(("switch", f"{uid}_sched_{_safe_id(p['id'])}"))
+            objs.append(("button", f"{uid}_planrun_{_safe_id(p['id'])}"))
         for comp, obj in objs:
             self._pub(f"{self.disc}/{comp}/{obj}/config", "")
         self.log(f"[MQTT] retirado descubrimiento duplicado ({uid})")
@@ -355,6 +368,18 @@ class MqttBridge:
             self._pub(f"conga/{node}/turbo_carpet", "on" if v else "off")
         elif action == "dust_freq":
             self._pub_dust_freq()   # el estado ya está en robot.state.collect_freq
+
+    def _current_room_name(self):
+        """Nombre de la habitación que el robot limpia AHORA (cleaning_roomId), o '—' si no
+        está limpiando/mapeando. Un id sin nombre en el mapa (segmento temporal) sale como
+        'Habitación N'."""
+        s = self.robot.state
+        rid = getattr(s, "cleaning_room", None)
+        if not rid or s.state not in ("cleaning", "mapping", "paused"):
+            return "—"
+        meta = self._rooms() or {}
+        info = meta.get(rid) or meta.get(str(rid))
+        return (info or {}).get("name") or f"Habitación {rid}"
 
     def _pub_dust_freq(self):
         """Publica el estado del select de frecuencia de vaciado según robot.state.collect_freq."""
@@ -406,10 +431,11 @@ class MqttBridge:
                   "on" if plan.get("enable", True) else "off")
 
     def forget_schedule(self, pid):
-        """Retira de HA el switch de un horario borrado (discovery vacío). El object_id del topic
-        de descubrimiento va saneado (igual que al publicarlo)."""
+        """Retira de HA el switch y el botón "Ejecutar" de un horario borrado (discovery vacío).
+        El object_id del topic de descubrimiento va saneado (igual que al publicarlo)."""
         self._pub(f"{self.disc}/switch/{self.uid}_sched_{_safe_id(pid)}/config", "")
         self._pub(f"conga/{self.node}/sched/{pid}", "")
+        self._pub(f"{self.disc}/button/{self.uid}_planrun_{_safe_id(pid)}/config", "")
 
     # ---------------- reflejo de estado ----------------
     def publish_state(self):
@@ -434,6 +460,7 @@ class MqttBridge:
             self._pub(f"conga/{self.node}/area", s.area)
         if s.clean_time is not None:
             self._pub(f"conga/{self.node}/time", s.clean_time)
+        self._pub(f"conga/{self.node}/room_now", self._current_room_name())
         if s.quiet:
             self._pub(f"conga/{self.node}/quiet", "on" if s.quiet.get("is_open") else "off")
             self._pub(f"conga/{self.node}/quiet_begin", _min_to_hhmm(s.quiet.get("begin_time")))
@@ -459,7 +486,8 @@ class MqttBridge:
         node = self.node
         client.publish(self.t_cmd, "", retain=True)      # limpia comandos retained viejos
         for sub in (self.t_cmd, "homeassistant/status",
-                    f"conga/{node}/room_command", f"conga/{node}/dust_action",
+                    f"conga/{node}/room_command", f"conga/{node}/plan_run",
+                    f"conga/{node}/dust_action",
                     f"conga/{node}/consumable/+/reset", f"conga/{node}/dust_freq/set",
                     f"conga/{node}/pref/+/set", f"conga/{node}/sched/+/set",
                     f"conga/{node}/twice/set", f"conga/{node}/turbo_carpet/set",
@@ -493,12 +521,13 @@ class MqttBridge:
             if rid not in {str(r) for r in (self._rooms() or {})}:
                 self._pub(topic, "")
                 self.log(f"[MQTT] retirada habitación obsoleta de HA ({obj})")
-        elif obj.startswith(f"{uid}_sched_"):
+        elif obj.startswith(f"{uid}_sched_") or obj.startswith(f"{uid}_planrun_"):
+            prefix = f"{uid}_sched_" if obj.startswith(f"{uid}_sched_") else f"{uid}_planrun_"
             active = getattr(self.robot.state, "map_head_id", None)
             current = {_safe_id(p["id"]) for p in self.schedules.for_map(active)}
-            if obj[len(f"{uid}_sched_"):] not in current:
+            if obj[len(prefix):] not in current:
                 self._pub(topic, "")
-                self.log(f"[MQTT] retirado horario obsoleto de HA ({obj})")
+                self.log(f"[MQTT] retirado horario/botón obsoleto de HA ({obj})")
 
     def _on_message(self, client, userdata, msg):
         topic = msg.topic
@@ -526,6 +555,20 @@ class MqttBridge:
                 time.sleep(0.3)
                 self._cmd(cmd.clean_rooms([rid], self.prefs["twice"]))
                 self.log(f"[MQTT] limpiar habitación {rid}")
+                return
+
+            if topic == f"conga/{node}/plan_run":
+                p = next((x for x in self.schedules.plans if x.get("id") == payload), None)
+                rooms = [r for r in (p.get("rooms") or []) if r.get("room") is not None] if p else []
+                if rooms:
+                    first = rooms[0]
+                    self._cmd(cmd.fan(first.get("fan") if first.get("fan") in cmd.FAN else self.prefs["fan"]))
+                    self._cmd(cmd.water(first.get("water") if first.get("water") in cmd.WATER else self.prefs["water"]))
+                    self._cmd(cmd.mop(first.get("mop") if first.get("mop") in cmd.MOP else self.prefs["mop"]))
+                    time.sleep(0.3)
+                    self._cmd(cmd.clean_rooms([r["room"] for r in rooms],
+                                              any(r.get("twice") for r in rooms)))
+                    self.log(f"[MQTT] ejecutar plan '{p.get('name', payload)}' ({len(rooms)} hab.)")
                 return
 
             if topic.startswith(f"conga/{node}/pref/") and topic.endswith("/set"):

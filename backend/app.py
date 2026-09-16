@@ -24,7 +24,7 @@ from conga_core import map as cmap
 from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
-from backend.schedules import ScheduleStore, suggested_plans, plan_from_order
+from backend.schedules import ScheduleStore, suggested_plans, plan_from_order, run_controls
 from backend.maps import MapStore
 from backend.history import HistoryStore
 from backend.mqtt_bridge import MqttBridge
@@ -872,7 +872,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.18.2", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.19.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1418,9 +1418,30 @@ async def schedule_delete(payload: dict):
     p = schedules.delete(payload["id"])
     if p:
         robot.command(schedules.delete_command(p))
-        mqtt.forget_schedule(p["id"])   # retira el switch del horario en HA
+        mqtt.forget_schedule(p["id"])   # retira el switch y el botón "Ejecutar" del horario en HA
     await broadcast_schedules()
     return {"ok": True, "schedules": schedules.for_map(_active_map())}
+
+
+@app.post("/api/schedules/run")
+async def schedule_run(payload: dict):
+    """Ejecuta AHORA las habitaciones de un plan guardado, sin esperar a su hora. Útil para
+    lanzar un plan desde Home Assistant (botón "Ejecutar …") o por REST."""
+    p = next((x for x in schedules.plans if x.get("id") == payload.get("id")), None)
+    if not p:
+        return {"ok": False, "error": "plan no encontrado"}
+    controls = run_controls(p)
+    if not controls:
+        return {"ok": False, "error": "el plan no tiene habitaciones"}
+    for i, c in enumerate(controls):
+        robot.command(c)
+        if i < len(controls) - 1:
+            await asyncio.sleep(0.3)          # deja que potencia/agua/mopa lleguen antes de limpiar
+    ids = [r["room"] for r in p.get("rooms", []) if r.get("room") is not None]
+    _clean_trigger["ts"] = time.time()        # limpieza lanzada desde CA -> "manual"
+    _clean_trigger["rooms"] = ids
+    await broadcast()
+    return {"ok": True, "plan": p["id"], "rooms": ids}
 
 
 # ---- horarios REALES guardados en el robot (getOrder6090), incluidos los de la app Cecotec ----
