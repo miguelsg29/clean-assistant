@@ -293,5 +293,5 @@ Clean Assistant is free and 100% local. If it's useful to you, you can support d
 ## License
 
 [MIT](LICENSE). Independent reverse-engineering project for interoperability and personal
-use — **not affiliated with or endorsed by Cecotec or 3irobotix**. "Conga" and "Cecotec"
-are trademarks of their respective owners.
+use — **not affiliated with, endorsed by, or authorized by Cecotec or 3irobotix**. "Conga"
+and "Cecotec" are trademarks of their respective owners. Use at your own risk.

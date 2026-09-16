@@ -295,5 +295,5 @@ comprar más robots para dar soporte a otros modelos): ☕ **[ko-fi.com/miguelsg
 ## Licencia
 
 [MIT](LICENSE). Proyecto independiente de ingeniería inversa para interoperabilidad y uso
-personal — **no afiliado ni respaldado por Cecotec ni 3irobotix**. «Conga» y «Cecotec» son
-marcas de sus respectivos propietarios.
+personal — **no afiliado, respaldado ni autorizado por Cecotec ni 3irobotix**. «Conga» y
+«Cecotec» son marcas de sus respectivos propietarios. Úsalo bajo tu propia responsabilidad.
