@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.18.2
+- **Conga 9090 compatible** (issue #3, gracias @serra410): en el 9090 (`project_type`
+  `CECOTECCRL350-2001`), iniciar una limpieza reporta `workMode=1`, que el add-on tomaba por
+  «inactivo» aunque el robot **sí estaba limpiando** (se movía y el mapa crecía). Ahora `workMode=1`
+  se reconoce como **limpiando** y desaparece el aviso `workMode=1 no reconocido`.
+- Home Assistant muestra el **modelo real** también para el **Conga 9090** (antes salía genérico).
+- La fase de **mapeado** (mapa nuevo) se refleja en HA como **limpiando** en vez de «inactivo»
+  (el robot se mueve y limpia mientras construye el mapa; `mapping` no es un estado válido de la
+  entidad `vacuum` de HA, así que se presenta como `cleaning`).
+
 ## 0.18.1
 - **Posición del robot por MQTT** (issue #2, gracias @miajed): nuevo sensor **«Conga Posición»**
   con `x`, `y` y `angle` (en celdas del mapa) como atributos, publicado en

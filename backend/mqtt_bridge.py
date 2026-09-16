@@ -23,8 +23,11 @@ AVAIL_OFFLINE_GRACE_S = 120.0
 
 from conga_core import commands as cmd
 
-# Estados válidos del esquema 'state' de la entidad vacuum de HA.
-_VACUUM_STATES = {"cleaning", "docked", "paused", "idle", "returning", "error", "mapping"}
+# Estados válidos del esquema 'state' de la entidad vacuum de HA (schema: state). HA SOLO acepta
+# estos seis; 'mapping' NO es válido (HA lo rechaza con "Received unsupported state"), por eso el
+# mapeado interno se publica como 'cleaning' (ver publish_state): el robot se mueve y limpia mientras
+# construye el mapa, así que 'cleaning' es lo correcto de cara a HA.
+_VACUUM_STATES = {"cleaning", "docked", "paused", "idle", "returning", "error"}
 
 # Frecuencia de autovaciado: nombre visible en HA <-> valor del robot (set_preference 16).
 DUST_FREQ = {"Nunca": -1, "Después de cada limpieza": 0, "Cada 30 minutos": 30,
@@ -37,6 +40,7 @@ DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
 CONGA_MODELS = {
     "CECOTECCRL350-1001": ("Conga 8090", "Conga 8090 Ultra"),
     "CCECOTECCRL300-1001": ("Conga 4690", "Conga 4690 Ultra"),   # confirmado por @teosoft0 (issue #1)
+    "CECOTECCRL350-2001": ("Conga 9090", "Conga 9090"),          # confirmado por @serra410 (issue #3)
 }
 
 
@@ -413,7 +417,10 @@ class MqttBridge:
             return
         s = self.robot.state
         self._update_availability(bool(s.online))
-        state = s.state if s.state in _VACUUM_STATES else "idle"
+        # 'mapping' (workMode 45 construyendo mapa) no es un estado válido de la entidad vacuum de HA:
+        # se presenta como 'cleaning' (el robot se mueve y limpia mientras mapea).
+        st = "cleaning" if s.state == "mapping" else s.state
+        state = st if st in _VACUUM_STATES else "idle"
         payload = {"state": state}
         if s.battery is not None:
             payload["battery_level"] = s.battery
