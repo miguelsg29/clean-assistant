@@ -24,7 +24,7 @@ AVAIL_OFFLINE_GRACE_S = 120.0
 from conga_core import commands as cmd
 
 # Estados válidos del esquema 'state' de la entidad vacuum de HA.
-_VACUUM_STATES = {"cleaning", "docked", "paused", "idle", "returning", "error"}
+_VACUUM_STATES = {"cleaning", "docked", "paused", "idle", "returning", "error", "mapping"}
 
 # Frecuencia de autovaciado: nombre visible en HA <-> valor del robot (set_preference 16).
 DUST_FREQ = {"Nunca": -1, "Después de cada limpieza": 0, "Cada 30 minutos": 30,

@@ -69,7 +69,7 @@ class RobotState:
             # modo automático de mapa nuevo: usa el MISMO workMode para mapear y para la
             # primera limpieza. Si ya está sobre una habitación, está limpiando; si no, mapeando.
             st = "cleaning" if data.get("cleaning_roomId", self.cleaning_room) else "mapping"
-        elif mode in (36, 2):
+        elif mode in (36, 2, 1):
             st = "cleaning"
         else:
             st = "idle"
