@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0
+- **Traza del recorrido en el mapa.** Ahora se dibuja por dónde ha ido limpiando (o mapeando) el
+  robot: una línea que traza su recorrido en la limpieza actual. Se reinicia al empezar una limpieza
+  nueva y se conserva al pausar/reanudar. El recorrido va también en `GET /api/map` (campo `trail`,
+  en metros) por si quieres pintarlo en tarjetas o floorplans propios de Home Assistant.
+
 ## 0.20.0
 - **Cuatro idiomas nuevos en la interfaz: Alemán, Italiano, Neerlandés y Catalán.** Con estos, Clean
   Assistant habla ya **9 idiomas** (ES/EN/DE/IT/FR/PT/NL/CA/PL). Se eligen desde el selector de la

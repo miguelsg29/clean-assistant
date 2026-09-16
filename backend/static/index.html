@@ -956,6 +956,7 @@
   var selected=new Set();          // ids numéricos
   var st={};                       // último estado del backend
   var MAP=null, CELLS=null, IDX={}; // mapa actual + rejilla real + id->indice
+  var TRAIL=[];                     // traza del recorrido (puntos [x,y] en metros; se dibuja con worldToCell)
   var ZONES=[], drawKind=null, drawStart=null, drawRect=null, moveZoneId=null;
   var ZK={nogo:{c:'--critical',l:'Prohibida'},nomop:{c:'--water',l:'Sin fregona'},
           clean:{c:'--accent',l:'Limpieza'},clean2:{c:'--accent',l:'Limpieza x2'}};
@@ -1243,7 +1244,7 @@
   // ---- mapa: aplicar (ejemplo -> SVG de ejemplo; real -> canvas) ----
   function applyMap(m){
     if(m.no_map){ m=Object.assign({},m,{rooms:[]}); }   // sin mapa: no mostrar habitaciones de ejemplo
-    MAP=m; ROOMS=m.rooms||[];
+    MAP=m; ROOMS=m.rooms||[]; TRAIL=m.trail||[];
     IDX={}; NAMED=new Set();
     ROOMS.forEach(function(r,i){ IDX[r.id]=i; if(r.named!==false)NAMED.add(r.id); });
     buildChips();
@@ -1395,6 +1396,15 @@
     var ctx=o.getContext('2d'); ctx.clearRect(0,0,o.width,o.height);
     if(!MAP||MAP.sample)return;
     var acc=cssVar('--accent'), surf=cssVar('--surface');
+    // traza del recorrido: línea semitransparente por donde ha limpiado/mapeado el robot
+    if(TRAIL&&TRAIL.length>1&&MAP.world&&MAP.bbox){
+      ctx.save(); ctx.strokeStyle=acc; ctx.globalAlpha=0.45;
+      ctx.lineWidth=Math.max(1.2,SCALE*0.8); ctx.lineCap='round'; ctx.lineJoin='round';
+      ctx.beginPath();
+      for(var ti=0;ti<TRAIL.length;ti++){ var tc=worldToCell(TRAIL[ti][0],TRAIL[ti][1]), tv=s2v(tc[0],tc[1]);
+        if(ti)ctx.lineTo(tv[0]*SCALE,tv[1]*SCALE); else ctx.moveTo(tv[0]*SCALE,tv[1]*SCALE); }
+      ctx.stroke(); ctx.globalAlpha=1; ctx.restore();
+    }
     // base de carga (campo 7): icono de casa/base
     if(MAP.charger){ var vc=s2v(MAP.charger.x,MAP.charger.y),bx=vc[0]*SCALE,by=vc[1]*SCALE,r=Math.max(5,SCALE*2.6);
       ctx.save();
@@ -2238,7 +2248,7 @@
         if(!wov.hidden){ if(robotBusyMapping())wov.hidden=true; else updateWizConn(); }
         updateNetConn();}
       else if(m.type==='map'){applyMap(m.map);}
-      else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; setRobotTarget(m.pose,false); } }
+      else if(m.type==='pose'){ if(MAP&&!MAP.sample){ MAP.robot=m.pose; if(m.trail)TRAIL=m.trail; setRobotTarget(m.pose,false); } }
       else if(m.type==='view'){ VIEW=m.view||{rot:0,flip:0}; applyViewBtns(); if(MAP&&!MAP.sample)renderRealMap(); }
       else if(m.type==='zones'){ZONES=m.zones||[];renderZones();if(MAP&&!MAP.sample)renderRealMap();}
       else if(m.type==='schedules'){SCHEDULES=m.schedules||[];renderSchedules();}

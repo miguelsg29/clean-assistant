@@ -370,6 +370,12 @@ def decode_map(frame: bytes) -> dict:
     # campo 8 = robot vivo; campo 7 = base de carga. Si no llega el 8, caemos al 7.
     charger = _to_cell(info.get("pose"))
     robot = _to_cell(info.get("robot")) or charger
+    # posición del robot en MUNDO (metros), para acumular la traza del recorrido sin que se
+    # desalinee cuando la caja recortada (bbox) cambia entre frames; el frontend la reconvierte
+    # a celda con worldToCell (igual que las zonas).
+    _rw = info.get("robot") or {}
+    robot_world = ({"x": _rw.get("x"), "y": _rw.get("y")}
+                   if _rw.get("x") is not None else None)
 
     # zonas guardadas EN EL ROBOT (campo 9): puntos de metros -> celda recortada.
     _ZKIND = {200: "nogo", 301: "nomop", 201: "clean"}
@@ -383,6 +389,7 @@ def decode_map(frame: bytes) -> dict:
                                  "points": cells,                     # celdas (para dibujar)
                                  "points_m": [list(p) for p in z.get("points", [])]})  # metros (para reeditar)
     return {
+        "robot_world": robot_world,
         "name": info["map_name"] or "Interior",
         "grid_size": [GRID_W, GRID_H],
         "bbox": [minx, miny, w, h],

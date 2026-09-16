@@ -36,6 +36,9 @@ class RealRobot:
         self.map_empty = False         # el robot no tiene mapa (se han borrado todos)
         self.reconnected = False       # acaba de (re)conectar -> re-enviar zonas al cargar mapa
         self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
+        self.trail = []                # traza del recorrido de la limpieza actual: [x,y] en METROS
+        self._trail_last = None        # último punto de la traza (para el umbral de movimiento)
+        self._trail_map = None         # map_head_id de la traza (reinicia al cambiar de mapa)
         self._last_fault_log = 0        # último faultCode ya registrado en el log (para no repetir)
         self.orders = []               # horarios REALES guardados en el robot (getOrder6090)
         self.on_update = None          # callback opcional (estado -> push)
@@ -258,6 +261,8 @@ class RealRobot:
             return
         self.map = None
         self.pose = None
+        self.trail = []
+        self._trail_last = None
         self.map_empty = True
         self._got_map = True
         self._last_cells = None
@@ -274,6 +279,7 @@ class RealRobot:
                 self.map = m
                 self.map_empty = False
                 self.pose = m.get("robot")
+                self._accumulate_trail(m)
                 zsig = json.dumps(m.get("stored_zones", []), sort_keys=True)
                 if m.get("cells_b64") != self._last_cells or zsig != self._last_zones:
                     self._last_cells = m["cells_b64"]
@@ -428,6 +434,27 @@ class RealRobot:
             except Exception:
                 pass
 
+    def _accumulate_trail(self, m):
+        """Añade la posición del robot (en metros) a la traza del recorrido, solo mientras limpia
+        o mapea. Reinicia al cambiar de mapa. Umbral de ~8 cm para no acumular en parado, y tope de
+        1000 puntos (submuestrea) para acotar memoria/tráfico."""
+        mh = self.state.map_head_id
+        if mh != self._trail_map:
+            self._trail_map = mh
+            self.trail = []
+            self._trail_last = None
+        rw = (m or {}).get("robot_world")
+        if not rw or rw.get("x") is None or self.state.state not in ("cleaning", "mapping"):
+            return
+        pt = [round(rw["x"], 2), round(rw["y"], 2)]
+        last = self._trail_last
+        if last is not None and abs(pt[0] - last[0]) + abs(pt[1] - last[1]) < 0.08:
+            return
+        self.trail.append(pt)
+        self._trail_last = pt
+        if len(self.trail) > 1000:
+            self.trail = self.trail[::2]        # submuestrea: 1 de cada 2 (conserva el último)
+
     def _notify_orders(self):
         if self.on_orders:
             try:
@@ -490,6 +517,7 @@ class RealRobot:
                 self.map_empty = False
                 self._got_map = True
                 self.pose = m.get("robot")
+                self._accumulate_trail(m)
                 cells = m.get("cells_b64")
                 zsig = json.dumps(m.get("stored_zones", []), sort_keys=True)
                 if cells != self._last_cells or zsig != self._last_zones:
@@ -549,6 +577,11 @@ class RealRobot:
                     self.log(f"  [robot] estado -> {self.state.state} "
                              f"(workMode={wm} charge={data.get('chargeStatus')} "
                              f"bat {self.state.battery})")
+                    # traza: al iniciar una limpieza nueva (desde base/inactivo) empieza de cero;
+                    # reanudar (pausa->limpiando) o volver (a base->limpiando) conserva el recorrido.
+                    if self.state.state in ("cleaning", "mapping") and prev in ("docked", "idle"):
+                        self.trail = []
+                        self._trail_last = None
                     # workMode activo no reconocido (sale 'inactivo'): candidato a mapeando/etc.
                     if self.state.state == "idle" and wm not in (0, 1, None):
                         self.log(f"  [robot] AVISO: workMode={wm} no reconocido -> 'inactivo'. "
