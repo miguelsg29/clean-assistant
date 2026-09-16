@@ -21,7 +21,7 @@ from . import ws
 from . import commands as cmd
 from . import map as cmap
 from .config import WS_MAGIC, RobotConfig
-from .state import RobotState
+from .state import RobotState, WARN_MESSAGES
 
 
 def _now_ms() -> str:
@@ -36,6 +36,7 @@ class RealRobot:
         self.map_empty = False         # el robot no tiene mapa (se han borrado todos)
         self.reconnected = False       # acaba de (re)conectar -> re-enviar zonas al cargar mapa
         self.pose = None               # última pose del robot {x, y, angle} (celda recortada)
+        self._last_fault_log = 0        # último faultCode ya registrado en el log (para no repetir)
         self.orders = []               # horarios REALES guardados en el robot (getOrder6090)
         self.on_update = None          # callback opcional (estado -> push)
         self.on_map = None             # callback opcional (mapa -> push)
@@ -552,6 +553,21 @@ class RealRobot:
                     if self.state.state == "idle" and wm not in (0, 1, None):
                         self.log(f"  [robot] AVISO: workMode={wm} no reconocido -> 'inactivo'. "
                                  f"Si estás mapeando o limpiando, apúntalo para mapearlo.")
+                # faultCode nuevo: se registra en el log para ir construyendo el diccionario de
+                # errores. 0 = sin fallo; 21xx = avisos de estación normales al cargar (se omiten).
+                try:
+                    code = int(data.get("faultCode") or 0)
+                except (TypeError, ValueError):
+                    code = 0
+                if code != self._last_fault_log:
+                    self._last_fault_log = code
+                    if code and not (2100 <= code <= 2199):
+                        known = WARN_MESSAGES.get(code)
+                        if known:
+                            self.log(f"  [robot] faultCode={code} ({known})")
+                        else:
+                            self.log(f"  [robot] AVISO: faultCode={code} SIN traducir. Si sabes qué "
+                                     f"error muestra la app de Cecotec, repórtalo para el diccionario.")
                 self._query_startup()
                 self._notify()
             except Exception:

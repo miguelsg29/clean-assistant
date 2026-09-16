@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.19.1
+- **Diagnóstico de códigos de error.** El registro del add-on ahora anota cada `faultCode` nuevo del
+  robot: los conocidos con su mensaje (525 = depósito de agua bajo, 512 = error al volver a la base)
+  y los **sin traducir** con un aviso para reportarlos. Así se puede ir construyendo el diccionario
+  de errores del Conga con ayuda de la comunidad (se omiten los avisos normales de estación 21xx).
+
 ## 0.19.0
 - **Ejecutar un plan guardado bajo demanda** (issue #2, sugerido por @miajed): cada horario
   aparece en Home Assistant también como **botón «Ejecutar …»** que lanza **ya** las habitaciones
