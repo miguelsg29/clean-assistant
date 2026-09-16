@@ -479,14 +479,20 @@ class RealRobot:
         if self.state.quiet is None and self._diag["quiet"] < 6:
             self._diag["quiet"] += 1
             self.command(cmd.query("get_quiet", uid))
-        if self._diag["info"] < 4 and (self.state.consumables is None
-                                       or self.state.auto_upgrade is None
+        if self._diag["info"] < 4 and (self.state.auto_upgrade is None
                                        or self.state.collect_freq is None):
             self._diag["info"] += 1
-            self.command(cmd.query("get_consumables", uid))
             self.command(cmd.query("get_upgrade_config", uid))
             self.command(cmd.query("get_voice", uid))
             self.command(cmd.get_pref(16))          # frecuencia de autovaciado
+        # consumibles: en algunas unidades solo aparecen tras varias peticiones (o tras abrir la
+        # app de Cecotec). Se reintenta de forma persistente y espaciada (cada ~20 s, hasta ~30
+        # veces) hasta que el robot los envíe, para que salgan sin abrir la app (issue #1, @teosoft0).
+        if self.state.consumables is None and self._diag.get("cons", 0) < 30 \
+                and (time.time() - self._diag.get("cons_ts", 0)) > 20:
+            self._diag["cons"] = self._diag.get("cons", 0) + 1
+            self._diag["cons_ts"] = time.time()
+            self.command(cmd.query("get_consumables", uid))
         # el robot solo responde a getOrder6090 en reposo -> consultarlo al estar en base
         if (not self.orders and self._diag.get("orders", 0) < 4
                 and self.state.state in ("docked", "idle")):

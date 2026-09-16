@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.1
+- **Consumibles sin abrir la app de Cecotec** (issue #1, @teosoft0): en algunas unidades las horas
+  de uso de cepillos/filtro/mopa solo aparecían tras abrir la app oficial. Ahora Clean Assistant
+  **reintenta pedirlas de forma persistente** (cada ~20 s, hasta que el robot las envíe), así que
+  deberían salir solas al conectar.
+
 ## 0.21.0
 - **Traza del recorrido en el mapa.** Ahora se dibuja por dónde ha ido limpiando (o mapeando) el
   robot: una línea que traza su recorrido en la limpieza actual. Se reinicia al empezar una limpieza
