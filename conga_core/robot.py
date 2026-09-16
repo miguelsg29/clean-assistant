@@ -549,7 +549,7 @@ class RealRobot:
                              f"(workMode={wm} charge={data.get('chargeStatus')} "
                              f"bat {self.state.battery})")
                     # workMode activo no reconocido (sale 'inactivo'): candidato a mapeando/etc.
-                    if self.state.state == "idle" and wm not in (0, None):
+                    if self.state.state == "idle" and wm not in (0, 1, None):
                         self.log(f"  [robot] AVISO: workMode={wm} no reconocido -> 'inactivo'. "
                                  f"Si estás mapeando o limpiando, apúntalo para mapearlo.")
                 self._query_startup()
