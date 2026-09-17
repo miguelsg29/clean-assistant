@@ -1,7 +1,7 @@
 # Clean Assistant — Roadmap
 
 Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de referencia:
-**v0.20.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
+**v0.22.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
 
 ---
 
@@ -24,6 +24,12 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 - **Home Assistant (MQTT)**: entidad `vacuum` + sensores + controles + horarios; **modelo
   real** del robot (**8090 / 4690 / 9090** Ultra); **posición del robot** (x/y/ángulo) para
   floorplans externos *(v0.18.1)*; sensor **«Habitación actual»** *(v0.19.0)*.
+- **Traza del recorrido** en el mapa: dibuja por dónde ha limpiado el robot; va también en
+  `GET /api/map` (`trail`). *(v0.21.0)*
+- **Mapa por MQTT** (sensor «Conga Mapa»): geometría + traza como atributos, para tarjetas de HA
+  sin pasar por el ingress (con throttle para no cargar el recorder). *(v0.22.0)*
+- **Consumibles**: se piden de forma persistente para que salgan sin abrir la app de Cecotec.
+  *(v0.21.1)*
 - **BD de HA mucho más ligera**: debounce de disponibilidad (evita cientos de miles de filas
   en el recorder). *(v0.18.0)*
 - **Diagnóstico de errores**: cada `faultCode` nuevo se registra en el log (base del futuro
@@ -46,10 +52,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 ## 🧭 Pendiente / próximas mejoras
 
 ### Rápidas (poco esfuerzo, buen valor)
-- **Endpoint de mapa sin autenticación** para tarjetas de HA (hoy `/api/map` va tras el
-  ingress). Pedido por @miajed (issue #2) para su floorplan.
-- **Consumibles sin abrir la app oficial**: forzar `get_consumables` de forma más agresiva
-  para que aparezcan al conectar (issue #1, @teosoft0).
 - **Más modelos Conga** en el mapa de `project_type` (según los confirmen usuarios).
 - **Revisión de traducciones** DE/IT/NL/CA por hablantes nativos (issues/PR de la comunidad).
 
@@ -65,11 +67,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
   el dispositivo a mano en HA. Pendiente (opcional): un campo para escribirlo en CA.
 
 ### Grandes (más trabajo, muy visibles)
-- **Traza del recorrido en el mapa**: dibujar por dónde ha limpiado el robot. Es el mayor
-  salto visual frente a Valetudo. *Nota:* el mapa decodificado NO trae capa «limpiado»
-  (solo desconocido/pared/habitación); dos vías: **(a)** acumular la `pose` que ya
-  publicamos (viable ya, sin capturas), **(b)** capturar tráfico para ver si el robot envía
-  una capa de cobertura nativa.
 - **Estadísticas**: totales por semana/mes, m² y desgaste de consumibles en el tiempo;
   miniatura del mapa por limpieza.
 
@@ -90,6 +87,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 
 | Prioridad | Ítems |
 |---|---|
-| **Alta** | Diccionario de errores + notificaciones · Traza del recorrido (vía pose) · Consumibles |
-| **Media** | Endpoint de mapa sin auth · Control manual · Lanzar zona · Estadísticas · Nombre manual |
+| **Alta** | Diccionario de errores + notificaciones · Estadísticas |
+| **Media** | Control manual · Lanzar zona dibujada · Nombre de dispositivo manual |
 | **Baja** | Diagnóstico · DNS integrado · pruebas · revisión de traducciones · nice-to-have |

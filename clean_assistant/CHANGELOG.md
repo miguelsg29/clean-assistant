@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.22.0
+- **Mapa por MQTT para tarjetas de Home Assistant** (issue #2, @miajed): nuevo sensor **«Conga
+  Mapa»** que publica la **geometría del mapa** (habitaciones, `bbox`, `world`, robot, base) y la
+  **traza del recorrido** como atributos (topic `conga/<node>/map`), para pintar el mapa en
+  tarjetas/floorplans propios **sin pasar por el ingress**. NO incluye la rejilla de píxeles (esa
+  sigue en `GET /api/map`). Se publica **con margen (throttle de 10 s)** y la traza va
+  submuestreada, para no cargar el broker ni el recorder de HA mientras el robot limpia.
+
 ## 0.21.1
 - **Consumibles sin abrir la app de Cecotec** (issue #1, @teosoft0): en algunas unidades las horas
   de uso de cepillos/filtro/mopa solo aparecían tras abrir la app oficial. Ahora Clean Assistant

@@ -88,6 +88,7 @@ class MqttBridge:
         self._legacy_cleaned = False   # limpieza única de "Congas fantasma" de identidades antiguas
         self._avail_state = None        # disponibilidad publicada ("online"/"offline")
         self._avail_timer = None        # temporizador de gracia antes de anunciar offline
+        self._map_pub_ts = 0.0          # último publish del mapa por MQTT (para acotar frecuencia)
         self.disc = "homeassistant"
         self.client = None
         # preferencias "para la próxima limpieza" (sombra local: el robot no las reporta)
@@ -217,6 +218,16 @@ class MqttBridge:
             "name": "Conga Habitación actual", "unique_id": f"{uid}_room_now",
             "state_topic": f"conga/{node}/room_now", "icon": "mdi:home-map-marker"})
         self._pub(f"conga/{node}/room_now", self._current_room_name())
+        # mapa (geometría + traza) para tarjetas/floorplans de HA. Estado = nº de habitaciones
+        # (estable); habitaciones/bbox/world/robot/base/traza van como atributos. Se publica con
+        # margen (throttle) para no llenar el recorder mientras el robot limpia. SIN la rejilla de
+        # píxeles (esa sigue en GET /api/map).
+        self._disc("sensor", f"{uid}_map", {
+            "name": "Conga Mapa", "unique_id": f"{uid}_map",
+            "state_topic": f"conga/{node}/map",
+            "value_template": "{{ (value_json.rooms | default([])) | length }}",
+            "json_attributes_topic": f"conga/{node}/map", "icon": "mdi:floor-plan"})
+        self.publish_map(force=True)
         # aviso de falta de agua (faultCode 525) como binary_sensor
         self._disc("binary_sensor", f"{uid}_low_water", {
             "name": "Conga Falta agua", "unique_id": f"{uid}_low_water",
@@ -331,7 +342,7 @@ class MqttBridge:
         actual) publicando payload vacío en cada topic de config -> HA lo elimina."""
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
                 ("sensor", f"{uid}_time"), ("sensor", f"{uid}_pose"),
-                ("sensor", f"{uid}_room_now"),
+                ("sensor", f"{uid}_room_now"), ("sensor", f"{uid}_map"),
                 ("number", f"{uid}_volume"), ("button", f"{uid}_dust"),
                 ("select", f"{uid}_dust_freq"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
@@ -402,6 +413,34 @@ class MqttBridge:
             return
         self._pub(f"conga/{self.node}/pose",
                   json.dumps({"x": p.get("x"), "y": p.get("y"), "angle": p.get("angle")}))
+
+    def publish_map(self, force=False):
+        """Publica la geometría del mapa + la traza en conga/<node>/map (retenido), para tarjetas
+        y floorplans de HA. SIN la rejilla de píxeles (esa va en /api/map). Con margen: si no es
+        forzado (cambio de mapa), no republica antes de 10 s, para no llenar el recorder mientras
+        limpia. La traza se submuestrea a <=500 puntos para no pasarse del límite de atributos de HA."""
+        if not self.client:
+            return
+        m = getattr(self.robot, "map", None)
+        if not m or m.get("sample"):
+            return
+        now = time.time()
+        if not force and (now - self._map_pub_ts) < 10:
+            return
+        self._map_pub_ts = now
+        trail = list(getattr(self.robot, "trail", None) or [])
+        if len(trail) > 500:
+            trail = trail[::(len(trail) + 499) // 500]   # submuestrea a <=500 puntos
+        payload = {
+            "name": m.get("name"),
+            "bbox": m.get("bbox"), "world": m.get("world"),
+            "charger": m.get("charger"), "robot": m.get("robot"),
+            "rooms": [{"id": r.get("id"), "name": r.get("name"),
+                       "center": r.get("center"), "bbox": r.get("bbox")}
+                      for r in (m.get("rooms") or []) if r.get("named", True)],
+            "trail": trail,
+        }
+        self._pub(f"conga/{self.node}/map", json.dumps(payload))
 
     def _update_availability(self, online):
         """Disponibilidad con debounce: 'online' inmediato; 'offline' SOLO si el robot lleva

@@ -518,6 +518,7 @@ async def broadcast_map():
     # emite si hay mapa real o si el robot se ha quedado sin mapa (no en el arranque sin datos)
     if not robot.map and not getattr(robot, "map_empty", False):
         return
+    mqtt.publish_map(force=True)               # geometría del mapa por MQTT (cambió el mapa)
     msg = json.dumps({"type": "map", "map": _view_map()})
     for ws in list(clients):
         try:
@@ -531,6 +532,7 @@ async def broadcast_pose():
     if not pose:
         return
     mqtt.publish_pose()                       # expone x/y/ángulo por MQTT (floorplans externos)
+    mqtt.publish_map()                         # geometría + traza por MQTT (con throttle de 10 s)
     msg = json.dumps({"type": "pose", "pose": pose,
                       "trail": list(getattr(robot, "trail", None) or [])})
     for ws in list(clients):
@@ -875,7 +877,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.21.1", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.22.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
