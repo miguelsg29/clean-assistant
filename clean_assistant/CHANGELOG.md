@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.1
+- **Mejor contraste en modo oscuro** (issue #1, @teosoft0): los elementos **seleccionados**
+  (habitaciones, chips, filas de zona…) se ven ahora con más claridad en el tema oscuro.
+
 ## 0.23.0
 - **Diccionario de errores del Conga** (issue #6, gracias @teosoft0; + faultCode 510 de @serra410 en
   el PR #5): **29 códigos** de error/aviso con mensaje entendible, traducidos a los **9 idiomas**
