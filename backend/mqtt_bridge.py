@@ -39,7 +39,7 @@ DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
 # auto-provisión, o el configurado). (nombre corto, modelo). Amplía el mapa según se confirmen.
 CONGA_MODELS = {
     "CECOTECCRL350-1001": ("Conga 8090", "Conga 8090 Ultra"),
-    "CCECOTECCRL300-1001": ("Conga 4690", "Conga 4690 Ultra"),   # confirmado por @teosoft0 (issue #1)
+    "CECOTECCRL300-1001": ("Conga 4690", "Conga 4690 Ultra"),    # confirmado por @teosoft0 (issue #1)
     "CECOTECCRL350-2001": ("Conga 9090", "Conga 9090"),          # confirmado por @serra410 (issue #3)
 }
 
@@ -194,7 +194,9 @@ class MqttBridge:
 
         # sensores
         for name, sid, topic, tmpl, unit, dclass in (
-            ("Conga Batería", "bat", self.t_state, "{{ value_json.battery_level }}", "%", "battery"),
+            ("Conga Batería", "bat", self.t_state,
+             "{% if value_json.battery_level is defined %}{{ value_json.battery_level }}{% endif %}",
+             "%", "battery"),
             ("Conga Área limpiada", "area", f"conga/{node}/area", "{{ value }}", "m²", None),
             ("Conga Tiempo limpieza", "time", f"conga/{node}/time", "{{ value }}", "min", "duration"),
         ):

@@ -565,6 +565,10 @@ class RealRobot:
                         "clientType": "ROBOT", "id": str(c.did), "resetCode": 0}}
             ws.send(tls, json.dumps(resp))
             self.state.online = True
+            # arranca las consultas (mapa, estado, consumibles, horarios…) YA tras el login: algunos
+            # modelos (p. ej. 4690) NO envían report_data solos al conectar, así que sin esto no
+            # habría estado/mapa/consumibles hasta forzar un cambio de mapa (issue #1, @teosoft0).
+            self._query_startup()
             self._notify()
             return
 
