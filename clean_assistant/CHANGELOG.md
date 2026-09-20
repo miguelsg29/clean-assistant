@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.3
+- **Modo oscuro**: la **pestaña activa** (Limpieza / Zonas / Horarios / Actividad / Ajustes) ya se
+  distingue con claridad; antes se confundía con el fondo, igual que pasaba con el segmentado.
+
 ## 0.23.2
 - **Modo oscuro**: el botón activo de los **controles segmentados** (p. ej. Local / Cloud + Local
   en Ajustes, o el modo/potencia/agua) ya se distingue con claridad; antes se confundía con el
