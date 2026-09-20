@@ -877,12 +877,24 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.22.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.23.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
 def get_state():
     return robot.state.to_dict()
+
+
+@app.get("/api/info")
+def get_info():
+    """Datos para la cabecera/pie de la app: versión real y modelo real del robot (según su
+    project_type) — así no quedan hardcodeados en index.html (issue #1, @teosoft0)."""
+    try:
+        _, model = mqtt._model_names()
+    except Exception:
+        model = "Conga"
+    return {"version": app.version, "model": model,
+            "mode": getattr(robot, "link", "local")}
 
 
 def _supervisor_get(path: str):

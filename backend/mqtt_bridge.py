@@ -236,6 +236,12 @@ class MqttBridge:
             "state_topic": self.t_state, "value_template": "{{ value_json.low_water }}",
             "payload_on": "ON", "payload_off": "OFF",
             "device_class": "problem", "icon": "mdi:water-alert"})
+        # aviso/error actual del robot (texto entendible del diccionario de faultCode), vacío si
+        # no hay ninguno. Para automatizar notificaciones en HA (issue #6).
+        self._disc("sensor", f"{uid}_warning", {
+            "name": "Conga Aviso", "unique_id": f"{uid}_warning",
+            "state_topic": f"conga/{node}/warning", "icon": "mdi:alert"})
+        self._pub(f"conga/{node}/warning", getattr(self.robot.state, "warning", None) or "")
         for key, name, icon in (("main_brush", "Cepillo central", "mdi:broom"),
                                 ("side_brush", "Cepillo lateral", "mdi:broom"),
                                 ("filter", "Filtro", "mdi:air-filter"),
@@ -345,6 +351,7 @@ class MqttBridge:
         objs = [("sensor", f"{uid}_bat"), ("sensor", f"{uid}_area"),
                 ("sensor", f"{uid}_time"), ("sensor", f"{uid}_pose"),
                 ("sensor", f"{uid}_room_now"), ("sensor", f"{uid}_map"),
+                ("sensor", f"{uid}_warning"),
                 ("number", f"{uid}_volume"), ("button", f"{uid}_dust"),
                 ("select", f"{uid}_dust_freq"), ("binary_sensor", f"{uid}_low_water")]
         for key in ("main_brush", "side_brush", "filter", "dishcloth"):
@@ -497,6 +504,7 @@ class MqttBridge:
             low_water = False
         payload["low_water"] = "ON" if low_water else "OFF"
         self._pub(self.t_state, json.dumps(payload))
+        self._pub(f"conga/{self.node}/warning", s.warning or "")   # aviso/error actual (o vacío)
         if s.area is not None:
             self._pub(f"conga/{self.node}/area", s.area)
         if s.clean_time is not None:

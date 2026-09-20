@@ -13,10 +13,39 @@ def _is_error_fault(fault) -> bool:
     return f != 0 and not (2100 <= f <= 2199) and not (500 <= f <= 599)
 
 
-# avisos (no errores) con mensaje entendible. De momento solo el de agua; se irán añadiendo
-# a medida que capturemos más códigos de la app.
-WARN_MESSAGES = {525: "Depósito de agua bajo", 512: "Error al volver a la base",
-                 510: "Parachoques atascado o bloqueado"}
+# faultCode -> mensaje entendible (en español; el frontend los traduce por su texto). Lista
+# capturada de la app de Cecotec del Conga 4690 (issue #6, gracias @teosoft0) + 510 de @serra410.
+WARN_MESSAGES = {
+    500: "Láser bloqueado: retira lo que lo obstruya",
+    501: "Rueda en el aire: coloca el robot en el suelo",
+    502: "Batería baja: carga el robot",
+    503: "Coloca el depósito de suciedad y el filtro HEPA",
+    504: "Campo magnético fuerte: cambia el robot de sitio",
+    505: "Quita obstáculos junto a la base e inténtalo de nuevo",
+    506: "Limpia los sensores anticolisión e inténtalo de nuevo",
+    507: "Reubicación fallida: elige un recorrido más corto",
+    508: "Coloca el robot en el suelo e inícialo",
+    509: "Limpia los sensores anticaída y reubica el robot",
+    510: "Parachoques atascado o bloqueado",
+    511: "No pudo llegar a la base: quita obstáculos alrededor",
+    512: "Error al volver a la base",
+    514: "Atascado: colócalo en la base de carga",
+    515: "Base bloqueada: retira los obstáculos de alrededor",
+    516: "Temperatura fuera de rango: espera a que se normalice",
+    517: "Actualizando el sistema: inténtalo más tarde",
+    518: "Batería baja: espera a que termine de cargar",
+    519: "Cepillo central bloqueado: retíralo y límpialo",
+    520: "Cepillo lateral bloqueado: quita los obstáculos",
+    521: "Coloca bien el depósito de agua",
+    522: "Falta la mopa: colócala",
+    523: "Revisa el filtro: límpialo y sécalo",
+    525: "Depósito de agua bajo",
+    526: "La mopa puede necesitar limpieza",
+    527: "Depósito de polvo lleno",
+    530: "Temperatura de la batería anormal",
+    531: "Temperatura de la batería normalizada",
+    2003: "Batería demasiado baja para la programación",
+}
 
 
 def _warn_message(fault):

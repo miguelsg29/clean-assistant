@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.23.0
+- **Diccionario de errores del Conga** (issue #6, gracias @teosoft0; + faultCode 510 de @serra410 en
+  el PR #5): **29 códigos** de error/aviso con mensaje entendible, traducidos a los **9 idiomas**
+  («Cepillo central bloqueado», «Coloca bien el depósito de agua», «Depósito de polvo lleno»…).
+  Nuevo sensor **«Conga Aviso»** en Home Assistant con el aviso/error actual (vacío si no hay
+  ninguno), para automatizar notificaciones.
+- **Conga 4690 reconocido de verdad** (issue #1, @teosoft0): había un **typo** en el `project_type`
+  (`CCECOTECCRL300-1001` con doble C en vez de `CECOTECCRL300-1001`), por el que el 4690 salía como
+  «Conga» genérico. Corregido.
+- **Estado nada más conectar** (issue #1, @teosoft0): algunos modelos (p. ej. 4690) **no envían
+  datos solos al conectar**, así que no aparecían estado, consumibles ni mapa activo hasta forzar un
+  cambio de mapa. Ahora Clean Assistant **pide el estado y el mapa justo tras el login**.
+- **Modelo y versión reales en la interfaz** (issue #1, @teosoft0): la cabecera muestra el **modelo
+  real** del robot y el pie la **versión instalada** (antes estaban fijos a «Conga 8090 Ultra» y
+  «v0.17»). La cabecera indica también si el control es **local** o **cloud + local**.
+- Home Assistant ya no llena el log con avisos de plantilla `battery_level` mientras aún no hay
+  batería.
+
 ## 0.22.0
 - **Mapa por MQTT para tarjetas de Home Assistant** (issue #2, @miajed): nuevo sensor **«Conga
   Mapa»** que publica la **geometría del mapa** (habitaciones, `bbox`, `world`, robot, base) y la

@@ -1,7 +1,7 @@
 # Clean Assistant — Roadmap
 
 Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de referencia:
-**v0.22.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
+**v0.23.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
 
 ---
 
@@ -30,6 +30,8 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
   sin pasar por el ingress (con throttle para no cargar el recorder). *(v0.22.0)*
 - **Consumibles**: se piden de forma persistente para que salgan sin abrir la app de Cecotec.
   *(v0.21.1)*
+- **Diccionario de errores + notificaciones**: 29 códigos de `faultCode` con mensaje entendible en
+  9 idiomas + sensor «Conga Aviso» en HA para automatizar notificaciones. *(v0.23.0)*
 - **BD de HA mucho más ligera**: debounce de disponibilidad (evita cientos de miles de filas
   en el recorder). *(v0.18.0)*
 - **Diagnóstico de errores**: cada `faultCode` nuevo se registra en el log (base del futuro
@@ -37,15 +39,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 - **Multiidioma**: **9 idiomas** (ES/EN/DE/IT/FR/PT/NL/CA/PL) *(v0.20.0)* e **imagen
   precompilada** en GHCR (updates rápidos).
 - Asistente de primer arranque (DNS + crear mapa).
-
----
-
-## 🚧 En progreso
-
-- **Diccionario de errores + notificaciones**: el log ya registra los `faultCode` (v0.19.1).
-  Falta: mapear cada código a un mensaje entendible («atascado», «cepillo enredado»,
-  «depósito lleno»…) y **avisar en HA/UI** ante error/atasco/consumible bajo o fin de
-  limpieza. Solo conocemos 2 códigos (525, 512): se están **recopilando de la comunidad**.
 
 ---
 
@@ -87,6 +80,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 
 | Prioridad | Ítems |
 |---|---|
-| **Alta** | Diccionario de errores + notificaciones · Estadísticas |
+| **Alta** | Estadísticas · Control manual |
 | **Media** | Control manual · Lanzar zona dibujada · Nombre de dispositivo manual |
 | **Baja** | Diagnóstico · DNS integrado · pruebas · revisión de traducciones · nice-to-have |
