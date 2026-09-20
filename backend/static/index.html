@@ -183,6 +183,10 @@
   .seg{display:flex;background:var(--inset);border-radius:11px;padding:4px;gap:3px}
   .seg button{flex:1;border:none;background:transparent;cursor:pointer;font:540 12.5px var(--font);color:var(--muted);padding:7px 6px;border-radius:8px;white-space:nowrap}
   .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
+  /* modo oscuro: el botón activo del segmentado con tinte teal para que destaque del contenedor
+     (en oscuro surface≈inset y la sombra no se ve). Solo dark; el claro se deja como está. */
+  @media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-ink)}}
+  :root[data-theme="dark"] .seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-ink)}
   /* desplegable propio de tipo de habitación (mismo look que la app) */
   .rtsel{position:relative}
   /* icono de tipo: ancho fijo + centrado para que alinee bien (los emojis descuadran) */

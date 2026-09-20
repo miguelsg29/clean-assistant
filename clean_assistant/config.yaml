@@ -1,5 +1,5 @@
 name: "Clean Assistant"
-version: "0.23.1"
+version: "0.23.2"
 slug: "clean_assistant"
 description: "Interfaz local (sin nube) para Cecotec Conga 8090 / 4690 / 9090 Ultra: mapa en vivo, habitaciones, zonas, horarios y MQTT."
 url: "https://github.com/miguelsg29/clean-assistant"

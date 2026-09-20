@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.23.2
+- **Modo oscuro**: el botón activo de los **controles segmentados** (p. ej. Local / Cloud + Local
+  en Ajustes, o el modo/potencia/agua) ya se distingue con claridad; antes se confundía con el
+  fondo. Completa el ajuste de contraste del issue #1 (gracias @teosoft0).
+
 ## 0.23.1
 - **Mejor contraste en modo oscuro** (issue #1, @teosoft0): los elementos **seleccionados**
   (habitaciones, chips, filas de zona…) se ven ahora con más claridad en el tema oscuro.
