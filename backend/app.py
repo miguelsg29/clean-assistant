@@ -295,12 +295,69 @@ def _active_map():
     return getattr(robot.state, "map_head_id", None)
 
 
+ROOM_NAMES_PATH = _data("room_names.json")
+# caché de nombres de habitación POR MAPA: {map_id(str): {room_id(str): nombre}}. Se acumula de cada
+# mapa decodificado y se persiste, para resolver los nombres del historial contra el mapa de ESA
+# limpieza (no el activo) y no perderlos si el robot reconecta y el mapa no está cargado un instante
+# (issue #2, @miajed). Los IDs de habitación se repiten entre mapas, por eso la caché es por mapa.
+_room_cache: dict = {}
+
+
+def _load_room_names():
+    global _room_cache
+    try:
+        with open(ROOM_NAMES_PATH, encoding="utf-8") as f:
+            d = json.load(f)
+            if isinstance(d, dict):
+                _room_cache = d
+    except Exception:
+        pass
+
+
+def _save_room_names():
+    try:
+        with open(ROOM_NAMES_PATH, "w", encoding="utf-8") as f:
+            json.dump(_room_cache, f, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+def _remember_rooms():
+    """Guarda/actualiza en la caché los nombres de las habitaciones del mapa cargado ahora."""
+    m = getattr(robot, "map", None)
+    mid = getattr(robot.state, "map_head_id", None)
+    if not m or not m.get("rooms") or not mid:
+        return
+    names = {str(r["id"]): r["name"] for r in m["rooms"]
+             if r.get("named", True) and r.get("id") is not None and r.get("name")}
+    cur = dict(_room_cache.get(str(mid)) or {})
+    merged = {**cur, **names}
+    if names and merged != cur:
+        _room_cache[str(mid)] = merged
+        _save_room_names()
+
+
+def _map_room_names(mid) -> dict:
+    """{room_id(int): nombre} conocidos del mapa `mid`, desde la caché persistente."""
+    out = {}
+    for k, v in (_room_cache.get(str(mid)) or {}).items():
+        try:
+            out[int(k)] = v
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
 def _rooms_meta() -> dict:
     m = getattr(robot, "map", None)
     if m and m.get("rooms"):
         # solo habitaciones reales (con nombre); descarta segmentos temporales
         return {r["id"]: {"name": r["name"]} for r in m["rooms"] if r.get("named", True)}
-    return {}
+    # mapa no cargado en este instante (p. ej. reconexión): usa los nombres cacheados del mapa activo
+    return {rid: {"name": n} for rid, n in _map_room_names(getattr(robot.state, "map_head_id", None)).items()}
+
+
+_load_room_names()
 
 
 # ------- registro de actividad (historial de limpiezas) -------
@@ -361,15 +418,20 @@ def _finish_session(ss):
         return None                                   # sin datos útiles (aborto): no registrar
     dt = datetime.datetime.fromtimestamp(ss["start"])
     days = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
-    meta = _rooms_meta()
+    _remember_rooms()                             # refresca la caché con el mapa cargado ahora
     rooms = sorted(ss["rooms"])
     mid = ss.get("map_id")
+    # resuelve los nombres contra el mapa de ESTA limpieza (no el activo); los IDs se repiten entre
+    # mapas, así que usar el mapa activo daría nombres erróneos o "Hab N" si se cambió de mapa/reconectó.
+    names = _map_room_names(mid)
+    if mid and mid == getattr(robot.state, "map_head_id", None):
+        names = {**names, **{rid: mv["name"] for rid, mv in _rooms_meta().items()}}   # mapa activo: en vivo
     map_name = next((m["name"] for m in house_maps.as_list(mid) if m["id"] == mid), None)  # nombre de CA
     entry = {"id": int(ss["start"] * 1000), "kind": "clean",
              "type": ss["type"], "sched": ss.get("sched"),
              "date": dt.strftime("%d/%m/%Y"), "time_hm": dt.strftime("%H:%M"),
              "day": days[dt.weekday()],
-             "rooms": [(meta.get(r) or {}).get("name") or f"Hab {r}" for r in rooms],
+             "rooms": [names.get(r) or f"Hab {r}" for r in rooms],
              "room_ids": rooms, "area": round(ss["area"] or 0, 2), "duration": dur,
              "map_id": mid, "map_name": map_name}
     # si un informe de la nube ya había registrado esta limpieza (entrada más pobre, sin
@@ -518,6 +580,7 @@ async def broadcast_map():
     # emite si hay mapa real o si el robot se ha quedado sin mapa (no en el arranque sin datos)
     if not robot.map and not getattr(robot, "map_empty", False):
         return
+    _remember_rooms()                          # cachea los nombres de habitación de este mapa
     mqtt.publish_map(force=True)               # geometría del mapa por MQTT (cambió el mapa)
     msg = json.dumps({"type": "map", "map": _view_map()})
     for ws in list(clients):
@@ -877,7 +940,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.23.3", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.23.4", lifespan=lifespan)
 
 
 @app.get("/api/state")

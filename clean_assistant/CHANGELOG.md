@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.23.4
+- **Nombres de habitación estables** (issue #2, @miajed): a veces el historial de actividad y el
+  sensor «Conga Habitación actual» mostraban el ID en crudo (`Hab 15`, `Habitación 20`) en vez del
+  nombre. Pasaba porque se resolvían contra el mapa **cargado en ese momento** en lugar del mapa de
+  esa limpieza (los IDs se repiten entre mapas), o si el robot reconectaba y el mapa no estaba
+  cargado un instante. Ahora Clean Assistant **cachea los nombres por mapa** (persistente), así que
+  cada habitación resuelve a su nombre esté activo el mapa que esté.
+
 ## 0.23.3
 - **Modo oscuro**: la **pestaña activa** (Limpieza / Zonas / Horarios / Actividad / Ajustes) ya se
   distingue con claridad; antes se confundía con el fondo, igual que pasaba con el segmentado.
