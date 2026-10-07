@@ -3,7 +3,7 @@
 # Clean Assistant
 
 A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** — and other Conga
-models on the same platform (e.g. the **4690 Ultra**, confirmed by a user): live map,
+models on the same platform (**4690 / 9090 / 7090** confirmed by users): live map,
 per-room cleaning, zones, schedules, history and every setting, in its own polished web
 interface, **available in 9 languages** (Spanish, English, German, Italian, French, Portuguese, Dutch, Catalan, Polish).
 In the spirit of Valetudo/Congatudo, but for the 8000 generation (which uses TLS +
@@ -280,10 +280,16 @@ for what's new in each version.
 
 Built and verified end to end with a **Conga 8090 Ultra**. Because these robots share the
 same cloud stack (3irobotix: TLS + WebSocket + JSON), **other Conga models on that platform
-also work** — the **4690 Ultra** is confirmed by a community user. Home Assistant shows the
-real model (from the robot's `project_type`). If you try another model, please
-[open an issue](https://github.com/miguelsg29/clean-assistant/issues) with your
-`PROJECT_TYPE` and what does/doesn't work.
+work too**. Confirmed so far:
+
+- **Conga 8090 Ultra** — developed and verified end to end
+- **Conga 4690 Ultra** — confirmed by a community user
+- **Conga 9090** — confirmed by a community user
+- **Conga 7090** — confirmed by a community user
+
+Home Assistant shows the real model (from the robot's `project_type`). If you try another
+model, please [open an issue](https://github.com/miguelsg29/clean-assistant/issues) with your
+`PROJECT_TYPE` and what does/doesn't work — I'll add it so it's recognized by name.
 
 ## Support
 

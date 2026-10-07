@@ -3,8 +3,8 @@
 # Clean Assistant
 
 Aplicación **local y sin nube** para gestionar el robot aspirador **Cecotec Conga
-8090 Ultra** — y otros modelos Conga de la misma plataforma (p. ej. el **4690 Ultra**,
-confirmado por un usuario): mapa en vivo, limpieza por habitaciones, zonas, horarios,
+8090 Ultra** — y otros modelos Conga de la misma plataforma (**4690 / 9090 / 7090**
+confirmados por usuarios): mapa en vivo, limpieza por habitaciones, zonas, horarios,
 historial y todos los ajustes, con una interfaz web propia y bonita, **disponible en 9
 idiomas** (español, inglés, alemán, italiano, francés, portugués, neerlandés, catalán y polaco). En la línea de
 Valetudo/Congatudo, pero para la generación 8000 (que usa TLS + WebSocket + JSON +
@@ -282,10 +282,16 @@ para las novedades de cada versión.
 
 Desarrollada y verificada de punta a punta con un **Conga 8090 Ultra**. Como estos robots
 comparten la misma pila de nube (3irobotix: TLS + WebSocket + JSON), **otros modelos Conga
-de esa plataforma también funcionan** — el **4690 Ultra** está confirmado por un usuario de
-la comunidad. Home Assistant muestra el modelo real (según el `project_type` del robot). Si
-pruebas otro modelo, [abre un issue](https://github.com/miguelsg29/clean-assistant/issues)
-con tu `PROJECT_TYPE` y qué funciona o no.
+de esa plataforma también funcionan**. Confirmados hasta ahora:
+
+- **Conga 8090 Ultra** — desarrollada y verificada de punta a punta
+- **Conga 4690 Ultra** — confirmado por un usuario de la comunidad
+- **Conga 9090** — confirmado por un usuario de la comunidad
+- **Conga 7090** — confirmado por un usuario de la comunidad
+
+Home Assistant muestra el modelo real (según el `project_type` del robot). Si pruebas otro
+modelo, [abre un issue](https://github.com/miguelsg29/clean-assistant/issues) con tu
+`PROJECT_TYPE` y qué funciona o no — lo añado para que se reconozca por su nombre.
 
 ## Apoyar el proyecto
 
