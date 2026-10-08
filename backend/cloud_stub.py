@@ -4,9 +4,14 @@ Con esto, Clean Assistant hace al robot INDEPENDIENTE de la nube: aunque Cecotec
 servidores, el robot sigue funcionando. Verificado por ingeniería inversa del Conga 8090.
 
 - OTA (puerto 8001, HTTPS): el robot pregunta al arrancar "¿hay firmware nuevo y DÓNDE están
-  los servicios?". Respondemos "sin actualización" + el DIRECTORIO (targetUrls) apuntando al
-  control LOCAL. Es la pieza CLAVE: sin esta respuesta el robot no sabe a dónde conectar y se
-  queda en bucle de reconexión. Así nunca depende de la nube ni descarga firmware.
+  los servicios?". Es un `POST /service-publish/open/upgrade/try_upgrade` (endpoint ABIERTO,
+  sin auth) con cuerpo JSON {"packageVersions":[{"packageType":"RKFW"|"ramdisk","version":N}],
+  "projectType":..., "robotType":"sweeper", "username":<SN>}. Respondemos "sin actualización"
+  (code:0) + el DIRECTORIO (targetUrls) apuntando al control LOCAL. Es la pieza CLAVE: sin esta
+  respuesta el robot no sabe a dónde conectar y se queda en bucle de reconexión. Así nunca
+  depende de la nube ni descarga firmware. (La última firmware del 8090/RK3308 es RKFW v20 =
+  S3.4.20; el OTA real ya solo la ofrece desde un bucket OSS borrado, así que no hay nada más
+  nuevo que bloquear.)
 - Historial (8006 HTTP, 8002 HTTPS): el robot sube informes de cada limpieza
   (PUT /sweeper-report/robot/sweeping_img|data). Los aceptamos (para que no reintente) y los
   pasamos al historial de Clean Assistant, para tener el histórico sin nube.
