@@ -30,6 +30,9 @@ room_names.json
 # ===== Capturas de pantalla de la app (muestran tu casamapadatos) =====
 Capturasdepantallaclean
 
+# ===== Notas internas de ingeniería inversa del firmware (no publicar) =====
+FIRMWARE_NOTES.md
+
 # Docker (volumen de datos local)
 data/
 
