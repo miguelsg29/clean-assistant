@@ -1,7 +1,7 @@
 # Clean Assistant — Roadmap
 
 Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de referencia:
-**v0.23.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
+**v0.24.0**. (¿Sugerencias? Abre un [issue](https://github.com/miguelsg29/clean-assistant/issues).)
 
 ---
 
@@ -12,6 +12,8 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 - **Limpieza**: iniciar/pausar/reanudar, a base, localizar, por habitaciones y completa;
   succión/agua/mopa/modo, doble pasada, turbo alfombras, tipo de base, **frecuencia de
   vaciado**, voz+volumen, no molestar, OTA.
+- **Control manual**: botón «Manual» con mando de 4 flechas + **joystick** en el mapa para
+  conducir el robot en cualquier dirección (`set_direct`). *(v0.24.0)*
 - **Habitaciones**: nombre, tipo, tipo de suelo, unir/separar, m² por habitación.
 - **Zonas** por mapa: prohibida, sin fregona, x2 — crear/mover/redimensionar/rotar/borrar;
   adopta las de la app oficial.
@@ -49,8 +51,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 - **Revisión de traducciones** DE/IT/NL/CA por hablantes nativos (issues/PR de la comunidad).
 
 ### Medianas
-- **Control manual (mando/flechas)**: `set_direct` ya existe; falta la UI para
-  desatascar/recolocar el robot.
 - **Lanzar limpieza de una zona dibujada**: limpiar un rectángulo concreto a demanda
   (`set_area`), no solo habitaciones.
 - **Modos por habitación en la limpieza inmediata de habitaciones** (los planes bajo demanda
@@ -62,6 +62,11 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 ### Grandes (más trabajo, muy visibles)
 - **Estadísticas**: totales por semana/mes, m² y desgaste de consumibles en el tiempo;
   miniatura del mapa por limpieza.
+- **Alta/onboarding 100% local (SoftAP)**: dar de alta un robot **reseteado de fábrica** sin
+  pasar nunca por la nube de Cecotec, enviándole SSID + contraseña WiFi + la **IP de Clean
+  Assistant** por su punto de acceso. El firmware lo soporta (hostapd + credenciales por
+  SoftAP, con campo `addr` de servidor); falta **capturar el protocolo exacto de
+  emparejamiento** (reset de fábrica + captura de lo que manda la app oficial). Idea futura.
 
 ### Robustez / adopción
 - **Página de diagnóstico**: log en vivo, últimos comandos, estado de conexión, firmware.
@@ -80,6 +85,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 
 | Prioridad | Ítems |
 |---|---|
-| **Alta** | Estadísticas · Control manual |
-| **Media** | Control manual · Lanzar zona dibujada · Nombre de dispositivo manual |
+| **Alta** | Estadísticas |
+| **Media** | Lanzar zona dibujada · Nombre de dispositivo manual |
 | **Baja** | Diagnóstico · DNS integrado · pruebas · revisión de traducciones · nice-to-have |
