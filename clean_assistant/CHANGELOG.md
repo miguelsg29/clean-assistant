@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.24.0
+- **Control manual (mando)**: nuevo botón «Manual» en la barra de controles que despliega un mando
+  en la esquina del mapa. Cuatro flechas para mover el robot (adelante / atrás / izquierda /
+  derecha) y un **joystick** en el centro: mantén pulsado y arrástralo para conducirlo en cualquier
+  dirección, con curvas en diagonal (el robot es de dos ruedas, así que las diagonales son arcos).
+  Usa el comando `set_direct` del robot. Se oculta al desactivar el modo manual.
+
 ## 0.23.4
 - **Nombres de habitación estables** (issue #2, @miajed): a veces el historial de actividad y el
   sensor «Conga Habitación actual» mostraban el ID en crudo (`Hab 15`, `Habitación 20`) en vez del

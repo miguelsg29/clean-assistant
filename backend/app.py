@@ -527,6 +527,7 @@ def build(action: str, p: dict):
     if action == "home":         return cmd.home()
     if action == "cancel_home":  return cmd.cancel_home()
     if action == "locate":       return cmd.locate()
+    if action == "direct":       return cmd.direct(p["direction"], p.get("angle", 0))
     if action == "clean_rooms":  return cmd.clean_rooms(p["rooms"], p.get("twice", False))
     if action == "clean_all":    return cmd.start()
     if action == "mode":         return cmd.select_mode(p["value"])
@@ -940,7 +941,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.23.4", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.24.0", lifespan=lifespan)
 
 
 @app.get("/api/state")

@@ -130,6 +130,16 @@
   .dbtn svg{width:19px;height:19px}
   .dbtn:hover{color:var(--ink)}
   .dbtn.primary{background:var(--accent);color:#fff;box-shadow:0 4px 12px color-mix(in srgb,var(--accent) 40%,transparent)}
+  .dbtn[aria-pressed="true"]{color:var(--accent)}
+  .dpad{position:absolute;left:12px;bottom:14px;z-index:5;display:grid;grid-template-columns:repeat(3,42px);grid-template-rows:repeat(3,42px);gap:5px;padding:7px;background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;width:max-content;box-shadow:var(--shadow-lg);touch-action:none}
+  .dpad[hidden]{display:none}
+  .dpad .dkey{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;font-size:16px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;user-select:none;-webkit-user-select:none;touch-action:none}
+  .dpad .dkey:active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .dpad .dstop{color:var(--muted);cursor:grab;touch-action:none;z-index:2}
+  .dpad .dstop:active{cursor:grabbing;background:var(--accent);color:#fff;border-color:var(--accent)}
+  .dpad [data-dir="up"]{grid-area:1/2} .dpad [data-dir="left"]{grid-area:2/1}
+  .dpad [data-dir="stop"]{grid-area:2/2} .dpad [data-dir="right"]{grid-area:2/3}
+  .dpad [data-dir="down"]{grid-area:3/2}
   .dbtn.primary:hover{color:#fff;filter:brightness(1.04)}
   .panel{padding:0}
   .tabs{display:flex;gap:2px;padding:5px;margin:12px;background:var(--inset);border-radius:12px}
@@ -371,6 +381,14 @@
         <button class="dbtn primary" id="playBtn"><svg viewBox="0 0 24 24" fill="currentColor" id="playIco"><path d="M8 5v14l11-7z"/></svg><span id="playLbl">Iniciar</span></button>
         <button class="dbtn" id="homeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Base</button>
         <button class="dbtn" id="locBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0M7 12a5 5 0 0 1 10 0M11 12a1 1 0 0 1 2 0"/></svg>Localizar</button>
+        <button class="dbtn" id="manBtn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="2.4"/></svg>Manual</button>
+      </div>
+      <div class="dpad" id="dpad" hidden role="group" aria-label="Control manual">
+        <button class="dkey" data-dir="up" aria-label="Adelante">▲</button>
+        <button class="dkey" data-dir="left" aria-label="Izquierda">◄</button>
+        <button class="dkey dstop" data-dir="stop" aria-label="Parar">■</button>
+        <button class="dkey" data-dir="right" aria-label="Derecha">►</button>
+        <button class="dkey" data-dir="down" aria-label="Atrás">▼</button>
       </div>
     </section>
 
@@ -1205,6 +1223,55 @@
   });
   document.getElementById('homeBtn').addEventListener('click',function(){api('home');});
   document.getElementById('locBtn').addEventListener('click',function(){api('locate');});
+  // ---- control manual (set_direct): mantén pulsada una flecha para mover el robot ----
+  // Códigos de dirección de set_direct; si alguna flecha va al revés, ajústalos aquí.
+  // adelante=1, atrás=4, izquierda=2, derecha=3 (set_direct, verificado en vivo). stop=0.
+  var MDIR={up:1,down:4,left:2,right:3,stop:0};
+  (function(){
+    var man=document.getElementById('manBtn'), dpad=document.getElementById('dpad');
+    if(!man||!dpad) return;
+    var timer=null;
+    function send(code){ api('direct',{direction:code,angle:0}); }
+    function stopAll(){ if(timer){clearInterval(timer);timer=null;} send(MDIR.stop); }
+    man.addEventListener('click',function(){
+      var open=dpad.hidden; dpad.hidden=!open; man.setAttribute('aria-pressed',open?'true':'false'); if(!open) stopAll();
+    });
+    // ---- flechas: pulsación discreta (mantener = enviar repetido) ----
+    dpad.querySelectorAll('.dkey:not(.dstop)').forEach(function(k){
+      var dir=k.getAttribute('data-dir');
+      function begin(e){ e.preventDefault(); if(timer)clearInterval(timer);
+        send(MDIR[dir]); timer=setInterval(function(){send(MDIR[dir]);},250); }
+      k.addEventListener('pointerdown',begin);
+      ['pointerup','pointerleave','pointercancel'].forEach(function(ev){k.addEventListener(ev,stopAll);});
+    });
+    // ---- centro = joystick: mantén pulsado y arrastra hacia donde quieras ir ----
+    // En diagonal alterna "avanzar/retroceder" + "girar" => el robot describe un arco.
+    var knob=dpad.querySelector('.dstop'), ox=null,oy=null, jTimer=null, cmd=null, tog=0;
+    function octant(dx,dy){
+      var r=Math.hypot(dx,dy); if(r<12) return null;            // zona muerta -> parar
+      var a=Math.atan2(-dy,dx)*180/Math.PI; if(a<0)a+=360;
+      if(a<22.5||a>=337.5) return [MDIR.right];
+      if(a<67.5)  return [MDIR.up,MDIR.right];
+      if(a<112.5) return [MDIR.up];
+      if(a<157.5) return [MDIR.up,MDIR.left];
+      if(a<202.5) return [MDIR.left];
+      if(a<247.5) return [MDIR.down,MDIR.left];
+      if(a<292.5) return [MDIR.down];
+      return [MDIR.down,MDIR.right];
+    }
+    function tick(){ if(!cmd){ send(MDIR.stop); return; } send(cmd[tog++ % cmd.length]); }
+    function jStart(e){ e.preventDefault(); if(knob.setPointerCapture){try{knob.setPointerCapture(e.pointerId);}catch(_){}}
+      ox=e.clientX; oy=e.clientY; cmd=null; tog=0;
+      if(jTimer)clearInterval(jTimer); jTimer=setInterval(tick,180); }
+    function jMove(e){ if(ox===null) return; var dx=e.clientX-ox, dy=e.clientY-oy;
+      cmd=octant(dx,dy);
+      var r=Math.min(Math.hypot(dx,dy),16), ang=Math.atan2(dy,dx);
+      knob.style.transform='translate('+(Math.cos(ang)*r).toFixed(1)+'px,'+(Math.sin(ang)*r).toFixed(1)+'px)'; }
+    function jEnd(){ ox=oy=null; cmd=null; if(jTimer){clearInterval(jTimer);jTimer=null;} knob.style.transform=''; send(MDIR.stop); }
+    knob.addEventListener('pointerdown',jStart);
+    knob.addEventListener('pointermove',jMove);
+    ['pointerup','pointercancel'].forEach(function(ev){knob.addEventListener(ev,jEnd);});
+  })();
   document.getElementById('cleanSel').addEventListener('click',function(){
     if(selected.size)api('clean_rooms',{rooms:Array.from(selected),twice:twiceOn});
   });
