@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.31.9
+- **Gen. legacy (3xxx/4xxx): succión y agua ya no están intercambiadas.** Al cambiar el agua cambiaba
+  la turbina, y la succión no hacía nada. Ahora succión 0–3 y agua 10–13, comprobado de oído por
+  @mactron254 en un 4090 (#12).
+
 ## 0.31.8
 - **3890: horarios sin el aviso 522 («falta la mopa»).** Los horarios (y la limpieza de habitaciones,
   que en este modelo va como horario de un solo uso) se mandan ahora exactamente con la forma de su app

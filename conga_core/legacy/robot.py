@@ -45,11 +45,13 @@ _MANUAL = {2}
 _ZONE_MODES = {30, 31, 32, 35}  # workMode en modo zona (device-mode.mapper)
 _SPOT_MODES = {7, 9, 12, 14}    # workMode en modo punto
 ROOM_PLAN_ID = 2                # plan que usan @agnoc y la app para limpiar por habitaciones
-# DEVICE_SET_CLEAN_PREFERENCE (0x10D9) lleva succión Y agua en el mismo campo, por rangos
-# (captura de la app oficial, @mactron254; @agnoc los tiene AL REVÉS):
-#   succión 10 silencio, 11 estándar, 12 turbo, 13 máximo  |  agua 0 off, 1 bajo, 2 medio, 3 alto
+# DEVICE_SET_CLEAN_PREFERENCE (0x10D9) lleva succión Y agua en el mismo campo, por rangos:
+#   succión 0 silencio, 1 estándar, 2 turbo, 3 máximo  |  agua 10 off, 11 bajo, 12 medio, 13 alto
+# (como @agnoc). Comprobado por @mactron254 en un 4090 (#12, 29-oct): el robot devuelve 0-3 en su
+# campo de turbina y 10-13 en el de agua, y DE OÍDO solo el 0-3 cambia la turbina. La v0.27.1 lo
+# había invertido por una anotación equivocada de la captura del 25-oct.
 # CA (commands.FAN): Off(=«Máx» en la UI)=0, Eco=1, Normal=2, Turbo=3
-FAN_TO_ROBOT = {0: 13, 1: 10, 2: 11, 3: 12}
+FAN_TO_ROBOT = {0: 3, 1: 0, 2: 1, 3: 2}
 # vida (horas) de cada consumible, la MISMA que usa la interfaz (index.html, CONS): el robot legacy
 # da el % de uso y CA trabaja en horas de uso
 CONSUMABLE_LIFE_H = {"main_brush": 300, "side_brush": 220, "filter": 100, "dishcloth": 160}
@@ -235,12 +237,12 @@ class LegacyRobot:
                 return self._run_mode(CTRL_PAUSE if val == 2 else CTRL_START, starting=(typ == 0))
         elif c == "device_ctrl" and control.get("ctrltype") == 3:   # localizar
             return self._send("DEVICE_SEEK_LOCATION_REQ", {})
-        elif c == "set_preference" and control.get("ctrltype") == 1:   # succión -> 10..13
+        elif c == "set_preference" and control.get("ctrltype") == 1:   # succión -> 0..3
             return self._send("DEVICE_SET_CLEAN_PREFERENCE_REQ",
-                              {1: FAN_TO_ROBOT.get(int(control["value"]), 11)})
-        elif c == "set_preference" and control.get("ctrltype") == 2:   # agua -> 0..3
+                              {1: FAN_TO_ROBOT.get(int(control["value"]), 1)})
+        elif c == "set_preference" and control.get("ctrltype") == 2:   # agua -> 10..13
             v = int(control["value"])                      # CA (commands.WATER): Off..Alto = 10..13
-            return self._send("DEVICE_SET_CLEAN_PREFERENCE_REQ", {1: max(0, min(3, v - 10 if v >= 10 else v))})
+            return self._send("DEVICE_SET_CLEAN_PREFERENCE_REQ", {1: 10 + max(0, min(3, v - 10 if v >= 10 else v))})
         elif c == "set_upgrade_config":                    # actualizaciones automáticas (0x10F3)
             on = bool(control.get("auto_upgrade"))
             self.state.auto_upgrade = int(on)
