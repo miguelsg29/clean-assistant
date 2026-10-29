@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.31.8
+- **3890: horarios sin el aviso 522 («falta la mopa»).** Los horarios (y la limpieza de habitaciones,
+  que en este modelo va como horario de un solo uso) se mandan ahora exactamente con la forma de su app
+  oficial. Antes llevaban campos que esa app no manda, entre ellos la intensidad de la mopa, y el robot
+  esperaba la mopa aunque estuviera en «Off» (#14). Hay que volver a crear los horarios del 3890.
+
 ## 0.31.7
 - **Se recuerdan Modo, Succión, Agua y Mopa** (y doble pasada / turbo en alfombras) tras reiniciar el
   add-on, y la web muestra los que están activos. Nueva opción `DEFAULT_MODE`. Gracias a @m-l (PR #22).

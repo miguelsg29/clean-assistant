@@ -282,6 +282,10 @@ def _order_id(plan) -> int:
 # modo de limpieza de cada habitación en un horario (cleanmode/sweep_mode). En el 8090 "Auto" es 0;
 # en el 3890 la app oficial manda 3 para "Auto" y con 0 el robot espera la mopa (fault 522, #14)
 ORDER_CLEANMODE = {"CECOTECCRL20S-1001": 3}
+# modelos cuyo horario se manda con la forma EXACTA de su app oficial. En el 3890, aun con agua y
+# mopa en Off, el horario de CA hacía saltar el 522 («falta la mopa», #14): llevaba campos que su
+# app no manda, entre ellos shake_shift (intensidad de la mopa)
+ORDER_APP_SHAPE = ("CECOTECCRL20S-1001",)
 
 
 def build_order(plan, map_head_id, rooms_meta=None, enable=None, project_type=None):
@@ -305,6 +309,17 @@ def build_order(plan, map_head_id, rooms_meta=None, enable=None, project_type=No
     # la hora/días del plan están en LOCAL; el robot los guarda en UTC (como la nube)
     day_time, weekday = local_to_robot(_daytime(plan.get("time", "0:00")),
                                        _weekday(plan.get("days", [])))
+    if project_type in ORDER_APP_SHAPE:
+        # igual que el setOrder6090 de la app del 3890 (log Cloud+Local de @Here87, 26-oct)
+        room_per = [{"room_id": rp["room_id"], "windpower": rp["windpower"], "isDone": False,
+                     "room_material": 0, "sweep_mode": mode, "room_name": rp["room_name"],
+                     "waterlevel": rp["waterlevel"], "carpet": 0, "isExpland": False,
+                     "twiceclean": rp["twiceclean"], "isExist": False, "cleanmode": mode,
+                     "room_type": rp["room_type"]} for rp in room_per]
+        return {"control": "setOrder6090", "order": {
+            "arealist": [], "orderid": _order_id(plan), "enable": 1 if en else 0, "repeat": 1,
+            "weekday": weekday, "mapid": int(map_head_id), "virwallList": [],
+            "day_time": day_time, "roomPer": room_per, "order_name": plan.get("name", "Plan")}}
     return {"control": "setOrder6090", "order": {
         "orderid": _order_id(plan), "order_name": plan.get("name", "Plan"),
         "enable": 1 if en else 0, "repeat": 1,
