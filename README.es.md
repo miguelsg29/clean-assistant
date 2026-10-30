@@ -394,6 +394,12 @@ de la habitación en curso). Home Assistant lo muestra como **"Conga 3xxx/4xxx (
 Clean Assistant es gratis y 100% local. Si te resulta útil, puedes apoyar el desarrollo (y
 comprar más robots para dar soporte a otros modelos): ☕ **[ko-fi.com/miguelsg29](https://ko-fi.com/miguelsg29)** — totalmente opcional, ¡gracias!
 
+### 💛 Quienes apoyan el proyecto
+
+Gracias a todas las personas que han apoyado Clean Assistant:
+
+- [@miajed](https://github.com/miajed) — el primer apoyo que recibió el proyecto ☕
+
 ## Licencia
 
 [MIT](LICENSE). Proyecto independiente de ingeniería inversa para interoperabilidad y uso

@@ -389,6 +389,12 @@ the current room). Home Assistant shows it as **"Conga 3xxx/4xxx (legacy)"**.
 Clean Assistant is free and 100% local. If it's useful to you, you can support development
 (and buying more robots to add support for): ☕ **[ko-fi.com/miguelsg29](https://ko-fi.com/miguelsg29)** — completely optional, and thank you!
 
+### 💛 Supporters
+
+Thank you to everyone who has supported Clean Assistant:
+
+- [@miajed](https://github.com/miajed) — the project's very first supporter ☕
+
 ## License
 
 [MIT](LICENSE). Independent reverse-engineering project for interoperability and personal
