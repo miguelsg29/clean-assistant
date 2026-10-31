@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.34.0
+- **Rowenta X-plorer Serie 80 (backend `robeye`), ya casi como un Conga:**
+  - **zonas prohibidas:** crearlas, moverlas y borrarlas desde Clean Assistant (se guardan en el robot);
+  - **unir y dividir habitaciones**;
+  - **mapa nuevo:** el robot lo guarda solo al terminar de explorar; ahora Clean Assistant lo detecta y
+    pasa a mostrarlo;
+  - habitaciones de mapas nuevos: el robot las numera por encima de 50 y Clean Assistant las traduce
+    (antes no se habrían dibujado).
+
 ## 0.33.1
 - Rowenta (backend `robeye`): si el robot se atasca (rueda, cepillo…) se muestra como **error**, no
   como «Parado». El robot lo manda como notificación, pero interrumpe la limpieza.

@@ -404,15 +404,15 @@ Tested end to end on a real X-plorer Serie 80 (firmware SER80-1.2.3).
 **Implemented:** status, battery and warnings · live map with rooms, walls, dock, no-go
 zones and robot position · clean the whole house (with the saved map) or selected rooms ·
 pause / resume / return to dock · the robot's 4 suction levels · edge mode and deep clean
-(double pass) · room names, room type and floor type · cleaning history with m², time and
+(double pass) · room names, room type and floor type · **no-go zones** (create, move,
+delete) · **maps**: create a new one, switch and delete · **merge and split rooms** · cleaning history with m², time and
 rooms (from the robot itself) · Clean Assistant's own schedules · the schedules saved in the
 robot (shown, and importable into Clean Assistant) · maintenance counters per part ·
 lifetime statistics in Home Assistant (distance, time, area, number of cleanings) · MQTT /
 Home Assistant.
 
-**Not yet:** creating, moving or deleting no-go zones; creating, switching, merging or
-splitting maps and rooms; mopping mode. The robot's API has these commands, but their
-parameters aren't known yet.
+**Not yet:** mopping mode (to be checked with the water tank fitted) and creating or editing
+the robot's own schedules (they're shown and can be imported).
 
 ## Support
 

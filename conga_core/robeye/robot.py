@@ -201,10 +201,26 @@ def _pip(x, y, poly) -> bool:
     return inside
 
 
-def rasterize(areas: list, lines: list):
+def room_ids_to_ca(areas: list) -> dict:
+    """{id del robot: id de CA}. El robot numera las habitaciones de forma global y creciente (las
+    de un mapa nuevo van por encima de las del anterior); en CA el id es el valor de la celda: 0/1
+    son desconocido/pared y 50+ significa «ya limpiado». Los de 2..49 se quedan igual; el resto
+    toma el primer hueco libre (estable mientras no cambien las habitaciones del mapa)."""
+    ids = sorted(int(a["id"]) for a in areas
+                 if a.get("area_type") == "room" and a.get("area_state") != "inactive")
+    out = {i: i for i in ids if 2 <= i < cmap.CLEANED_OFFSET}
+    free = (i for i in range(2, cmap.CLEANED_OFFSET) if i not in out)
+    for i in ids:
+        if i not in out:
+            out[i] = next(free, None)
+    return {k: v for k, v in out.items() if v is not None}
+
+
+def rasterize(areas: list, lines: list, to_ca: dict | None = None):
     """Habitaciones (polígonos) + paredes (segmentos), en unidades del robot -> (grid, W, H,
-    params) con los valores de CA: 0 desconocido, 255 pared, id de habitación."""
+    params) con los valores de CA: 0 desconocido, 255 pared, id de habitación (de CA)."""
     rooms = [a for a in areas if a.get("area_type") == "room" and a.get("area_state") != "inactive"]
+    to_ca = room_ids_to_ca(areas) if to_ca is None else to_ca
     pts = [(p["x"], p["y"]) for a in rooms for p in a["points"]]
     pts += [(l["x1"], l["y1"]) for l in lines] + [(l["x2"], l["y2"]) for l in lines]
     if not pts:
@@ -217,8 +233,8 @@ def rasterize(areas: list, lines: list):
     grid = bytearray(W * H)
     cell = lambda x, y: (int((x - min_x) / step), int((y - min_y) / step))
     for a in rooms:
-        rid = int(a["id"])
-        if not 2 <= rid < cmap.CLEANED_OFFSET:      # 0/1 son desconocido/pared; +50 = «ya limpiado»
+        rid = to_ca.get(int(a["id"]))
+        if rid is None:
             continue
         poly = [(p["x"], p["y"]) for p in a["points"]]
         (cx0, cy0), (cx1, cy1) = cell(min(p[0] for p in poly), min(p[1] for p in poly)), \
@@ -272,6 +288,8 @@ class RobEyeRobot:
         self._resume_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
+        self._to_ca, self._to_robot = {}, {}   # ids de habitación robot <-> CA (ver room_ids_to_ca)
+        self._maps_before = None           # mapas guardados al empezar a explorar
         self._map_sig = None               # para avisar del mapa solo si cambia
         self.stats = None                  # totales del robot (get/statistics), para HA
         self._maint = self._load_json(self._maint_path(), {})   # mantenimiento: base de cada pieza
@@ -316,6 +334,7 @@ class RobEyeRobot:
             typ, val = control.get("type"), control.get("value")
             if typ == 7 and val == 1:                        # crear mapa nuevo = explorar
                 self._paused = False
+                self._maps_before = {m.get("map_id") for m in self._maps}
                 return self._set("explore")
             if typ == 3:                                     # volver a la base / cancelarlo
                 self._paused = False
@@ -342,7 +361,7 @@ class RobEyeRobot:
                     return self._set("clean_map", map_id=self._map_id, **self._clean_params())
                 return self._set("clean_all", **self._clean_params())
         elif c == "setRoomClean":
-            ids = [int(r) for r in control.get("roomsID") or []]
+            ids = [self._rid(r) for r in control.get("roomsID") or []]
             if not ids or self._map_id is None:
                 return {"ok": False, "error": "sin mapa o sin habitaciones"}
             self._twice, self._paused = bool(control.get("clean_type")), False
@@ -361,7 +380,7 @@ class RobEyeRobot:
         elif c == "setPlanData6090":       # nombre (en CA), tipo y suelo (en el robot: modify_area)
             areas = {int(a["id"]): a for a in self._areas}
             for r in control.get("roomInfo") or []:
-                rid = int(r["roomID"])
+                rid = self._rid(r["roomID"])
                 name = (r.get("roomName") or "").strip()
                 if name:
                     self._names[rid] = name
@@ -393,13 +412,27 @@ class RobEyeRobot:
         elif c in ("get_map", "getMapAll"):
             self._map_ts = 0.0
             return {"result": 0}
+        elif c == "set_virwall":                             # zonas prohibidas (lista completa)
+            zones = [z for z in control.get("virwallList") or []
+                     if int(z.get("Type", 200)) == 200 and len(z.get("PointList") or []) >= 3]
+            return self._in_background(self._sync_nogo, zones)
+        elif c == "mergeRoom":
+            ids = [self._rid(r) for r in control.get("roomsId") or []]
+            return self._in_background(self._merge, ids)
+        elif c == "splitRoom":
+            return self._set("split_area", map_id=self._map_id, area_id=self._rid(control["roomId"]),
+                             **self._robot_xy(1, control["startX"], control["startY"]),
+                             **self._robot_xy(2, control["endX"], control["endY"]))
         elif c == "setSaveMap":                              # tras explorar: guardar o descartar
             self.state.pending_map = False
             new = self._new_map_id()
             if new is None:
                 return {"ok": False, "error": "no hay mapa nuevo"}
             if control.get("isSave", 1):
-                r = self._set("save_map", map_id=new)
+                perm = any(m.get("map_id") == new and m.get("permanent_flag") in (True, "true")
+                           for m in (self._get("get/maps") or {}).get("maps") or [])
+                r = {"result": 0} if perm else self._set("save_map", map_id=new)
+                self._maps_before = None
                 self._choose_map(new)
                 return r
             return self._set("delete_map", map_id=new)
@@ -536,6 +569,7 @@ class RobEyeRobot:
                         if a.get("area_type") == "room" and a.get("area_state") != "inactive"
                         and (not self._task_areas or int(a["id"]) in self._task_areas)
                         and _pip(rx, ry, [(q["x"], q["y"]) for q in a["points"]])), None)
+            rid = self._to_ca.get(rid) if rid is not None else None
             if rid is not None and rid != self.state.cleaning_room:
                 self.state.cleaning_room = rid
                 self._fire(self.on_update)
@@ -568,8 +602,56 @@ class RobEyeRobot:
         s = self.state
         s.area, s.clean_time = t["area"], t["minutes"]
         if t["rooms"]:
-            s.cleaning_room = t["rooms"][-1]
+            s.cleaning_room = self._to_ca.get(t["rooms"][-1], t["rooms"][-1])
         self._fire(self.on_update)
+
+    def _rid(self, ca_id) -> int:
+        """id de habitación de CA -> id del robot."""
+        return self._to_robot.get(int(ca_id), int(ca_id))
+
+    @staticmethod
+    def _robot_xy(n: int, x: float, y: float) -> dict:
+        """Punto en metros de CA -> xN/yN del robot (unidades y eje y del robot)."""
+        return {f"x{n}": round(float(x) / UNIT_M), f"y{n}": round(-float(y) / UNIT_M)}
+
+    def _in_background(self, fn, *args) -> dict:
+        threading.Thread(target=fn, args=args, daemon=True).start()
+        return {"result": 0}
+
+    def _sync_nogo(self, zones: list):
+        """Zonas prohibidas de CA -> áreas «blocking» del robot. Reemplazo completo: se borran las
+        prohibidas que tenga y se crean las de CA (add_area con 4 esquinas + area_state=blocking).
+        Las que el robot solo propone (proposed_blocking) no se tocan."""
+        mid = self._map_id
+        if mid is None:
+            return
+        try:
+            for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []:
+                if a.get("area_state") == "blocking":
+                    self._set("delete_area", map_id=mid, area_id=a["id"])
+            for z in zones:
+                pts = [(float(p["PointX"]), float(p["PointY"])) for p in z["PointList"]]
+                xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+                if len(pts) != 4:                      # el robot quiere 4 esquinas: su rectángulo
+                    pts = [(min(xs), min(ys)), (min(xs), max(ys)), (max(xs), max(ys)), (max(xs), min(ys))]
+                before = {a["id"] for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []}
+                corners = {}
+                for i, (x, y) in enumerate(pts, 1):
+                    corners.update(self._robot_xy(i, x, y))
+                self._set("add_area", map_id=mid, **corners)
+                new = [a["id"] for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []
+                       if a["id"] not in before]
+                if new:
+                    self._set("modify_area", map_id=mid, area_id=max(new), area_state="blocking")
+        except Exception as e:
+            self.log(f"  [robeye] no se pudieron guardar las zonas prohibidas: {e}")
+        self._map_ts = 0.0
+
+    def _merge(self, ids: list):
+        """Unir: el robot une de dos en dos (merge_areas area_id1/area_id2)."""
+        for other in ids[1:]:
+            self._set("merge_areas", map_id=self._map_id, area_id1=ids[0], area_id2=other)
+        self._map_ts = 0.0
 
     # ---------------- mapas ----------------
     def _choose_map(self, mid: int):
@@ -585,7 +667,11 @@ class RobEyeRobot:
         except Exception:
             return None
         temp = [m["map_id"] for m in maps if m.get("permanent_flag") not in (True, "true")]
-        return max(temp) if temp else None
+        if temp:
+            return max(temp)
+        # el Rowenta guarda solo el mapa al acabar de explorar: el nuevo es el que no estaba antes
+        new = [m["map_id"] for m in maps if m.get("map_id") not in (self._maps_before or set())]
+        return max(new) if new and self._maps_before is not None else None
 
     # ---------------- totales y mantenimiento ----------------
     def _maint_path(self) -> str:
@@ -625,6 +711,10 @@ class RobEyeRobot:
             orders = parse_schedule((self._get("get/schedule") or {}).get("schedule"))
         except Exception:
             return
+        for o in orders:                # habitaciones del mapa mostrado: a ids de CA
+            if o.get("mapid") == self._map_id:
+                for r in o["roomPer"]:
+                    r["room_id"] = self._to_ca.get(r["room_id"], r["room_id"])
         if orders != self.orders:
             self.orders = orders
             self._fire(self.on_orders)
@@ -654,7 +744,8 @@ class RobEyeRobot:
                 return
             m = self._map_from(self._areas, self._lines, self._dock)
             sig = (m["cells_b64"], json.dumps(m.get("stored_zones"), sort_keys=True),
-                   json.dumps([(r["id"], r["name"]) for r in m["rooms"]]))
+                   json.dumps([(r["id"], r["name"], r.get("type"), r.get("material")) for r in m["rooms"]]),
+                   json.dumps((m.get("house") or {}).get("maps")))
             self.map = m
             if sig == self._map_sig and not force:     # sin cambios: no republicar todo
                 self._map_ts = time.time()
@@ -670,7 +761,9 @@ class RobEyeRobot:
         self._fire(self.on_map)
 
     def _map_from(self, areas, lines, dock) -> dict:
-        grid, W, H, prm = rasterize(areas, lines)
+        self._to_ca = room_ids_to_ca(areas)
+        self._to_robot = {v: k for k, v in self._to_ca.items()}
+        grid, W, H, prm = rasterize(areas, lines, self._to_ca)
         rooms, count = [], {}
         for a in areas:
             if a.get("area_type") != "room" or a.get("area_state") == "inactive":
@@ -682,7 +775,8 @@ class RobEyeRobot:
             count[name] = count.get(name, 0) + 1
             default = name if count[name] == 1 else f"{name} {count[name]}"
             mat = FLOOR_TO_CA.get(a.get("floor_type")) or self._materials.get(rid)
-            rooms.append((rid, self._names.get(rid) or default, tid, mat))
+            if rid in self._to_ca:      # nombres y suelos: por id del robot (único entre mapas)
+                rooms.append((self._to_ca[rid], self._names.get(rid) or default, tid, mat))
         zones = [{"type": 200, "name": "",
                   "points": [(p["x"] * UNIT_M, p["y"] * UNIT_M) for p in a["points"]]}
                  for a in areas if a.get("area_state") == "blocking"]

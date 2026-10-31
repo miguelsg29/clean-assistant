@@ -410,14 +410,14 @@ Probado de principio a fin con un X-plorer Serie 80 real (firmware SER80-1.2.3).
 zonas prohibidas y posición del robot · limpiar toda la casa (con el mapa guardado) o las
 habitaciones elegidas · pausa / continuar / volver a la base · los 4 niveles de succión del
 robot · modo bordes y limpieza a fondo (doble pasada) · nombre, tipo y suelo de cada
-habitación · historial con m², tiempo y habitaciones (del propio robot) · horarios de Clean
+habitación · **zonas prohibidas** (crear, mover, borrar) · **mapas**: crear uno nuevo, cambiar y
+borrar · **unir y dividir habitaciones** · historial con m², tiempo y habitaciones (del propio robot) · horarios de Clean
 Assistant · los horarios guardados en el robot (se muestran y se pueden importar) · contadores
 de mantenimiento por pieza · estadísticas totales en Home Assistant (distancia, tiempo, área y
 número de limpiezas) · MQTT / Home Assistant.
 
-**Todavía no:** crear, mover o borrar zonas prohibidas; crear, cambiar, unir o dividir mapas y
-habitaciones; modo fregado. La API del robot tiene esas órdenes, pero aún no se conocen sus
-parámetros.
+**Todavía no:** modo fregado (pendiente de probar con el depósito de agua puesto) y crear o
+editar los horarios propios del robot (se muestran y se pueden importar).
 
 ## Apoyar el proyecto
 
