@@ -11,6 +11,7 @@ Los horarios los ejecuta Clean Assistant a su hora (como en la gen. legacy).
 from __future__ import annotations
 import json
 import os
+import datetime
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -24,7 +25,8 @@ from ..state import RobotState, WARN_MESSAGES
 PORT = 8080
 POLL_S = 2.0                 # estado + avisos
 POSE_S = 2.0                 # pose (solo mientras se mueve; parado, cada MAP_S)
-MAP_S = 60.0                 # mapa completo
+MAP_S = 60.0                 # mapa completo (+ horarios guardados en el robot)
+TASK_S = 15.0                # tarea en curso (m², minutos, habitaciones) mientras se mueve
 OFFLINE_AFTER = 3            # fallos seguidos -> robot desconectado
 # IP dinámica: si el robot deja de responder, se le busca por la subred (/24) y se le reconoce por
 # su unique_id. Sin mDNS: el add-on no tiene red de host y no recibe multicast, pero sí llega por
@@ -109,6 +111,46 @@ def robot_state(mode: str, charging: str, flags: dict) -> str:
     return "idle"
 
 
+def _dt(t):
+    """{year, month, day, hour, min, sec} del robot (hora local) -> datetime, o None."""
+    try:
+        return datetime.datetime(t["year"], t["month"], t["day"], t["hour"], t["min"], t.get("sec", 0))
+    except Exception:
+        return None
+
+
+def task_summary(task: dict, now=None) -> dict:
+    """Tarea de get/task_history -> {area (m²), minutes, rooms (en orden)}. `area` va en unidades²
+    del robot: un piso completo de ~39 m² sale ~9,8 millones (2 mm/unidad)."""
+    start, end = _dt(task.get("start_time") or {}), _dt(task.get("end_time") or {})
+    mins = round(((end or now or datetime.datetime.now()) - start).total_seconds() / 60) if start else None
+    rooms = []
+    for h in task.get("area_history") or []:
+        if h.get("area_id") is not None and h["area_id"] not in rooms:
+            rooms.append(int(h["area_id"]))
+    return {"area": round((task.get("area") or 0) * UNIT_M ** 2, 2), "minutes": mins, "rooms": rooms}
+
+
+# get/schedule: days_of_week 1=lunes … 7=domingo (0 también domingo) -> bits de CA (como el robot 8090)
+_DAY_BITS = {1: 2, 2: 4, 3: 8, 4: 16, 5: 32, 6: 64, 7: 1, 0: 1}
+
+
+def parse_schedule(sched: list) -> list:
+    """get/schedule -> horarios con la forma de getOrder6090, para mostrarlos como los del robot."""
+    out = []
+    for s in sched or []:
+        t, task = s.get("time") or {}, s.get("task") or {}
+        bits = 0
+        for d in t.get("days_of_week") or []:
+            bits |= _DAY_BITS.get(int(d), 0)
+        out.append({"orderid": int(s.get("task_id") or 0), "enable": int(bool(s.get("enabled"))),
+                    "repeat": 1, "weekday": bits,
+                    "day_time": int(t.get("hour", 0)) * 60 + int(t.get("min", 0)),
+                    "mapid": task.get("map_id"), "order_name": "Horario del robot",
+                    "roomPer": [{"room_id": int(r), "room_name": ""} for r in task.get("parameters") or []]})
+    return out
+
+
 def _pip(x, y, poly) -> bool:
     """¿Está (x, y) dentro del polígono? (par-impar)"""
     inside = False
@@ -123,7 +165,7 @@ def _pip(x, y, poly) -> bool:
 
 def rasterize(areas: list, lines: list):
     """Habitaciones (polígonos) + paredes (segmentos), en unidades del robot -> (grid, W, H,
-    params) con los valores de CA: 0 desconocido, 1 pared, id de habitación."""
+    params) con los valores de CA: 0 desconocido, 255 pared, id de habitación."""
     rooms = [a for a in areas if a.get("area_type") == "room" and a.get("area_state") != "inactive"]
     pts = [(p["x"], p["y"]) for a in rooms for p in a["points"]]
     pts += [(l["x1"], l["y1"]) for l in lines] + [(l["x2"], l["y2"]) for l in lines]
@@ -148,13 +190,13 @@ def rasterize(areas: list, lines: list):
             for cx in range(cx0, cx1 + 1):
                 if _pip(min_x + (cx + 0.5) * step, wy, poly):
                     grid[cy * W + cx] = rid
-    for l in lines:                                  # paredes encima
+    for l in lines:                                  # paredes encima (255 = pared, como la gen. nueva)
         (x0, y0), (x1, y1) = cell(l["x1"], l["y1"]), cell(l["x2"], l["y2"])
         n = max(abs(x1 - x0), abs(y1 - y0), 1)
         for i in range(n + 1):
             x, y = round(x0 + (x1 - x0) * i / n), round(y0 + (y1 - y0) * i / n)
             if 0 <= x < W and 0 <= y < H:
-                grid[y * W + x] = 1
+                grid[y * W + x] = 255
     return grid, W, H, {"min_x": min_x * UNIT_M, "min_y": min_y * UNIT_M, "res": RES}
 
 
@@ -188,6 +230,8 @@ class RobEyeRobot:
         self._mode = 0                     # commands.CLEAN_MODES elegido en la interfaz
         self._twice = False
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
+        self._task_ts = 0.0
+        self._task_floor = None            # id de la última tarea al arrancar (las anteriores no cuentan)
         self._areas, self._lines, self._dock, self._map_id, self._maps = [], [], None, None, []
         self._map_ts = 0.0
         self._fails = 0
@@ -309,6 +353,9 @@ class RobEyeRobot:
             moving = self.state.state in ("cleaning", "mapping", "returning")
             if self.state.online and (moving or time.time() - self._map_ts > MAP_S):
                 self._poll_pose()
+            if self.state.online and (self._task_floor is None or
+                                      (moving and time.time() - self._task_ts > TASK_S)):
+                self._poll_task()
             if self.state.online and time.time() - self._map_ts > MAP_S:
                 self._build_map()
             self._stop.wait(POLL_S)
@@ -346,7 +393,10 @@ class RobEyeRobot:
         s.warning = WARN_MESSAGES.get(s.fault) if s.fault else None
         real_err = {"error": [f for f in (flags or {}).get("error") or []
                               if FLAG_CODES.get(f) not in _NOTICE_CODES]}
-        s.state = robot_state(mode, st.get("charging"), real_err)
+        new = robot_state(mode, st.get("charging"), real_err)
+        if was[1] == "cleaning" and new != "cleaning" and self._task_floor is not None:
+            self._poll_task()                  # m² y minutos finales antes de cerrar la sesión
+        s.state = new
         # el robot no tiene pausa: CA la hace con stop y el robot queda en 'ready' fuera de la base
         if s.state != "idle":
             self._paused = False
@@ -371,8 +421,52 @@ class RobEyeRobot:
             return
         self.map["robot"] = self.pose = cellp
         self.map["robot_world"] = {"x": x, "y": y}
+        if self.state.state == "cleaning":     # habitación en curso: la que contiene al robot
+            rx, ry = p["x1"], -p["y1"]
+            rid = next((int(a["id"]) for a in self._areas
+                        if a.get("area_type") == "room" and a.get("area_state") != "inactive"
+                        and _pip(rx, ry, [(q["x"], q["y"]) for q in a["points"]])), None)
+            if rid is not None and rid != self.state.cleaning_room:
+                self.state.cleaning_room = rid
+                self._fire(self.on_update)
         self._accumulate_trail(x, y)
         self._fire(self.on_pose)
+
+    def _poll_task(self):
+        """Última tarea del robot (get/task_history) -> m², minutos y habitaciones de la limpieza en
+        curso, para el historial y los sensores de CA."""
+        self._task_ts = time.time()
+        try:
+            tasks = (self._get("get/task_history") or {}).get("task_history") or []
+        except Exception:
+            return
+        if not tasks:
+            return
+        last = max(tasks, key=lambda t: t.get("id") or 0)
+        if self._task_floor is None:          # si ya limpiaba al arrancar, su tarea sí cuenta
+            cleaning = self.state.state == "cleaning"
+            self._task_floor = (last.get("id") or 0) - (1 if cleaning else 0)
+            if not cleaning:
+                return
+        clean = [t for t in tasks if (t.get("id") or 0) > self._task_floor
+                 and str(t.get("task_type", "")).startswith("clean")]
+        if not clean:
+            return
+        t = task_summary(max(clean, key=lambda t: t.get("id") or 0))
+        s = self.state
+        s.area, s.clean_time = t["area"], t["minutes"]
+        if t["rooms"]:
+            s.cleaning_room = t["rooms"][-1]
+        self._fire(self.on_update)
+
+    def _poll_schedule(self):
+        try:
+            orders = parse_schedule((self._get("get/schedule") or {}).get("schedule"))
+        except Exception:
+            return
+        if orders != self.orders:
+            self.orders = orders
+            self._fire(self.on_orders)
 
     def _build_map(self, force: bool = False):
         try:
@@ -391,6 +485,7 @@ class RobEyeRobot:
                 dock = fm.get("docking_pose")
                 self._dock = dict(dock, y=-dock["y"], heading=-(dock.get("heading") or 0)) if dock else None
                 self._maps = maps
+                self._poll_schedule()
             self._map_ts = time.time()
             if not self._areas:
                 return

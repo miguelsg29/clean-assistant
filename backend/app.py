@@ -445,7 +445,10 @@ def _match_schedule(ts):
     """Nombre del horario del robot que cuadra con este momento (día+hora ±20 min), o None."""
     if CA_SCHEDULES:   # los horarios los lanza CA (_run_due_schedules_legacy), no el robot
         last = _legacy_sched["last"]
-        return last["name"] if last and abs(ts - last["ts"]) <= 20 * 60 else None
+        if last and abs(ts - last["ts"]) <= 20 * 60:
+            return last["name"]
+        if not ROBEYE:     # robeye: el robot también tiene los suyos (get/schedule), abajo
+            return None
     dt = datetime.datetime.fromtimestamp(ts)
     wd_bit = {0: 2, 1: 4, 2: 8, 3: 16, 4: 32, 5: 64, 6: 1}[dt.weekday()]   # bits del robot
     mins = dt.hour * 60 + dt.minute
@@ -1105,7 +1108,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.32.1", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.32.2", lifespan=lifespan)
 
 
 @app.get("/api/state")

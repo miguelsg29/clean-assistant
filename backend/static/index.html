@@ -513,7 +513,7 @@
         <div class="seg nolegacy" id="linkSeg"><button data-v="local" aria-pressed="true">Local</button><button data-v="cloud">Cloud + Local</button></div>
         <p class="hint nolegacy" style="opacity:.65;font-size:11.5px;margin:6px 0 2px">Local: sin nube (la app de Cecotec no llega al robot). Cloud + Local: el robot pasa por la nube real, la app oficial funciona y se capturan sus comandos (útil para depurar).</p>
 
-        <details class="netcfg" id="netCfg">
+        <details class="netcfg norobeye" id="netCfg">
           <summary>Configuración de red (DNS del robot)</summary>
           <p class="hint" style="opacity:.7;font-size:11.5px;margin:6px 0">Para que el robot hable con Clean Assistant, su tráfico a la nube de Cecotec debe redirigirse a este servidor. Crea reescrituras de DNS en AdGuard Home / Pi-hole / router:</p>
           <div class="wizdns">
@@ -550,18 +550,18 @@
         <div class="row"><div class="rt"><div class="t">Mapa en vivo en Home Assistant</div><div class="d">Publica por MQTT la imagen del mapa con el robot y el recorrido mientras limpia (cada 30 s)</div></div><button class="toggle" id="mapLiveTog"></button></div>
         <div class="btnrow onlylegacy"><button class="btn ghost" id="resetMapBtn" style="color:var(--critical)">Reiniciar mapa</button></div>
 
-        <div class="phead">Robot</div>
-        <div class="row"><div class="rt"><div class="t">No molestar</div><div class="d" id="quietDesc">—</div></div><button class="toggle" id="quietTog"></button></div>
-        <div class="field" style="margin-top:2px"><label>Franja de silencio (inicio – fin)</label>
+        <div class="phead norobeye">Robot</div>
+        <div class="row norobeye"><div class="rt"><div class="t">No molestar</div><div class="d" id="quietDesc">—</div></div><button class="toggle" id="quietTog"></button></div>
+        <div class="field norobeye" style="margin-top:2px"><label>Franja de silencio (inicio – fin)</label>
           <div class="slider"><input type="time" id="quietBegin" class="tinput" value="22:00"/><span style="opacity:.55">–</span><input type="time" id="quietEnd" class="tinput" value="07:00"/></div></div>
-        <div class="row"><div class="rt"><div class="t">Sonido</div></div><button class="toggle" id="voiceTog"></button></div>
-        <div class="field" style="margin-top:4px"><label>Volumen</label><div class="slider"><input type="range" min="0" max="10" value="7" id="vol" aria-label="Volumen"/><span class="v" id="volv">7</span></div></div>
-        <div class="row"><div class="rt"><div class="t">Turbo en alfombras</div><div class="d">Sube potencia al detectar alfombra</div></div><button class="toggle" id="carpetTog" aria-pressed="true"></button></div>
+        <div class="row norobeye"><div class="rt"><div class="t">Sonido</div></div><button class="toggle" id="voiceTog"></button></div>
+        <div class="field norobeye" style="margin-top:4px"><label>Volumen</label><div class="slider"><input type="range" min="0" max="10" value="7" id="vol" aria-label="Volumen"/><span class="v" id="volv">7</span></div></div>
+        <div class="row norobeye"><div class="rt"><div class="t">Turbo en alfombras</div><div class="d">Sube potencia al detectar alfombra</div></div><button class="toggle" id="carpetTog" aria-pressed="true"></button></div>
         <div class="row onlylegacy"><div class="rt"><div class="t">Mapa persistente</div><div class="d">El robot guarda el mapa y lo reutiliza en cada limpieza</div></div><button class="toggle" id="persistTog"></button></div>
-        <div class="row"><div class="rt"><div class="t">Actualizaciones automáticas</div><div class="d">Recomendado desactivar en local</div></div><button class="toggle" id="otaTog"></button></div>
-        <div class="phead">Base</div>
-        <div class="field"><label>Tipo de base</label><div class="seg" data-cmd="base_type"><button data-v="Base de carga">Base de carga</button><button data-v="Colector automático" aria-pressed="true">Colector automático</button></div></div>
-        <div class="field"><label>Frecuencia de vaciado</label>
+        <div class="row norobeye"><div class="rt"><div class="t">Actualizaciones automáticas</div><div class="d">Recomendado desactivar en local</div></div><button class="toggle" id="otaTog"></button></div>
+        <div class="phead norobeye">Base</div>
+        <div class="field norobeye"><label>Tipo de base</label><div class="seg" data-cmd="base_type"><button data-v="Base de carga">Base de carga</button><button data-v="Colector automático" aria-pressed="true">Colector automático</button></div></div>
+        <div class="field norobeye"><label>Frecuencia de vaciado</label>
           <select id="dustFreq" class="tinput">
             <option value="-1">Nunca</option>
             <option value="0" selected>Después de cada limpieza</option>
@@ -570,9 +570,9 @@
             <option value="90">Cada 90 minutos</option>
             <option value="120">Cada 2 horas</option>
           </select></div>
-        <div class="btnrow" style="margin-top:6px"><button class="btn ghost" id="dustBtn">Vaciar base ahora</button></div>
-        <div class="phead">Consumibles</div>
-        <div id="consList"></div>
+        <div class="btnrow norobeye" style="margin-top:6px"><button class="btn ghost" id="dustBtn">Vaciar base ahora</button></div>
+        <div class="phead norobeye">Consumibles</div>
+        <div id="consList" class="norobeye"></div>
         <div class="phead" style="margin-top:18px">Batería</div>
         <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 6px">Estimación de Clean Assistant a partir de las limpiezas y cargas que va viendo.</p>
         <div id="batHealth"></div>

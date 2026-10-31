@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.32.2
+- **Rowenta (backend `robeye`):**
+  - paredes del mapa bien marcadas (salían casi del color del suelo);
+  - historial con los m², los minutos y las habitaciones de cada limpieza (del propio robot), y la
+    habitación en curso en el mapa y en Home Assistant;
+  - se muestran los horarios guardados en el robot (los de la app de Rowenta);
+  - Ajustes sin lo que este robot no tiene: configuración de red/DNS, no molestar, sonido, turbo en
+    alfombras, actualizaciones, base de autovaciado y consumibles.
+
 ## 0.32.1
 - **Rowenta (backend `robeye`), tras la primera prueba con el robot real:**
   - el mapa ya no sale en espejo por defecto (en el Rowenta sale como la casa);
