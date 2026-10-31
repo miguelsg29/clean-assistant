@@ -246,6 +246,7 @@ class RobEyeRobot:
         self._twice = False
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
         self._paused_ts = 0.0
+        self._resume_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
         self._map_sig = None               # para avisar del mapa solo si cambia
@@ -303,7 +304,10 @@ class RobEyeRobot:
                 return r
             if typ == 2 and val == 1:
                 self._paused = False
-                return self._set("continue")
+                r = self._set("continue")
+                self._resume_ts = time.time()          # el robot tarda ~2 s en decir 'cleaning'
+                self.state.state = "cleaning"
+                return r
             if typ in (0, 14) and val == 1:                  # limpiar toda la casa
                 self._paused = False
                 # clean_map del mapa guardado sin habitaciones = todas (como la app). set/clean_all
@@ -441,6 +445,8 @@ class RobEyeRobot:
             self._paused = False
         if self._paused:
             s.state = "paused"
+        elif s.state == "idle" and time.time() - self._resume_ts < PAUSE_GRACE_S:
+            s.state = "cleaning"                       # recién mandado «continuar»
         if (s.online, s.state, s.battery, s.fault) != was:
             self._fire(self.on_update)
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.32.6
+- Rowenta (backend `robeye`): al continuar tras una pausa ya no parpadea «Parado» un par de segundos.
+- El log de los horarios lanzados por Clean Assistant ya no dice «gen. legacy» en robots que no lo son.
+
 ## 0.32.5
 - **Rowenta (backend `robeye`): «Limpieza completa de la casa» usa el mapa guardado.** Antes mandaba
   la orden de limpiar sin mapa: el robot creaba un mapa temporal y al terminar no encontraba la base.

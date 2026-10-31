@@ -881,7 +881,7 @@ async def _run_due_schedules_legacy():
             continue
         _legacy_sched["fired"][p.get("id")] = stamp
         _legacy_sched["last"] = {"ts": time.time(), "name": p.get("name") or "Horario"}
-        print(f"[horarios] lanzo '{p.get('name')}' (gen. legacy: lo ejecuta Clean Assistant)")
+        print(f"[horarios] lanzo '{p.get('name')}' (lo ejecuta Clean Assistant, no el robot)")
         for i, c in enumerate(controls):
             robot.command(c)
             if i < len(controls) - 1:
@@ -1108,7 +1108,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.32.5", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.32.6", lifespan=lifespan)
 
 
 @app.get("/api/state")
