@@ -417,8 +417,10 @@ def _map_room_names(mid) -> dict:
 def _rooms_meta() -> dict:
     m = getattr(robot, "map", None)
     if m and m.get("rooms"):
-        # solo habitaciones reales (con nombre); descarta segmentos temporales
-        return {r["id"]: {"name": r["name"]} for r in m["rooms"] if r.get("named", True)}
+        # solo habitaciones reales (con nombre); descarta segmentos temporales. Con su categoría
+        # y suelo: los horarios los llevan (room_type), y la app del 3890 manda p. ej. 2006 (#14)
+        return {r["id"]: {"name": r["name"], "type": r.get("type"), "material": r.get("material")}
+                for r in m["rooms"] if r.get("named", True)}
     # mapa no cargado en este instante (p. ej. reconexión): usa los nombres cacheados del mapa activo
     return {rid: {"name": n} for rid, n in _map_room_names(getattr(robot.state, "map_head_id", None)).items()}
 
@@ -1091,7 +1093,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.31.9", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.31.10", lifespan=lifespan)
 
 
 @app.get("/api/state")

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.31.10
+- **Los horarios llevan la categoría y el suelo reales de cada habitación.** Antes se mandaban siempre
+  sin categoría (`room_type: 0`) y con suelo por defecto; la app oficial del 3890 manda la categoría
+  (p. ej. 2006 = Salón). Puede ser la causa del aviso 522 («falta la mopa») en el 3890 (#14). Hay que
+  volver a crear los horarios para que se manden con los datos nuevos.
+
 ## 0.31.9
 - **Gen. legacy (3xxx/4xxx): succión y agua ya no están intercambiadas.** Al cambiar el agua cambiaba
   la turbina, y la succión no hacía nada. Ahora succión 0–3 y agua 10–13, comprobado de oído por

@@ -297,13 +297,13 @@ def build_order(plan, map_head_id, rooms_meta=None, enable=None, project_type=No
         rid = int(r["room"])
         meta = rooms_meta.get(rid, {})
         room_per.append({
-            "material_type": meta.get("material", 2),
+            "material_type": meta.get("material") or 2,
             "room_id": rid, "sweep_mode": mode, "room_name": meta.get("name", ""),
             "waterlevel": _lvl(WATER, r.get("water", "Medio")),
             "windpower": _lvl(FAN, r.get("fan", "Normal")),
             "carpet": 0, "twiceclean": 1 if r.get("twice") else 0,
             "shake_shift": _lvl(MOP, r.get("mop", "Estándar")),
-            "cleanmode": mode, "room_type": meta.get("type", 0),
+            "cleanmode": mode, "room_type": meta.get("type") or 0,
         })
     en = plan.get("enable", True) if enable is None else enable
     # la hora/días del plan están en LOCAL; el robot los guarda en UTC (como la nube)
