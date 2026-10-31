@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.1
+- Rowenta (backend `robeye`): las zonas prohibidas creadas en Clean Assistant ya quedan como
+  prohibidas en el robot (el robot tarda un momento en crear el área y Clean Assistant no la esperaba).
+
 ## 0.34.0
 - **Rowenta X-plorer Serie 80 (backend `robeye`), ya casi como un Conga:**
   - **zonas prohibidas:** crearlas, moverlas y borrarlas desde Clean Assistant (se guardan en el robot);

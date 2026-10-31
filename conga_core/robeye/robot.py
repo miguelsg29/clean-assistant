@@ -625,26 +625,38 @@ class RobEyeRobot:
         mid = self._map_id
         if mid is None:
             return
+        areas = lambda: (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []
+        mine = set(self._link.get("zone_ids") or [])   # áreas creadas por CA (por si quedó alguna a medias)
+        created = []
         try:
-            for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []:
-                if a.get("area_state") == "blocking":
+            for a in areas():
+                if a.get("area_state") == "blocking" or a["id"] in mine:
                     self._set("delete_area", map_id=mid, area_id=a["id"])
             for z in zones:
                 pts = [(float(p["PointX"]), float(p["PointY"])) for p in z["PointList"]]
                 xs, ys = [p[0] for p in pts], [p[1] for p in pts]
                 if len(pts) != 4:                      # el robot quiere 4 esquinas: su rectángulo
                     pts = [(min(xs), min(ys)), (min(xs), max(ys)), (max(xs), max(ys)), (max(xs), min(ys))]
-                before = {a["id"] for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []}
+                before = {a["id"] for a in areas()}
                 corners = {}
                 for i, (x, y) in enumerate(pts, 1):
                     corners.update(self._robot_xy(i, x, y))
                 self._set("add_area", map_id=mid, **corners)
-                new = [a["id"] for a in (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []
-                       if a["id"] not in before]
+                new = []
+                for _ in range(10):                    # el robot la crea al cabo de un momento
+                    time.sleep(0.5)
+                    new = [a["id"] for a in areas() if a["id"] not in before]
+                    if new:
+                        break
                 if new:
+                    created.append(max(new))
                     self._set("modify_area", map_id=mid, area_id=max(new), area_state="blocking")
+                else:
+                    self.log("  [robeye] el robot no creó la zona prohibida")
         except Exception as e:
             self.log(f"  [robeye] no se pudieron guardar las zonas prohibidas: {e}")
+        self._link["zone_ids"] = created
+        self._save_json(self._link_path, self._link)
         self._map_ts = 0.0
 
     def _merge(self, ids: list):
