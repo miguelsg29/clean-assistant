@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.32.3
+- **Arreglo general: entidades «no disponibles» en Home Assistant tras reiniciar o actualizar el
+  add-on.** Si el robot respondía antes de que Clean Assistant se conectara a MQTT, la disponibilidad
+  «online» se perdía y se quedaba el «offline» de la instancia anterior. Ahora se republica al conectar.
+- **Rowenta (backend `robeye`):**
+  - mantenimiento: Clean Assistant cuenta las horas de limpieza de cada pieza (cepillo central,
+    cepillo lateral, filtro, mopa) desde que la cambias, con su botón ↺ (también en Home Assistant);
+  - totales del robot en Home Assistant: distancia, tiempo y área totales y número de limpiezas;
+  - los horarios guardados en el robot se pueden importar a Clean Assistant (se importan
+    desactivados, para no limpiar dos veces);
+  - la habitación en curso ya no cuenta las que el robot solo atraviesa;
+  - el mapa ya no se republica en Home Assistant cada minuto si no ha cambiado;
+  - avisos nuevos traducidos a todos los idiomas.
+
 ## 0.32.2
 - **Rowenta (backend `robeye`):**
   - paredes del mapa bien marcadas (salían casi del color del suelo);

@@ -247,7 +247,7 @@ class MqttBridge:
             self.client.publish(topic, payload, retain=retain)
 
     # entidades del Conga que no existen en un RobEye (Rowenta…): no se publican (y se retiran)
-    ROBEYE_SKIP = ("_low_water", "_cons_", "_creset_", "_sel_water", "_sel_mop", "_sel_base_type",
+    ROBEYE_SKIP = ("_low_water", "_sel_water", "_sel_mop", "_sel_base_type",
                    "_volume", "_quiet", "_voice", "_ota", "_dust", "_turbo_carpet")
 
     def _disc(self, comp, obj, cfg):
@@ -308,6 +308,21 @@ class MqttBridge:
             if dclass:
                 cfg["device_class"] = dclass
             self._disc("sensor", f"{uid}_{sid}", cfg)
+        if getattr(self.robot, "robeye", False):          # totales del robot (como la app)
+            for sid, name, key, unit, dclass, icon in (
+                ("tot_distance", "Distancia total recorrida", "distance_km", "km", "distance", "mdi:map-marker-distance"),
+                ("tot_time", "Tiempo total de limpieza", "time_h", "h", "duration", "mdi:timer-outline"),
+                ("tot_area", "Área total limpiada", "area_m2", "m²", None, "mdi:texture-box"),
+                ("tot_runs", "Total de limpiezas", "runs", None, None, "mdi:counter")):
+                cfg = {"name": t(lang, name), "unique_id": f"{uid}_{sid}",
+                       "state_topic": f"conga/{node}/stats",
+                       "value_template": "{{ value_json.%s }}" % key, "icon": icon,
+                       "state_class": "total_increasing", "entity_category": "diagnostic"}
+                if unit:
+                    cfg["unit_of_measurement"] = unit
+                if dclass:
+                    cfg["device_class"] = dclass
+                self._disc("sensor", f"{uid}_{sid}", cfg)
         # posición del robot (x/y/ángulo en celdas del mapa) para floorplans/tarjetas externas.
         # El estado es "x,y"; x, y y angle van también como atributos (json_attributes_topic).
         self._disc("sensor", f"{uid}_pose", {
@@ -779,6 +794,9 @@ class MqttBridge:
             for key in ("main_brush", "side_brush", "filter", "dishcloth"):
                 if s.consumables.get(key) is not None:
                     self._pub(f"conga/{self.node}/consumable/{key}", str(s.consumables[key]))
+        stats = getattr(self.robot, "stats", None)       # robeye: totales del robot (get/statistics)
+        if stats:
+            self._pub(f"conga/{self.node}/stats", json.dumps(stats))
 
     # ---------------- entrada: MQTT -> robot ----------------
     def _on_connect(self, client, userdata, flags, reason_code, properties=None):
@@ -813,6 +831,10 @@ class MqttBridge:
                     f"{self.disc}/switch/+/config", f"{self.disc}/button/+/config"):
             client.subscribe(sub)
         self.publish_discovery()
+        # la disponibilidad publicada antes de conectar se pierde, y el «offline» retenido del
+        # testamento (LWT) de la instancia anterior dejaba todo «no disponible» en HA: se republica
+        self._avail_state = None
+        self.publish_state()
 
     def _on_disconnect(self, client, userdata, *args):
         """Paho dispara esto tanto si la app llama a disconnect() (ver stop()) como si la

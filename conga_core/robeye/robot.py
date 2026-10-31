@@ -231,6 +231,10 @@ class RobEyeRobot:
         self._twice = False
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
         self._task_ts = 0.0
+        self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
+        self._map_sig = None               # para avisar del mapa solo si cambia
+        self.stats = None                  # totales del robot (get/statistics), para HA
+        self._maint = self._load_json(self._maint_path(), {})   # mantenimiento: base de cada pieza
         self._task_floor = None            # id de la última tarea al arrancar (las anteriores no cuentan)
         self._areas, self._lines, self._dock, self._map_id, self._maps = [], [], None, None, []
         self._map_ts = 0.0
@@ -309,6 +313,16 @@ class RobEyeRobot:
                     self._names[int(r["roomID"])] = name
             self._save_names()
             self._build_map(force=True)
+            return {"result": 0}
+        elif c == "get_consumables":
+            self._poll_stats()
+            return {"result": 0}
+        elif c == "set_consumables":                         # «la he cambiado/limpiado»
+            key = {v: k for k, v in cmd.CONSUMABLE_RESET.items()}.get(int(control.get("resetType", 0)))
+            if key and self.stats:
+                self._maint[key] = self.stats["_raw_time"]
+                self._save_json(self._maint_path(), self._maint)
+                self._apply_maint()
             return {"result": 0}
         elif c in ("get_map", "getMapAll"):
             self._map_ts = 0.0
@@ -425,6 +439,7 @@ class RobEyeRobot:
             rx, ry = p["x1"], -p["y1"]
             rid = next((int(a["id"]) for a in self._areas
                         if a.get("area_type") == "room" and a.get("area_state") != "inactive"
+                        and (not self._task_areas or int(a["id"]) in self._task_areas)
                         and _pip(rx, ry, [(q["x"], q["y"]) for q in a["points"]])), None)
             if rid is not None and rid != self.state.cleaning_room:
                 self.state.cleaning_room = rid
@@ -452,11 +467,46 @@ class RobEyeRobot:
                  and str(t.get("task_type", "")).startswith("clean")]
         if not clean:
             return
-        t = task_summary(max(clean, key=lambda t: t.get("id") or 0))
+        task = max(clean, key=lambda t: t.get("id") or 0)
+        self._task_areas = {int(a) for a in task.get("area_ids") or []}
+        t = task_summary(task)
         s = self.state
         s.area, s.clean_time = t["area"], t["minutes"]
         if t["rooms"]:
             s.cleaning_room = t["rooms"][-1]
+        self._fire(self.on_update)
+
+    # ---------------- totales y mantenimiento ----------------
+    def _maint_path(self) -> str:
+        return os.path.join(os.path.dirname(self._names_path) or ".", "robeye_maint.json")
+
+    def _poll_stats(self):
+        """get/statistics (en 1/64: horas, m²; distancia en 1/128 m, como la app) -> totales para HA y
+        horas de uso de cada pieza desde que se cambió (el robot no lleva el mantenimiento: lo hace
+        la app de Rowenta en la nube; aquí lo lleva Clean Assistant)."""
+        try:
+            st = self._get("get/statistics") or {}
+        except Exception:
+            return
+        raw = int(st.get("total_cleaning_time") or 0)
+        self.stats = {"distance_km": round((st.get("total_distance_driven") or 0) / 128 / 1000, 1),
+                      "time_h": round(raw / 64, 1), "area_m2": round((st.get("total_area_cleaned") or 0) / 64),
+                      "runs": int(st.get("total_number_of_cleaning_runs") or 0), "_raw_time": raw}
+        changed = False
+        for k in cmd.CONSUMABLE_RESET:                  # primera vez: piezas «nuevas» desde hoy
+            if k not in self._maint:
+                self._maint[k] = raw
+                changed = True
+        if changed:
+            self._save_json(self._maint_path(), self._maint)
+        self._apply_maint()
+
+    def _apply_maint(self):
+        raw = (self.stats or {}).get("_raw_time")
+        if raw is None:
+            return
+        self.state.consumables = {k: max(0, round((raw - b) / 64)) for k, b in self._maint.items()
+                                  if k in cmd.CONSUMABLE_RESET}
         self._fire(self.on_update)
 
     def _poll_schedule(self):
@@ -486,10 +536,18 @@ class RobEyeRobot:
                 self._dock = dict(dock, y=-dock["y"], heading=-(dock.get("heading") or 0)) if dock else None
                 self._maps = maps
                 self._poll_schedule()
+                self._poll_stats()
             self._map_ts = time.time()
             if not self._areas:
                 return
-            self.map = self._map_from(self._areas, self._lines, self._dock)
+            m = self._map_from(self._areas, self._lines, self._dock)
+            sig = (m["cells_b64"], json.dumps(m.get("stored_zones"), sort_keys=True),
+                   json.dumps([(r["id"], r["name"]) for r in m["rooms"]]))
+            self.map = m
+            if sig == self._map_sig and not force:     # sin cambios: no republicar todo
+                self._map_ts = time.time()
+                return
+            self._map_sig = sig
         except Exception as e:
             self.log(f"  [robeye] no se pudo leer el mapa: {e}")
             self._map_ts = time.time()

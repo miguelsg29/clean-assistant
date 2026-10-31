@@ -1,5 +1,5 @@
 name: "Clean Assistant"
-version: "0.32.2"
+version: "0.32.3"
 slug: "clean_assistant"
 description: "Local (no-cloud) control for Cecotec Conga (8090 / 6090 / 7090 / 4690 / 9090 Ultra and more; 3090/4090 experimental; Rowenta X-plorer Serie 80 experimental): live map, room cleaning, zones, schedules, MQTT & Home Assistant."
 url: "https://github.com/miguelsg29/clean-assistant"
