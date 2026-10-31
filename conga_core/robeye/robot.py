@@ -97,6 +97,8 @@ WARN_MESSAGES.update({
     9011: "Parada de seguridad: reinicia el robot",
     9012: "Error interno del robot: reinícialo",
 })
+# avisos que paran al robot aunque lleguen como notificación (stuck_* también)
+_BLOCKING_FLAGS = {"lifted", "toplid_open", "safety_supervisor_safety_stop", "safety_supervisor_eternal_stop"}
 # avisos que NO son error (el robot sigue operativo)
 _NOTICE_CODES = {502, 527, 525, 530}
 
@@ -488,8 +490,11 @@ class RobEyeRobot:
                  for f in (flags or {}).get(k) or [] if f in FLAG_CODES]
         s.fault = codes[0] if codes else 0
         s.warning = WARN_MESSAGES.get(s.fault) if s.fault else None
-        real_err = {"error": [f for f in (flags or {}).get("error") or []
-                              if FLAG_CODES.get(f) not in _NOTICE_CODES]}
+        # el robot manda «atascado» como notificación, pero interrumpe la limpieza: cuenta como error
+        blocking = [f for k in ("error", "notification", "not_ready") for f in (flags or {}).get(k) or []
+                    if (k == "error" or f.startswith("stuck_") or f in _BLOCKING_FLAGS)
+                    and FLAG_CODES.get(f) not in _NOTICE_CODES]
+        real_err = {"error": blocking}
         new = robot_state(mode, st.get("charging"), real_err)
         if was[1] == "cleaning" and new != "cleaning" and self._task_floor is not None:
             self._poll_task()                  # m² y minutos finales antes de cerrar la sesión

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.33.1
+- Rowenta (backend `robeye`): si el robot se atasca (rueda, cepillo…) se muestra como **error**, no
+  como «Parado». El robot lo manda como notificación, pero interrumpe la limpieza.
+
 ## 0.33.0
 - **Rowenta X-plorer Serie 80 (backend `robeye`):**
   - **mapas:** crear un mapa nuevo (el robot explora y, al volver a la base, se guarda), cambiar de
