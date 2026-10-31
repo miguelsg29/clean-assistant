@@ -430,6 +430,11 @@ class MqttBridge:
                 "name": f"{t(lang, 'Limpiar')} {rname}", "unique_id": f"{uid}_room_{rid}",
                 "command_topic": f"conga/{node}/room_command", "payload_press": str(rid),
                 "icon": "mdi:broom"})
+        # limpiar toda la casa como botón (como los de habitación): cómodo en paneles de HA, donde
+        # el aspirador sale en gris mientras no limpia
+        self._disc("button", f"{uid}_clean_all", {
+            "name": t(lang, "Limpiar toda la casa"), "unique_id": f"{uid}_clean_all",
+            "command_topic": self.t_cmd, "payload_press": "start", "icon": "mdi:home"})
 
         # selectores: potencia / agua / mopa / modo / tipo de base. Las OPCIONES se traducen,
         # pero la clave canónica que entiende conga_core.commands se guarda en _opt_reverse
@@ -528,7 +533,7 @@ class MqttBridge:
                 ("sensor", f"{uid}_bh_cycles"), ("sensor", f"{uid}_bh_health"),
                 ("sensor", f"{uid}_bh_drain"), ("sensor", f"{uid}_bh_charge"),
                 ("sensor", f"{uid}_sensor_hours"), ("binary_sensor", f"{uid}_sensor_due"),
-                ("button", f"{uid}_sensor_reset"),
+                ("button", f"{uid}_sensor_reset"), ("button", f"{uid}_clean_all"),
                 ("sensor", f"{uid}_warning"),
                 ("number", f"{uid}_volume"), ("button", f"{uid}_dust"),
                 ("select", f"{uid}_dust_freq"), ("binary_sensor", f"{uid}_low_water")]

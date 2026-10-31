@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.7
+- **Home Assistant (todos los modelos): nuevo botón «Limpiar toda la casa»**, como los de cada
+  habitación, para paneles y automatizaciones.
+- Rowenta (backend `robeye`): el editor de horarios ya no muestra agua ni mopa, y la succión ofrece sus
+  4 niveles (Silencio, Eco, Normal, Turbo).
+
 ## 0.34.6
 - Rowenta (backend `robeye`): **activar o desactivar** desde Clean Assistant los horarios guardados en el
   robot (los de la app de Rowenta), además de borrarlos o importarlos.

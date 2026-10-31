@@ -2177,6 +2177,10 @@
   var MODE_OPTS={fan:['Eco','Normal','Turbo'],water:['Off','Bajo','Medio','Alto'],mop:['Off','Estándar','Fuerte','Potente']};
   var MODE_LBL={fan:'Succión',water:'Agua',mop:'Mopa'};
   var MODE_DEF={fan:'Normal',water:'Medio',mop:'Estándar',twice:false};
+  // robeye (Rowenta): sin agua ni mopa en los horarios; succión con sus 4 niveles («Off» = Silencio)
+  function isRobeye(){ return document.body.classList.contains('robeye'); }
+  function modeOpts(field){ return (field==='fan'&&isRobeye())?['Off','Eco','Normal','Turbo']:MODE_OPTS[field]; }
+  function fanLabel(v){ return (v==='Off'&&isRobeye())?t('Silencio'):t(v); }
   // config sugerida según el tipo de suelo (roomMaterialId 1..4): alfombra solo aspira,
   // madera suave/poca agua, azulejos fregado fuerte, suave normal.
   var FLOOR_DEF={4:{fan:'Turbo',water:'Off',mop:'Off'},3:{fan:'Eco',water:'Bajo',mop:'Estándar'},
@@ -2194,7 +2198,7 @@
     if(!SCHEDULES.length){ el.innerHTML='<p class="hint" style="opacity:.65">'+t('Aún no hay horarios.')+'</p>'; return; }
     SCHEDULES.forEach(function(p){
       var days=DAY_KEYS.map(function(d,i){return '<span class="day'+((p.days||[]).indexOf(d[0])>=0?' on':'')+'">'+(CA_DAYLET[CA_LANG][i]||d[1])+'</span>';}).join('');
-      var rooms=(p.rooms||[]).map(function(r,i){return '<span class="pr"><b>'+(i+1)+'. '+roomName(r.room)+'</b> · '+t(r.fan||'')+(r.twice?' · x2':'')+'</span>';}).join('');
+      var rooms=(p.rooms||[]).map(function(r,i){return '<span class="pr"><b>'+(i+1)+'. '+roomName(r.room)+'</b> · '+fanLabel(r.fan||'')+(r.twice?' · x2':'')+'</span>';}).join('');
       var card=document.createElement('div'); card.className='sched';
       card.innerHTML='<div class="top"><span class="nm"></span><span class="tm">'+(p.time||'')+'</span><button class="toggle sEn" style="margin-left:auto" aria-pressed="'+(p.enable?'true':'false')+'"></button></div>'+
         '<div class="days">'+days+'</div><div class="perroom">'+rooms+'</div>'+
@@ -2266,8 +2270,8 @@
   }
   function buildModeSeg(field,current,onChange){
     var seg=document.createElement('div'); seg.className='seg';
-    MODE_OPTS[field].forEach(function(opt){
-      var b=document.createElement('button'); b.textContent=t(opt); b.dataset.v=opt;
+    modeOpts(field).forEach(function(opt){
+      var b=document.createElement('button'); b.textContent=(field==='fan')?fanLabel(opt):t(opt); b.dataset.v=opt;
       if(opt===current)b.setAttribute('aria-pressed','true');
       b.addEventListener('click',function(){ seg.querySelectorAll('button').forEach(function(x){x.setAttribute('aria-pressed',x===b);}); onChange(opt); });
       seg.appendChild(b);
@@ -2281,7 +2285,7 @@
       var mode=editorModes[id]||(editorModes[id]=Object.assign({},MODE_DEF));
       var card=document.createElement('div'); card.className='rmode';
       var head=document.createElement('div'); head.className='rmhead'; head.textContent=(editorSel.indexOf(id)+1)+'. '+roomName(id); card.appendChild(head);
-      ['fan','water','mop'].forEach(function(field){
+      (isRobeye()?['fan']:['fan','water','mop']).forEach(function(field){
         var lab=document.createElement('div'); lab.className='rmlbl'; lab.textContent=t(MODE_LBL[field]); card.appendChild(lab);
         card.appendChild(buildModeSeg(field,mode[field],function(v){mode[field]=v;}));
       });

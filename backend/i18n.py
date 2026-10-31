@@ -134,6 +134,10 @@ STR: dict[str, dict[str, str]] = {
     #   salvo "Máx" -- usado solo en el backend legacy, ver FAN_LABELS_LEGACY en mqtt_bridge.py) —
     "Máx": {"en": "Max", "pt": "Máx", "fr": "Max", "pl": "Maks", "de": "Max", "it": "Max",
             "nl": "Max", "ca": "Màx"},
+    "Limpiar toda la casa": {"en": "Clean the whole house", "pt": "Limpar a casa toda",
+                             "fr": "Nettoyer toute la maison", "pl": "Posprzątaj cały dom",
+                             "de": "Ganzes Haus reinigen", "it": "Pulisci tutta la casa",
+                             "nl": "Hele huis schoonmaken", "ca": "Netejar tota la casa"},
     "Silencio": {"en": "Quiet", "pt": "Silêncio", "fr": "Silence", "pl": "Cichy", "de": "Leise",
                  "it": "Silenzioso", "nl": "Stil", "ca": "Silenci"},
     "Distancia total recorrida": {"en": "Total distance driven", "pt": "Distância total percorrida",
