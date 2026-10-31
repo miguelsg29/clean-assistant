@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.34.5
+- **Rowenta (backend `robeye`):**
+  - **mando manual**: el joystick de Clean Assistant mueve el robot (modo directo de su API local:
+    pasos cortos adelante/atrás y giros). Al soltarlo, o al mandar otra orden, el robot vuelve al modo normal;
+  - **borrar del robot** los horarios creados con la app de Rowenta (junto a «Importar a Clean Assistant»);
+  - el **tipo de suelo** y de habitación se ven cambiados al momento (antes volvía un instante al valor
+    anterior y parecía que no se dejaba cambiar);
+  - la **orientación del robot** en el mapa sale bien (el robot la da en radianes ×2048);
+  - sin botón **«Localizar»**, que este robot no tiene (tampoco en Home Assistant).
+
 ## 0.34.4
 - Rowenta (backend `robeye`): ya no aparece un falso «Error interno del robot» un par de segundos al
   quitar el depósito, levantar el robot o dejarlo en el suelo. El robot emite un instante unos

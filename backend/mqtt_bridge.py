@@ -294,8 +294,8 @@ class MqttBridge:
                   "model": dev_model, "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
             "name": dev_name, "unique_id": uid, "schema": "state",
-            "supported_features": ["start", "pause", "stop", "return_home",
-                                   "status", "locate"],
+            "supported_features": ["start", "pause", "stop", "return_home", "status"] +
+                                  ([] if getattr(self.robot, "robeye", False) else ["locate"]),
             "command_topic": self.t_cmd, "state_topic": self.t_state, "device": device})
 
         # sensores

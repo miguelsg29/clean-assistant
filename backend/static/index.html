@@ -396,7 +396,7 @@
       <div class="dockbar" role="group" aria-label="Controles del robot">
         <button class="dbtn primary" id="playBtn"><svg viewBox="0 0 24 24" fill="currentColor" id="playIco"><path d="M8 5v14l11-7z"/></svg><span id="playLbl">Iniciar</span></button>
         <button class="dbtn" id="homeBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></svg>Base</button>
-        <button class="dbtn" id="locBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0M7 12a5 5 0 0 1 10 0M11 12a1 1 0 0 1 2 0"/></svg>Localizar</button>
+        <button class="dbtn norobeye" id="locBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 12a8 8 0 0 1 16 0M7 12a5 5 0 0 1 10 0M11 12a1 1 0 0 1 2 0"/></svg>Localizar</button>
         <button class="dbtn" id="manBtn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="2.4"/></svg>Manual</button>
         <button class="dbtn onlylegacy" id="gotoBtn" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>Ir aquí</button>
       </div>
@@ -2348,7 +2348,7 @@
         '<div class="days">'+days+'</div>'+
         '<div class="perroom"><span class="pr">'+t('Habitaciones: {list}',{list:(rooms.join(', ')||t('todas'))})+'</span></div>'+
         // gen. legacy: solo lectura (borrar en el robot aún no está soportado)
-        (document.body.classList.contains('robeye')?'<div class="actions"><button class="btn ghost oimp">'+t('Importar a Clean Assistant')+'</button></div>':
+        (document.body.classList.contains('robeye')?'<div class="actions"><button class="btn ghost odel">'+t('Borrar del robot')+'</button><button class="btn ghost oimp">'+t('Importar a Clean Assistant')+'</button></div>':
          document.body.classList.contains('legacy')?'':'<div class="actions"><button class="btn ghost odel">'+t('Borrar del robot')+'</button></div>');
       card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">'+t('⚠ sábado')+'</b>':'');
       var oimp=card.querySelector('.oimp');

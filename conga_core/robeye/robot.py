@@ -26,7 +26,13 @@ PORT = 8080
 POLL_S = 2.0                 # estado + avisos
 POSE_S = 2.0                 # pose (solo mientras se mueve; parado, cada MAP_S)
 MAP_S = 60.0                 # mapa completo (+ horarios guardados en el robot)
-PAUSE_GRACE_S = 20.0         # tras pausar, el robot aún dice 'cleaning' unos segundos
+PAUSE_GRACE_S = 20.0
+# control manual (/direct/…, de la página «Direct Mode» de la web del robot). Cada pulso de la
+# interfaz (~cada 180 ms) es un paso corto. Formatos de coma fija de su JS: distancia en cm (×32),
+# velocidad en cm/s (×512), ángulo en rad (×2048), velocidad angular en rad/s (×8192)
+DIRECT_STEP_CM, DIRECT_SPEED_CMS = 6, 30
+DIRECT_TURN_DEG, DIRECT_TURN_DPS = 12, 70
+DIRECT_IDLE_S = 4.0          # sin pulsos: se sale del modo manual         # tras pausar, el robot aún dice 'cleaning' unos segundos
 TASK_S = 15.0                # tarea en curso (m², minutos, habitaciones) mientras se mueve
 OFFLINE_AFTER = 3            # fallos seguidos -> robot desconectado
 # IP dinámica: si el robot deja de responder, se le busca por la subred (/24) y se le reconoce por
@@ -38,6 +44,9 @@ REDISCOVER_S = 60.0
 # captura sale de ~44 m², que cuadra con sus estadísticas (~38 m² por limpieza). Por confirmar.
 UNIT_M = 0.002
 RES = 0.05                   # metros por celda de la rejilla de CA
+# orientación (heading) en radianes ×2048 (coma fija 1.4.11, como los giros del modo manual):
+# comprobado girando 90° con /direct/turn_right -> el heading bajó 3168
+HEADING_SCALE = 2048.0
 # el eje y del robot crece hacia arriba y la rejilla de CA hacia abajo: se invierte al leer, para que
 # el mapa salga igual que en la app del robot (y el ángulo, con él)
 
@@ -291,6 +300,7 @@ class RobEyeRobot:
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
         self._paused_ts = 0.0
         self._flag_since = {}              # desde cuándo está cada indicador del robot
+        self._direct_on, self._direct_ts = False, 0.0   # mando manual activo / último pulso
         self._resume_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
@@ -332,7 +342,9 @@ class RobEyeRobot:
         self._map_ts = 0.0
 
     def query_orders(self):
-        pass                             # los horarios los guarda y lanza Clean Assistant
+        """Horarios guardados en el robot (los de su app); los de CA los lanza Clean Assistant."""
+        if self.host:
+            self._poll_schedule()
 
     def command(self, control: dict) -> dict:
         c = control.get("control")
@@ -401,6 +413,7 @@ class RobEyeRobot:
                         params["floor_type"] = CA_TO_FLOOR.get(mat, "none")
                 if params and self._map_id is not None:
                     self._set("modify_area", map_id=self._map_id, area_id=rid, **params)
+                    a.update(params)                 # reflejo en el mapa en caché (es el mismo dict)
             self._save_names()
             self._map_ts = 0.0                     # relee el mapa (tipo/suelo nuevos) en el próximo ciclo
             self._build_map(force=True)
@@ -418,6 +431,15 @@ class RobEyeRobot:
         elif c in ("get_map", "getMapAll"):
             self._map_ts = 0.0
             return {"result": 0}
+        elif c == "set_direct":                              # mando manual
+            return self._direct(int(control.get("direction", 0)))
+        elif c == "deleteOrder6090":                         # borrar un horario guardado en el robot
+            tid = int(control.get("orderid") or 0)
+            if any(o.get("orderid") == tid for o in self.orders):
+                r = self._set("delete_scheduled_task", task_id=tid)
+                self._poll_schedule()
+                return r
+            return {"result": 0}                             # los de CA no viven en el robot
         elif c == "set_virwall":                             # zonas prohibidas (lista completa)
             zones = [z for z in control.get("virwallList") or []
                      if int(z.get("Type", 200)) == 200 and len(z.get("PointList") or []) >= 3]
@@ -452,7 +474,7 @@ class RobEyeRobot:
                 return self._set("delete_map", map_id=mid)
             self._choose_map(mid)                            # activar
             return {"result": 0}
-        elif c in ("setOrder6090", "deleteOrder6090", "lock_device", "set_time", "set_upgrade_config",
+        elif c in ("setOrder6090", "lock_device", "set_time", "set_upgrade_config",
                    "setEditInfoBeforeHand"):
             return {"result": 0}                             # horarios: los lanza Clean Assistant
         self.log(f"  [robeye] comando '{c}' no soportado en este robot")
@@ -466,6 +488,7 @@ class RobEyeRobot:
             return json.loads(r.read().decode("utf-8", "replace"))
 
     def _set(self, name: str, **params) -> dict:
+        self._direct_off()                     # cualquier otra orden saca del modo manual
         try:
             r = self._get(f"set/{name}", params or None)
         except Exception as e:
@@ -490,6 +513,8 @@ class RobEyeRobot:
                 self._stop.wait(POLL_S)
                 continue
             self._poll_status()
+            if self._direct_on and time.time() - self._direct_ts > DIRECT_IDLE_S:
+                self._direct_off()
             moving = self.state.state in ("cleaning", "mapping", "returning")
             if self.state.online and (moving or time.time() - self._map_ts > MAP_S):
                 self._poll_pose()
@@ -572,7 +597,7 @@ class RobEyeRobot:
         x, y = p["x1"] * UNIT_M, -p["y1"] * UNIT_M
         cellp = {"x": round((x - w["min_x"]) / w["res"] - b[0], 1),
                  "y": round((y - w["min_y"]) / w["res"] - b[1], 1),
-                 "angle": -(p.get("heading") or 0) / 1000.0}
+                 "angle": -(p.get("heading") or 0) / HEADING_SCALE}
         if cellp == self.pose:
             return
         self.map["robot"] = self.pose = cellp
@@ -618,6 +643,35 @@ class RobEyeRobot:
         if t["rooms"]:
             s.cleaning_room = self._to_ca.get(t["rooms"][-1], t["rooms"][-1])
         self._fire(self.on_update)
+
+    def _direct(self, d: int) -> dict:
+        """Un pulso del mando: 1 adelante, 4 atrás, 2 izquierda, 3 derecha, 0 parar."""
+        try:
+            if not self._direct_on:
+                self._get("direct/enable", {"enabled": 1})
+                self._direct_on = True
+            if d in (1, 4):
+                self._get("direct/forward" if d == 1 else "direct/back",
+                          {"dist": round(DIRECT_STEP_CM * 32), "speed": round(DIRECT_SPEED_CMS * 512)})
+            elif d in (2, 3):
+                rad = 3.141592653589793 / 180
+                self._get("direct/turn_left" if d == 2 else "direct/turn_right",
+                          {"angle": round(DIRECT_TURN_DEG * rad * 2048),
+                           "ang_speed": round(DIRECT_TURN_DPS * rad * 8192)})
+        except Exception as e:
+            self.log(f"  [!] robeye: mando manual: {e}")
+            return {"ok": False, "error": str(e)}
+        self._direct_ts = time.time()
+        return {"result": 0}
+
+    def _direct_off(self):
+        """Sale del modo manual (tras unos segundos sin pulsos, o antes de otra orden)."""
+        if self._direct_on:
+            self._direct_on = False
+            try:
+                self._get("direct/enable", {"enabled": 0})
+            except Exception:
+                pass
 
     def _rid(self, ca_id) -> int:
         """id de habitación de CA -> id del robot."""
@@ -810,7 +864,7 @@ class RobEyeRobot:
         name = next((m.get("map_meta_data") for m in maps if m.get("map_id") == self._map_id), "")
         info = {"grid": grid, "rooms": rooms, "map_name": name or "Interior", "params": prm,
                 "pose": ({"x": dock["x"] * UNIT_M, "y": dock["y"] * UNIT_M,
-                          "angle": (dock.get("heading") or 0) / 1000.0} if dock else None),
+                          "angle": (dock.get("heading") or 0) / HEADING_SCALE} if dock else None),
                 "robot": None, "zones": zones,
                 "house": {"id": None, "name": "",
                           "maps": [{"id": m["map_id"], "name": m.get("map_meta_data") or ""}
