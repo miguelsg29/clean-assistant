@@ -105,9 +105,20 @@ MODE = (env("CONGA_MODE", "mock") or "mock").lower()
 # propio en TCP claro (4010/4030/4050), sin TLS/WebSocket. Por defecto 'new' (8090/9090/4690…).
 BACKEND = (env("CONGA_BACKEND", "new") or "new").lower()
 LEGACY = MODE == "real" and BACKEND == "legacy"
+# CONGA_BACKEND=robeye -> Rowenta X-plorer Serie 80 y demás RobArt «RobEye»: API HTTP local del
+# robot (puerto 8080, opción ROBOT_IP). Sin nube que suplantar.
+ROBEYE = MODE == "real" and BACKEND == "robeye"
+# backends cuyos horarios lanza Clean Assistant a su hora (no el robot)
+CA_SCHEDULES = LEGACY or ROBEYE
+BACKEND_NAME = "legacy" if LEGACY else "robeye" if ROBEYE else "new"
 if MODE == "real":
     from conga_core.config import RobotConfig
-    if LEGACY:
+    if ROBEYE:
+        from conga_core.robeye.robot import RobEyeRobot
+        robot = RobEyeRobot(RobotConfig.from_env(), host=(env("ROBOT_IP", "") or "").strip(),
+                            names_path=_data("robeye_rooms.json"),
+                            subnet_hint=lambda: _server_ip())
+    elif LEGACY:
         from conga_core.legacy.robot import LegacyRobot
         robot = LegacyRobot(RobotConfig.from_env())
     else:
@@ -431,7 +442,7 @@ _load_room_names()
 # ------- registro de actividad (historial de limpiezas) -------
 def _match_schedule(ts):
     """Nombre del horario del robot que cuadra con este momento (día+hora ±20 min), o None."""
-    if LEGACY:     # los horarios los lanza CA (_run_due_schedules_legacy), no el robot
+    if CA_SCHEDULES:   # los horarios los lanza CA (_run_due_schedules_legacy), no el robot
         last = _legacy_sched["last"]
         return last["name"] if last and abs(ts - last["ts"]) <= 20 * 60 else None
     dt = datetime.datetime.fromtimestamp(ts)
@@ -839,7 +850,7 @@ async def _loop():
         mqtt.publish_state()
         if sensor_care.update(robot.state):   # horas de trabajo para el aviso de sensores
             mqtt.publish_sensors()
-        if LEGACY:
+        if CA_SCHEDULES:
             await _run_due_schedules_legacy()
 
 
@@ -1018,7 +1029,7 @@ async def lifespan(app: FastAPI):
         peticiones (via cloud_stub) y, cuando tiene los esenciales (DID + SN), completa MAC
         (ARP) + factory_id (por defecto 1003) + userid (acuñado del DID) y configura CA. Solo
         si aún no hay identidad; no toca instalaciones ya configuradas."""
-        if MODE != "real" or LEGACY or robot.cfg.configured:
+        if MODE != "real" or LEGACY or ROBEYE or robot.cfg.configured:
             return
         for k in ("did", "sn", "project_type", "factory_id"):
             if ident.get(k) and not _auto_ident.get(k):
@@ -1047,7 +1058,7 @@ async def lifespan(app: FastAPI):
     # en cloud como RESERVA (si solo se redirige tcp-cecotec, se captura del relay); en cuanto
     # llega la OTA al cloud_stub, _auto_provision configura CA y cambia a local por su cuenta.
     # (la gen. legacy no necesita provisión: el robot manda su identidad al registrarse)
-    if MODE == "real" and not LEGACY and not robot.cfg.configured:
+    if MODE == "real" and not LEGACY and not ROBEYE and not robot.cfg.configured:
         robot.link = "cloud"
         print("[provision] primer arranque: aprendo la identidad del robot "
               "(local por OTA; cloud como reserva)")
@@ -1064,7 +1075,7 @@ async def lifespan(app: FastAPI):
         # sincroniza CA <-> robot (importa los del robot que falten, sube los de CA que falten).
         # Legacy: los del robot solo se MUESTRAN; los ejecuta el propio robot y, si se importaran,
         # Clean Assistant los lanzaría también (_run_due_schedules_legacy) -> doble limpieza.
-        if not LEGACY and _reconcile_schedules():
+        if not CA_SCHEDULES and _reconcile_schedules():
             asyncio.run_coroutine_threadsafe(broadcast_schedules(), loop)
     robot.on_orders = on_orders
     robot.on_provision = on_provision
@@ -1076,7 +1087,7 @@ async def lifespan(app: FastAPI):
     # y acepta las subidas de informes de limpieza, que ingerimos en el historial. Requiere
     # redirigir por DNS los dominios de Cecotec a este servidor (ver cloud_stub.py).
     # Solo gen. nueva: la legacy no usa estos servicios TLS (su OTA es HTTP en otros puertos).
-    if MODE == "real" and not LEGACY:
+    if MODE == "real" and not LEGACY and not ROBEYE:
         def _on_report(rep):
             if _ingest_report(rep):
                 asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
@@ -1086,14 +1097,14 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"[cloud-local] no se pudo arrancar: {e}")
     mqtt.start()
-    print(f"[Clean Assistant] modo={MODE} backend={'legacy' if LEGACY else 'new'}")
+    print(f"[Clean Assistant] modo={MODE} backend={BACKEND_NAME}")
     task = asyncio.create_task(_loop())
     yield
     task.cancel()
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.31.10", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.32.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1111,7 +1122,7 @@ def get_info():
         model = "Conga"
     return {"version": app.version, "model": model,
             "mode": getattr(robot, "link", "local"),
-            "backend": "legacy" if LEGACY else "new",   # la interfaz oculta lo que no aplica
+            "backend": BACKEND_NAME,   # la interfaz oculta lo que no aplica
             "map_image_live": mqtt.map_image_live,
             "lang": _ui_prefs["lang"]}
 
@@ -1220,7 +1231,10 @@ def _server_ip() -> str | None:
 def get_setup():
     """Datos para el asistente de primer arranque: IP a la que redirigir el DNS del robot,
     el hostname a reescribir, si el robot ya conecta, y si es primer arranque (sin mapas)."""
-    if LEGACY:
+    if ROBEYE:
+        # sin DNS que redirigir: Clean Assistant llama al robot por su IP
+        host, dns_hosts = getattr(robot, "host", ""), []
+    elif LEGACY:
         # gen. 3xxx/4xxx: un único host para cmd/map/hora (4010/4030/4050). El resto son los que
         # redirige Congatudo para cortar del todo con la nube (OTA, descargas, logs).
         host = "cecotec.das.3irobotix.net"

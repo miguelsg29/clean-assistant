@@ -103,7 +103,8 @@ class MqttBridge:
         self._rooms = rooms_provider
         # ver el comentario sobre FAN_LABELS_NEW/FAN_LABELS_LEGACY: el significado real de
         # FAN["Off"] depende del backend (nuevo = apagado real; legacy = remapeado a "máximo").
-        self.legacy = (env("CONGA_BACKEND", "new") or "new").lower() == "legacy"
+        # robeye (Rowenta…) usa la misma tabla: su «Off» también es el nivel máximo
+        self.legacy = (env("CONGA_BACKEND", "new") or "new").lower() in ("legacy", "robeye")
         self._fan_labels = FAN_LABELS_LEGACY if self.legacy else FAN_LABELS_NEW
         self.log = log
         self._persist = persist        # callback opcional para persistir prefs (frecuencia/base)
@@ -159,6 +160,8 @@ class MqttBridge:
         """Identidad del dispositivo en HA. Usa el DID REAL del robot (capturado por
         auto-provisión o del .env), no el del entorno del add-on (que es 0). Así el
         add-on y las pruebas del PC convergen en UN solo Conga y no salen duplicados."""
+        if getattr(self.robot, "robeye", False):   # sin DID: un único robot RobEye por instalación
+            return "robeye"
         did = getattr(getattr(self.robot, "cfg", None), "did", 0) or 0
         if did in (0, 123456):
             did = self._env_did
@@ -167,6 +170,11 @@ class MqttBridge:
     def _model_names(self):
         """(nombre, modelo) del dispositivo para HA según el project_type del robot. Para modelos
         no mapeados usa un nombre genérico 'Conga' e incluye el project_type crudo en el modelo."""
+        if getattr(self.robot, "robeye", False):   # Rowenta X-plorer y demás RobArt «RobEye»
+            cap = getattr(self.robot, "captured", {}) or {}
+            fw = cap.get("firmware") or ""
+            model = "Rowenta X-plorer Serie 80" if fw.startswith("SER80") else "RobEye"
+            return (cap.get("name") or "Robot", f"{model} ({fw.split('-release')[0]})" if fw else model)
         if getattr(self.robot, "legacy", False):   # gen. 3xxx/4xxx: no reporta project_type
             return ("Conga", "Conga 3xxx/4xxx (legacy)")
         pt = (getattr(getattr(self.robot, "cfg", None), "project_type", "") or "").strip()

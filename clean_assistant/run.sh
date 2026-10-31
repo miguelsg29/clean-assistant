@@ -3,8 +3,10 @@
 CONFIG="/data/options.json"
 
 export CONGA_MODE=real
-# "new" = 8090/9090/4690/6090… (TLS+WebSocket en 9090); "legacy" = 3090/3490/4090 (TCP 4010/4030/4050)
+# "new" = 8090/9090/4690/6090… (TLS+WebSocket en 9090); "legacy" = 3090/3490/4090 (TCP 4010/4030/4050);
+# "robeye" = Rowenta X-plorer Serie 80 (API HTTP local del robot en ROBOT_IP:8080)
 export CONGA_BACKEND=$(jq -r '.BACKEND // "new"' $CONFIG)
+export ROBOT_IP=$(jq -r '.ROBOT_IP // ""' $CONFIG)
 export ROBOT_DID=$(jq -r '.ROBOT_DID // 0' $CONFIG)
 export ROBOT_USERID=$(jq -r '.ROBOT_USERID // 0' $CONFIG)
 export ROBOT_SN=$(jq -r '.ROBOT_SN // ""' $CONFIG)

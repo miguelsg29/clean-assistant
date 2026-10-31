@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.32.0
+- **Nuevo backend experimental `robeye`: Rowenta X-plorer Serie 80** (y otros robots con plataforma
+  RobArt «RobEye»). Habla con la API HTTP local del robot (puerto 8080), sin nube ni DNS: mapa con
+  sus habitaciones y zonas de bloqueo, posición en vivo, limpiar todo o por habitaciones, pausa,
+  volver a la base, succión, modo bordes y doble pasada («a fondo»), avisos del robot, horarios y
+  MQTT/Home Assistant. Los nombres de las habitaciones se guardan en Clean Assistant.
+- Opciones nuevas: `BACKEND: robeye` y `ROBOT_IP` (opcional). Si el robot cambia de IP, Clean
+  Assistant lo vuelve a encontrar solo en la red y lo reconoce por su identificador.
+
 ## 0.31.10
 - **Los horarios llevan la categoría y el suelo reales de cada habitación.** Antes se mandaban siempre
   sin categoría (`room_type: 0`) y con suelo por defecto; la app oficial del 3890 manda la categoría

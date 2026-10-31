@@ -1,7 +1,7 @@
 name: "Clean Assistant"
-version: "0.31.10"
+version: "0.32.0"
 slug: "clean_assistant"
-description: "Local (no-cloud) control for Cecotec Conga (8090 / 6090 / 7090 / 4690 / 9090 Ultra and more; 3090/4090 experimental): live map, room cleaning, zones, schedules, MQTT & Home Assistant."
+description: "Local (no-cloud) control for Cecotec Conga (8090 / 6090 / 7090 / 4690 / 9090 Ultra and more; 3090/4090 experimental; Rowenta X-plorer Serie 80 experimental): live map, room cleaning, zones, schedules, MQTT & Home Assistant."
 url: "https://github.com/miguelsg29/clean-assistant"
 # Imagen PRECOMPILADA (GitHub Actions -> GHCR). Con esto Home Assistant DESCARGA la imagen en vez
 # de compilarla en el dispositivo: actualizaciones rápidas y con barra de progreso. La publica el
@@ -42,6 +42,7 @@ services:
   - mqtt:want
 options:
   BACKEND: "new"
+  ROBOT_IP: ""
   ROBOT_DID: 0
   ROBOT_USERID: 0
   ROBOT_SN: "PON_AQUI_EL_SN_DE_TU_ROBOT"
@@ -58,7 +59,8 @@ options:
   DEFAULT_MOP: "Estándar"
   DEFAULT_MODE: "Auto"
 schema:
-  BACKEND: list(new|legacy)
+  BACKEND: list(new|legacy|robeye)
+  ROBOT_IP: str?
   ROBOT_DID: int
   ROBOT_USERID: int
   ROBOT_SN: str

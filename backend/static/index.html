@@ -244,6 +244,8 @@
   /* backend legacy (Conga 3xxx/4xxx): oculta lo que no existe en esa generación */
   body.legacy .nolegacy,body.legacy .mDel{display:none!important}
   body:not(.legacy) .onlylegacy{display:none!important}
+  /* backend robeye (Rowenta X-plorer…): sin agua/mopa ni los extras de la gen. legacy */
+  body.robeye .norobeye,body.robeye .onlylegacy{display:none!important}
   .mapnote{position:absolute;left:50%;transform:translateX(-50%);bottom:96px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:max-content;max-width:calc(100% - 32px);padding:8px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12.5px}
   .mapnote[hidden]{display:none}
   .mapnote .btn{width:auto;padding:5px 12px;font-size:12px}
@@ -420,13 +422,13 @@
         <div class="rooms" id="roomChips"></div>
         <p class="hint" id="houseSum" style="opacity:.75;font-size:12px;margin:2px 0 4px;font-weight:560"></p>
         <div class="phead">Modo</div>
-        <div class="seg" data-cmd="mode"><button data-v="Auto" aria-pressed="true">Auto</button><button data-v="Fregado">Fregado</button><button data-v="Bordes">Bordes</button><button data-v="Espiral">Espiral</button></div>
+        <div class="seg" data-cmd="mode"><button data-v="Auto" aria-pressed="true">Auto</button><button data-v="Fregado" class="norobeye">Fregado</button><button data-v="Bordes">Bordes</button><button data-v="Espiral" class="norobeye">Espiral</button></div>
         <div class="phead">Succión</div>
         <div class="seg" data-cmd="fan"><button data-v="Off" id="fanOffBtn">Off</button><button data-v="Eco">Eco</button><button data-v="Normal" aria-pressed="true">Normal</button><button data-v="Turbo">Turbo</button></div>
-        <div class="phead">Agua</div>
-        <div class="seg" data-cmd="water"><button data-v="Off">Off</button><button data-v="Bajo">Bajo</button><button data-v="Medio" aria-pressed="true">Medio</button><button data-v="Alto">Alto</button></div>
-        <div class="phead">Mopa</div>
-        <div class="seg" data-cmd="mop"><button data-v="Off">Off</button><button data-v="Estándar" aria-pressed="true">Estándar</button><button data-v="Fuerte">Fuerte</button><button data-v="Potente">Potente</button></div>
+        <div class="phead norobeye">Agua</div>
+        <div class="seg norobeye" data-cmd="water"><button data-v="Off">Off</button><button data-v="Bajo">Bajo</button><button data-v="Medio" aria-pressed="true">Medio</button><button data-v="Alto">Alto</button></div>
+        <div class="phead norobeye">Mopa</div>
+        <div class="seg norobeye" data-cmd="mop"><button data-v="Off">Off</button><button data-v="Estándar" aria-pressed="true">Estándar</button><button data-v="Fuerte">Fuerte</button><button data-v="Potente">Potente</button></div>
         <div class="row" style="margin-top:8px"><div class="rt"><div class="t">Doble pasada (x2)</div><div class="d">Pasa dos veces por cada zona</div></div><button class="toggle" id="twiceTog"></button></div>
         <div class="btnrow">
           <button class="btn" id="cleanSel" disabled>Limpiar selección</button>
@@ -2526,6 +2528,7 @@
   }
   function maybeWizard(){
     if(_wizShown) return;
+    if(document.body.classList.contains('robeye')) return;   // sin DNS que configurar ni mapa que crear
     if(localStorage.getItem('ca_wizard_dismissed')==='1') return;
     if((HOUSE_MAPS.maps||[]).length>0) return;   // ya hay mapa -> no molestar
     if(robotBusyMapping()) return;                // está mapeando/limpiando -> no molestar
@@ -2671,10 +2674,11 @@
     var ver=document.getElementById('appVer');
     if(ver&&info.version) ver.textContent='v'+info.version;
     if(info.backend==='legacy') document.body.classList.add('legacy');   // Conga 3xxx/4xxx
+    if(info.backend==='robeye') document.body.classList.add('legacy','robeye');   // Rowenta X-plorer (API local)
     // El botón de succión "Off" (seg[data-cmd=fan]) es un apagado real SOLO en el backend nuevo.
     // En el legacy, conga_core/legacy/robot.py remapea ese mismo valor a "máximo" de verdad
     // (ver FAN_LABELS_LEGACY en mqtt_bridge.py) -- ahí el botón vuelve a decir "Máx", traducido.
-    if(info.backend==='legacy'){ var fb=document.getElementById('fanOffBtn'); if(fb){ fb.textContent=t('Máx');
+    if(info.backend==='legacy'||info.backend==='robeye'){ var fb=document.getElementById('fanOffBtn'); if(fb){ fb.textContent=t('Máx');
       fb.parentNode.appendChild(fb); } }   // relabelled "Máx" reads better at the end, not first (review #18)
     var ml=document.getElementById('mapLiveTog'); if(ml) ml.setAttribute('aria-pressed',!!info.map_image_live);
     var el=document.getElementById('entityLangSel'); if(el&&info.lang){ el.value=info.lang; el.setAttribute('data-prev',info.lang); }
