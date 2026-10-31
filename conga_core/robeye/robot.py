@@ -433,6 +433,11 @@ class RobEyeRobot:
             return {"result": 0}
         elif c == "set_direct":                              # mando manual
             return self._direct(int(control.get("direction", 0)))
+        elif c == "robot_order_enable":                      # activar/desactivar un horario del robot
+            tid = int(control.get("orderid") or 0)
+            r = self._set("modify_scheduled_task", task_id=tid, enabled=1 if control.get("enable") else 0)
+            self._poll_schedule()
+            return r
         elif c == "deleteOrder6090":                         # borrar un horario guardado en el robot
             tid = int(control.get("orderid") or 0)
             if any(o.get("orderid") == tid for o in self.orders):

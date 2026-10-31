@@ -1108,7 +1108,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.34.5", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.34.6", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1834,6 +1834,17 @@ def get_robot_orders():
 @app.post("/api/robot/orders/refresh")
 async def refresh_robot_orders():
     robot.query_orders()             # respuesta asíncrona -> llega por WS (broadcast_orders)
+    return {"ok": True}
+
+
+@app.post("/api/robot/orders/toggle")
+async def toggle_robot_order(payload: dict):
+    """Activa/desactiva un horario guardado en el robot (solo backends que lo permiten: robeye)."""
+    if not ROBEYE:
+        return {"ok": False, "error": "no disponible en este robot"}
+    robot.command({"control": "robot_order_enable", "orderid": int(payload["orderid"]),
+                   "enable": bool(payload.get("enable"))})
+    await broadcast_orders()
     return {"ok": True}
 
 

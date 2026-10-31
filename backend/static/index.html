@@ -955,6 +955,7 @@
   "Aún no hay mapas recordados. Aparecerán al cargar el mapa del robot.":{en:"No maps remembered yet. They'll appear when the robot's map loads.",pt:"Ainda não há mapas guardados. Aparecerão ao carregar o mapa do robô.",fr:"Aucune carte mémorisée pour l’instant. Elles apparaîtront au chargement de la carte du robot.",pl:"Brak zapamiętanych map. Pojawią się po załadowaniu mapy robota.",de:"Noch keine Karten gespeichert. Sie erscheinen, wenn die Roboterkarte geladen wird.",it:"Ancora nessuna mappa memorizzata. Appariranno al caricamento della mappa del robot.",nl:"Nog geen kaarten onthouden. Ze verschijnen wanneer de robotkaart wordt geladen.",ca:"Encara no hi ha mapes recordats. Apareixeran en carregar el mapa del robot."},
   "(sin nombre)":{en:"(no name)",pt:"(sem nome)",fr:"(sans nom)",pl:"(bez nazwy)",de:"(ohne Name)",it:"(senza nome)",nl:"(zonder naam)",ca:"(sense nom)"},
   "Activo":{en:"Active",pt:"Ativo",fr:"Actif",pl:"Aktywna",de:"Aktiv",it:"Attiva",nl:"Actief",ca:"Actiu"},
+  "Desactivar":{en:"Deactivate",pt:"Desativar",fr:"Désactiver",pl:"Dezaktywuj",de:"Deaktivieren",it:"Disattiva",nl:"Deactiveren",ca:"Desactivar"},
   "Activar":{en:"Activate",pt:"Ativar",fr:"Activer",pl:"Aktywuj",de:"Aktivieren",it:"Attiva",nl:"Activeren",ca:"Activar"},
   "Toca para editar la casa":{en:"Tap to edit the house",pt:"Toca para editar a casa",fr:"Touchez pour modifier la maison",pl:"Dotknij, aby edytować dom",de:"Zum Bearbeiten des Hauses tippen",it:"Tocca per modificare la casa",nl:"Tik om het huis te bewerken",ca:"Toca per editar la casa"},
   "Renombrar mapa":{en:"Rename map",pt:"Renomear mapa",fr:"Renommer la carte",pl:"Zmień nazwę mapy",de:"Karte umbenennen",it:"Rinomina mappa",nl:"Kaart hernoemen",ca:"Reanomenar mapa"},
@@ -2348,9 +2349,15 @@
         '<div class="days">'+days+'</div>'+
         '<div class="perroom"><span class="pr">'+t('Habitaciones: {list}',{list:(rooms.join(', ')||t('todas'))})+'</span></div>'+
         // gen. legacy: solo lectura (borrar en el robot aún no está soportado)
-        (document.body.classList.contains('robeye')?'<div class="actions"><button class="btn ghost odel">'+t('Borrar del robot')+'</button><button class="btn ghost oimp">'+t('Importar a Clean Assistant')+'</button></div>':
+        (document.body.classList.contains('robeye')?'<div class="actions"><button class="btn ghost oen">'+t(o.enable?'Desactivar':'Activar')+'</button><button class="btn ghost odel">'+t('Borrar del robot')+'</button><button class="btn ghost oimp">'+t('Importar a Clean Assistant')+'</button></div>':
          document.body.classList.contains('legacy')?'':'<div class="actions"><button class="btn ghost odel">'+t('Borrar del robot')+'</button></div>');
       card.querySelector('.nm').innerHTML=(o.order_name||('#'+o.orderid))+(sat?' <b style="color:var(--critical)">'+t('⚠ sábado')+'</b>':'');
+      var oen=card.querySelector('.oen');
+      if(oen) oen.addEventListener('click',function(){
+        oen.disabled=true;
+        fetch(BASE+'api/robot/orders/toggle',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({orderid:o.orderid,enable:!o.enable})})
+          .then(function(r){return r.json();}).then(function(){ oen.disabled=false; });
+      });
       var oimp=card.querySelector('.oimp');
       if(oimp) oimp.addEventListener('click',function(){
         var keys={1:'dom',2:'lun',4:'mar',8:'mie',16:'jue',32:'vie',64:'sab'}, days=[];

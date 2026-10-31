@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.6
+- Rowenta (backend `robeye`): **activar o desactivar** desde Clean Assistant los horarios guardados en el
+  robot (los de la app de Rowenta), además de borrarlos o importarlos.
+
 ## 0.34.5
 - **Rowenta (backend `robeye`):**
   - **mando manual**: el joystick de Clean Assistant mueve el robot (modo directo de su API local:
