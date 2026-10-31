@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.32.4
+- **Rowenta (backend `robeye`): la pausa desde Home Assistant ya no se pierde.** Justo después de
+  parar, el robot sigue diciendo «limpiando» unos segundos y Clean Assistant olvidaba la pausa; así
+  el «iniciar» de HA lanzaba una limpieza completa en vez de continuar.
+
 ## 0.32.3
 - **Arreglo general: entidades «no disponibles» en Home Assistant tras reiniciar o actualizar el
   add-on.** Si el robot respondía antes de que Clean Assistant se conectara a MQTT, la disponibilidad

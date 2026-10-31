@@ -26,6 +26,7 @@ PORT = 8080
 POLL_S = 2.0                 # estado + avisos
 POSE_S = 2.0                 # pose (solo mientras se mueve; parado, cada MAP_S)
 MAP_S = 60.0                 # mapa completo (+ horarios guardados en el robot)
+PAUSE_GRACE_S = 20.0         # tras pausar, el robot aún dice 'cleaning' unos segundos
 TASK_S = 15.0                # tarea en curso (m², minutos, habitaciones) mientras se mueve
 OFFLINE_AFTER = 3            # fallos seguidos -> robot desconectado
 # IP dinámica: si el robot deja de responder, se le busca por la subred (/24) y se le reconoce por
@@ -230,6 +231,7 @@ class RobEyeRobot:
         self._mode = 0                     # commands.CLEAN_MODES elegido en la interfaz
         self._twice = False
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
+        self._paused_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
         self._map_sig = None               # para avisar del mapa solo si cambia
@@ -281,8 +283,10 @@ class RobEyeRobot:
                 self._mode = int(typ)
                 return {"result": 0}
             if val == 2:                                     # pausa = parar (luego «continuar»)
-                self._paused = True
-                return self._set("stop")
+                r = self._set("stop")
+                self._paused, self._paused_ts = True, time.time()
+                self.state.state = "paused"
+                return r
             if typ == 2 and val == 1:
                 self._paused = False
                 return self._set("continue")
@@ -411,10 +415,13 @@ class RobEyeRobot:
         if was[1] == "cleaning" and new != "cleaning" and self._task_floor is not None:
             self._poll_task()                  # m² y minutos finales antes de cerrar la sesión
         s.state = new
-        # el robot no tiene pausa: CA la hace con stop y el robot queda en 'ready' fuera de la base
-        if s.state != "idle":
+        # el robot no tiene pausa: CA la hace con stop y el robot queda en 'ready' fuera de la base.
+        # Tras el stop sigue diciendo 'cleaning' unos segundos: eso no quita la pausa (si no, el
+        # «start» de HA lanzaba una limpieza completa en vez de continuar)
+        if self._paused and (s.state in ("returning", "docked", "error") or
+                             (s.state == "cleaning" and time.time() - self._paused_ts > PAUSE_GRACE_S)):
             self._paused = False
-        elif self._paused:
+        if self._paused:
             s.state = "paused"
         if (s.online, s.state, s.battery, s.fault) != was:
             self._fire(self.on_update)
