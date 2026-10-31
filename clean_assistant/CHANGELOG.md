@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.33.0
+- **Rowenta X-plorer Serie 80 (backend `robeye`):**
+  - **mapas:** crear un mapa nuevo (el robot explora y, al volver a la base, se guarda), cambiar de
+    mapa y borrar mapas, como con los Conga. Crear un mapa nunca borra los que ya tiene el robot;
+  - **tipo de suelo y de habitación** guardados en el propio robot (antes el suelo volvía a «Suave»).
+    El robot distingue azulejo, alfombra y «sin definir»; Suave y Madera se guardan en Clean Assistant;
+  - **succión con los 4 niveles del robot**: Silencio, Eco, Normal y Turbo (antes «Máx» y «Turbo» eran
+    el mismo);
+  - la habitación en curso ya no salta a la última planificada al empezar una limpieza completa.
+- README: el Rowenta X-plorer Serie 80 en los robots compatibles.
+
 ## 0.32.6
 - Rowenta (backend `robeye`): al continuar tras una pausa ya no parpadea «Parado» un par de segundos.
 - El log de los horarios lanzados por Clean Assistant ya no dice «gen. legacy» en robots que no lo son.

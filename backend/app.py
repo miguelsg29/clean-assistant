@@ -1108,7 +1108,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.32.6", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.33.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1589,6 +1589,8 @@ async def maps_create(payload: dict):
     wipe = payload.get("wipe")
     if wipe is None:
         wipe = not house_maps.maps          # por defecto, solo al crear el primer mapa
+    if ROBEYE:
+        wipe = False                        # el mapa nuevo se añade; los del robot no se tocan
     if wipe:
         ids = _robot_known_map_ids()
         for mid in ids:

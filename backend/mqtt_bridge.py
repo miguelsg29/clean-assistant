@@ -49,6 +49,8 @@ DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
 # realmente la succión. Ver MqttBridge.legacy / self._fan_labels (__init__).
 FAN_LABELS_NEW = {"Off": "Off", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
 FAN_LABELS_LEGACY = {"Off": "Máx", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
+# robeye (Rowenta): 4 niveles distintos; el «Off» de CA es su «Super Silent»
+FAN_LABELS_ROBEYE = {"Off": "Silencio", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
 WATER_LABELS = {"Off": "Off", "Bajo": "Bajo", "Medio": "Medio", "Alto": "Alto"}
 MOP_LABELS = {"Off": "Off", "Estándar": "Estándar", "Fuerte": "Fuerte", "Potente": "Potente"}
 CLEAN_MODE_LABELS = {"Auto": "Auto", "Limpieza completa": "Limpieza completa",
@@ -103,9 +105,10 @@ class MqttBridge:
         self._rooms = rooms_provider
         # ver el comentario sobre FAN_LABELS_NEW/FAN_LABELS_LEGACY: el significado real de
         # FAN["Off"] depende del backend (nuevo = apagado real; legacy = remapeado a "máximo").
-        # robeye (Rowenta…) usa la misma tabla: su «Off» también es el nivel máximo
-        self.legacy = (env("CONGA_BACKEND", "new") or "new").lower() in ("legacy", "robeye")
-        self._fan_labels = FAN_LABELS_LEGACY if self.legacy else FAN_LABELS_NEW
+        backend = (env("CONGA_BACKEND", "new") or "new").lower()
+        self.legacy = backend in ("legacy", "robeye")
+        self._fan_labels = (FAN_LABELS_ROBEYE if backend == "robeye" else
+                            FAN_LABELS_LEGACY if self.legacy else FAN_LABELS_NEW)
         self.log = log
         self._persist = persist        # callback opcional para persistir prefs (frecuencia/base)
         self.host = env("MQTT_HOST")

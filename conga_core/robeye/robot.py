@@ -50,16 +50,25 @@ def _flip_lines(lines):
     return [{"x1": l["x1"], "y1": -l["y1"], "x2": l["x2"], "y2": -l["y2"]} for l in lines]
 MARGIN = 4                   # celdas libres alrededor del mapa
 
-# succión de CA (commands.FAN: Off=«Máx» como en legacy, Eco, Normal, Turbo) -> cleaning_parameter_set
-# del robot (0 Default, 1 Normal, 2 Silent, 3 Intensive, 4 Super Silent)
-FAN_TO_ROBOT = {0: 3, 1: 2, 2: 1, 3: 3}
-ROBOT_TO_FAN = {1: 2, 2: 1, 3: 3, 4: 1}
+# succión de CA (commands.FAN: Off, Eco, Normal, Turbo) -> cleaning_parameter_set del robot (0 Default,
+# 1 Normal, 2 Silent, 3 Intensive, 4 Super Silent). Los 4 niveles, distintos: en robeye el «Off» de CA
+# es «Silencio» (Super Silent; la interfaz y HA lo rotulan así)
+FAN_TO_ROBOT = {0: 4, 1: 2, 2: 1, 3: 3}
+ROBOT_TO_FAN = {1: 2, 2: 1, 3: 3, 4: 0}
 # estrategia (cleaning_strategy_mode): 4 Default, 1 Normal, 2 Paredes/esquinas, 3 A fondo
 STRATEGY_DEFAULT, STRATEGY_EDGES, STRATEGY_DEEP = 4, 2, 3
 
-# room_type del robot -> (nombre por defecto, roomTypeId de la interfaz)
+# room_type del robot -> (nombre por defecto, roomTypeId de la interfaz). Valores que acepta
+# set/modify_area (probados uno a uno, los demás los rechaza): estos + office, kids, storage,
+# utility, guest (-> «Otros») y none
 ROOM_TYPES = {"living": ("Salón", 2106), "sleeping": ("Dormitorio", 2101), "bath": ("Baño", 2103),
               "corridor": ("Pasillo", 2104), "kitchen": ("Cocina", 2105), "dining": ("Comedor", 2102)}
+_OTHER_TYPES = ("office", "kids", "storage", "utility", "guest")
+TYPE_TO_ROBOT = {v[1] % 100: k for k, v in ROOM_TYPES.items()}
+# floor_type del robot <-> roomMaterialId de CA (1 Suave, 2 Azulejos, 3 Madera, 4 Alfombra). El robot
+# solo distingue tiles, carpet y none: Suave y Madera se guardan en Clean Assistant
+FLOOR_TO_CA = {"tiles": 2, "carpet": 4}
+CA_TO_FLOOR = {2: "tiles", 4: "carpet", 1: "none", 3: "none"}
 
 # robot_flags -> faultCode de CA. Se reutilizan los códigos del Conga con el mismo significado
 # (así ya tienen texto y traducción); los propios de RobEye van en el rango 9000.
@@ -126,8 +135,8 @@ def task_summary(task: dict, now=None) -> dict:
     start, end = _dt(task.get("start_time") or {}), _dt(task.get("end_time") or {})
     mins = round(((end or now or datetime.datetime.now()) - start).total_seconds() / 60) if start else None
     rooms = []
-    for h in task.get("area_history") or []:
-        if h.get("area_id") is not None and h["area_id"] not in rooms:
+    for h in task.get("area_history") or []:      # 'pending' = planificadas, aún sin empezar
+        if h.get("area_id") is not None and h.get("state") != "pending" and h["area_id"] not in rooms:
             rooms.append(int(h["area_id"]))
     return {"area": round((task.get("area") or 0) * UNIT_M ** 2, 2), "minutes": mins, "rooms": rooms}
 
@@ -152,18 +161,30 @@ def parse_schedule(sched: list) -> list:
     return out
 
 
-def pick_map(ms: dict, maps: list):
+def pick_map(ms: dict, maps: list, chosen=None, busy: bool = False):
     """Mapa a mostrar: el guardado (permanente) en el que trabaja el robot. get/map_status da
     operation_map_id (el guardado que usa la tarea) y active_map_id (el de trabajo: al empezar a
-    limpiar es uno temporal hasta que se sitúa). Si ninguno es permanente, el primer permanente."""
+    limpiar es uno temporal hasta que se sitúa). Parado, manda el elegido en Clean Assistant
+    (`chosen`: el robot no tiene «mapa activo», cada limpieza dice con qué mapa va)."""
     perm = [m.get("map_id") for m in maps or [] if m.get("permanent_flag") in (True, "true")]
+    if not busy and chosen in perm:
+        return chosen
     for k in ("operation_map_id", "active_map_id"):
         if (ms or {}).get(k) in perm:
             return ms[k]
+    if chosen in perm:
+        return chosen
     if perm:
         return perm[0]
     mid = (ms or {}).get("active_map_id")
     return mid if mid is not None and mid >= 0 else None
+
+
+def _robot_room_type(rt):
+    """room_type del robot -> roomTypeId % 100 de CA (8 = Otros), o None."""
+    if rt in ROOM_TYPES:
+        return ROOM_TYPES[rt][1] % 100
+    return 8 if rt in _OTHER_TYPES else None
 
 
 def _pip(x, y, poly) -> bool:
@@ -291,6 +312,9 @@ class RobEyeRobot:
         c = control.get("control")
         if c == "set_mode":
             typ, val = control.get("type"), control.get("value")
+            if typ == 7 and val == 1:                        # crear mapa nuevo = explorar
+                self._paused = False
+                return self._set("explore")
             if typ == 3:                                     # volver a la base / cancelarlo
                 self._paused = False
                 return self._set("go_home" if val else "stop")
@@ -332,12 +356,26 @@ class RobEyeRobot:
             return {"result": 0}
         elif c == "set_preference":                          # agua/mopa/alfombras: no aplican
             return {"result": 0}
-        elif c == "setPlanData6090":                         # renombrar habitaciones (solo en CA)
+        elif c == "setPlanData6090":       # nombre (en CA), tipo y suelo (en el robot: modify_area)
+            areas = {int(a["id"]): a for a in self._areas}
             for r in control.get("roomInfo") or []:
+                rid = int(r["roomID"])
                 name = (r.get("roomName") or "").strip()
                 if name:
-                    self._names[int(r["roomID"])] = name
+                    self._names[rid] = name
+                a, params = areas.get(rid) or {}, {}
+                tid = int(r.get("roomTypeId") or 0) % 100
+                if tid and _robot_room_type(a.get("room_type")) != tid:
+                    params["room_type"] = TYPE_TO_ROBOT.get(tid, "none")
+                mat = int(r.get("roomMaterialId") or 0)
+                if mat:
+                    self._materials[rid] = mat
+                    if a.get("floor_type") != CA_TO_FLOOR.get(mat, "none"):
+                        params["floor_type"] = CA_TO_FLOOR.get(mat, "none")
+                if params and self._map_id is not None:
+                    self._set("modify_area", map_id=self._map_id, area_id=rid, **params)
             self._save_names()
+            self._map_ts = 0.0                     # relee el mapa (tipo/suelo nuevos) en el próximo ciclo
             self._build_map(force=True)
             return {"result": 0}
         elif c == "get_consumables":
@@ -353,7 +391,26 @@ class RobEyeRobot:
         elif c in ("get_map", "getMapAll"):
             self._map_ts = 0.0
             return {"result": 0}
-        elif c in ("setOrder6090", "deleteOrder6090", "lock_device", "set_time", "set_upgrade_config"):
+        elif c == "setSaveMap":                              # tras explorar: guardar o descartar
+            self.state.pending_map = False
+            new = self._new_map_id()
+            if new is None:
+                return {"ok": False, "error": "no hay mapa nuevo"}
+            if control.get("isSave", 1):
+                r = self._set("save_map", map_id=new)
+                self._choose_map(new)
+                return r
+            return self._set("delete_map", map_id=new)
+        elif c == "selectMapPlan":
+            mid = int(control.get("mapid") or 0)
+            if int(control.get("type", 1)) == 2:             # borrar
+                if mid == self._link.get("map_id"):
+                    self._link.pop("map_id", None)
+                return self._set("delete_map", map_id=mid)
+            self._choose_map(mid)                            # activar
+            return {"result": 0}
+        elif c in ("setOrder6090", "deleteOrder6090", "lock_device", "set_time", "set_upgrade_config",
+                   "setEditInfoBeforeHand"):
             return {"result": 0}                             # horarios: los lanza Clean Assistant
         self.log(f"  [robeye] comando '{c}' no soportado en este robot")
         return {"ok": False, "error": f"'{c}' no soportado (robeye)"}
@@ -509,6 +566,22 @@ class RobEyeRobot:
             s.cleaning_room = t["rooms"][-1]
         self._fire(self.on_update)
 
+    # ---------------- mapas ----------------
+    def _choose_map(self, mid: int):
+        """Mapa elegido en CA: el que se muestra y con el que se limpia (clean_map?map_id=)."""
+        self._link["map_id"] = int(mid)
+        self._save_json(self._link_path, self._link)
+        self._map_ts = 0.0
+
+    def _new_map_id(self):
+        """Mapa recién explorado (aún sin guardar): el no permanente más reciente."""
+        try:
+            maps = (self._get("get/maps") or {}).get("maps") or []
+        except Exception:
+            return None
+        temp = [m["map_id"] for m in maps if m.get("permanent_flag") not in (True, "true")]
+        return max(temp) if temp else None
+
     # ---------------- totales y mantenimiento ----------------
     def _maint_path(self) -> str:
         return os.path.join(os.path.dirname(self._names_path) or ".", "robeye_maint.json")
@@ -556,7 +629,8 @@ class RobEyeRobot:
             if not force:
                 ms = self._get("get/map_status") or {}
                 maps = (self._get("get/maps") or {}).get("maps") or []
-                mid = pick_map(ms, maps)
+                busy = self.state.state in ("cleaning", "paused", "returning", "mapping")
+                mid = pick_map(ms, maps, self._link.get("map_id"), busy)
                 if mid is None:
                     self._map_ts = time.time()
                     self.map_empty = True
@@ -598,9 +672,12 @@ class RobEyeRobot:
                 continue
             rid = int(a["id"])
             name, tid = ROOM_TYPES.get(a.get("room_type"), ("Habitación", None))
+            if tid is None and a.get("room_type") in _OTHER_TYPES:
+                tid = 2108
             count[name] = count.get(name, 0) + 1
             default = name if count[name] == 1 else f"{name} {count[name]}"
-            rooms.append((rid, self._names.get(rid) or default, tid, None))
+            mat = FLOOR_TO_CA.get(a.get("floor_type")) or self._materials.get(rid)
+            rooms.append((rid, self._names.get(rid) or default, tid, mat))
         zones = [{"type": 200, "name": "",
                   "points": [(p["x"] * UNIT_M, p["y"] * UNIT_M) for p in a["points"]]}
                  for a in areas if a.get("area_state") == "blocking"]
@@ -682,10 +759,13 @@ class RobEyeRobot:
 
     # ---------------- nombres de habitación (el robot no los guarda) ----------------
     def _load_names(self) -> dict:
-        return {int(k): v for k, v in self._load_json(self._names_path, {}).items()}
+        d = self._load_json(self._names_path, {})
+        self._materials = {int(k): int(v) for k, v in (d.pop("_materials", None) or {}).items()}
+        return {int(k): v for k, v in d.items()}
 
     def _save_names(self):
-        self._save_json(self._names_path, self._names)
+        self._save_json(self._names_path, {**{str(k): v for k, v in self._names.items()},
+                                           "_materials": {str(k): v for k, v in self._materials.items()}})
 
     @staticmethod
     def _load_json(path: str, default):

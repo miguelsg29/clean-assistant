@@ -4,7 +4,8 @@
 
 A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** — and other Conga
 models on the same **3irobotix** platform (**4690 / 6090 / 7090 / 9090 / 3890** confirmed by
-users): live map, per-room cleaning, zones, schedules, history and every
+users), and now other brands too: the **Rowenta X-plorer Serie 80** (experimental). Live map,
+per-room cleaning, zones, schedules, history and every
 setting, in its own polished web interface, **available in 9 languages** (Spanish, English,
 German, Italian, French, Portuguese, Dutch, Catalan, Polish).
 In the spirit of Valetudo/Congatudo, but for the 8000 generation (which uses TLS +
@@ -15,6 +16,8 @@ WebSocket + JSON + Protobuf, not supported by those projects).
 > supported here — for those, use [LocalTuya](https://github.com/xZetsubou/hass-localtuya).
 > Older Congas (**3090 / 3490 / 4090**) use a different 3irobotix protocol: they're supported
 > by an **experimental `legacy` backend** — see [Older Congas](#older-congas-3090--3490--4090--legacy-backend-experimental).
+> **Rowenta X-plorer Serie 80** (RobArt RobEye platform): **experimental `robeye` backend** — see
+> [Rowenta X-plorer Serie 80](#rowenta-x-plorer-serie-80--robeye-backend-experimental).
 
 > Built on the reverse engineering from the documentation repo:
 > [conga_8090_mqtt_bridge](https://github.com/miguelsg29/conga_8090_mqtt_bridge).
@@ -384,6 +387,33 @@ fire.
 generation, and the history can't list which rooms were cleaned (the robot doesn't report
 the current room). Home Assistant shows it as **"Conga 3xxx/4xxx (legacy)"**.
 
+### Rowenta X-plorer Serie 80 — `robeye` backend (experimental)
+
+Clean Assistant isn't only for Congas anymore. Since **v0.32.0** it also controls the
+**Rowenta X-plorer Serie 80** (RobArt **RobEye** platform, the same one behind ROMY robots)
+through the robot's own **local HTTP API** on port 8080 — no cloud and no DNS to redirect.
+Tested end to end on a real X-plorer Serie 80 (firmware SER80-1.2.3).
+
+1. In the app's **Configuration**, set **`BACKEND`** to **`robeye`**.
+2. Optionally set **`ROBOT_IP`** to the robot's IP. If you leave it empty, or the IP changes
+   (DHCP), Clean Assistant finds the robot on your network by itself and recognizes it by its
+   unique ID.
+3. Restart the app. If you used Home Assistant's **ROMY** integration for this robot, you can
+   remove it: Clean Assistant replaces it (keep the same entity IDs if automations use them).
+
+**Implemented:** status, battery and warnings · live map with rooms, walls, dock, no-go
+zones and robot position · clean the whole house (with the saved map) or selected rooms ·
+pause / resume / return to dock · the robot's 4 suction levels · edge mode and deep clean
+(double pass) · room names, room type and floor type · cleaning history with m², time and
+rooms (from the robot itself) · Clean Assistant's own schedules · the schedules saved in the
+robot (shown, and importable into Clean Assistant) · maintenance counters per part ·
+lifetime statistics in Home Assistant (distance, time, area, number of cleanings) · MQTT /
+Home Assistant.
+
+**Not yet:** creating, moving or deleting no-go zones; creating, switching, merging or
+splitting maps and rooms; mopping mode. The robot's API has these commands, but their
+parameters aren't known yet.
+
 ## Support
 
 Clean Assistant is free and 100% local. If it's useful to you, you can support development
@@ -398,5 +428,6 @@ Thank you to everyone who has supported Clean Assistant:
 ## License
 
 [MIT](LICENSE). Independent reverse-engineering project for interoperability and personal
-use — **not affiliated with, endorsed by, or authorized by Cecotec or 3irobotix**. "Conga"
-and "Cecotec" are trademarks of their respective owners. Use at your own risk.
+use — **not affiliated with, endorsed by, or authorized by Cecotec, 3irobotix, Rowenta /
+Groupe SEB or RobArt**. "Conga", "Cecotec", "Rowenta" and "X-plorer" are trademarks of their
+respective owners. Use at your own risk.

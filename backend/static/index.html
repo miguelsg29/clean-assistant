@@ -242,7 +242,7 @@
   .wizstep .hint{font-size:12px;line-height:1.5;color:var(--muted);margin:4px 0}
   .wizdns{display:flex;flex-direction:column;gap:6px;margin:8px 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px}
   /* backend legacy (Conga 3xxx/4xxx): oculta lo que no existe en esa generación */
-  body.legacy .nolegacy,body.legacy .mDel{display:none!important}
+  body.legacy .nolegacy,body.legacy:not(.robeye) .mDel,body.legacy:not(.robeye) .legacyhide{display:none!important}
   body:not(.legacy) .onlylegacy{display:none!important}
   /* backend robeye (Rowenta X-plorer…): sin agua/mopa ni los extras de la gen. legacy */
   body.robeye .norobeye,body.robeye .onlylegacy{display:none!important}
@@ -541,8 +541,8 @@
         <div class="phead">Mapas de la casa</div>
         <p class="hint nolegacy" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
         <div id="mapsList"></div>
-        <div class="btnrow nolegacy"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button><button class="btn ghost" id="wipeMapsBtn" style="color:var(--critical)">Borrar todos</button></div>
-        <div id="newMapForm" class="nolegacy" style="display:none">
+        <div class="btnrow legacyhide"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button><button class="btn ghost norobeye" id="wipeMapsBtn" style="color:var(--critical)">Borrar todos</button></div>
+        <div id="newMapForm" class="legacyhide" style="display:none">
           <div class="field"><label>Nombre del mapa</label><input type="text" id="nmName" class="tinput" placeholder="Planta baja"/></div>
           <div class="field"><label>Nombre de la casa</label><input type="text" id="nmHouse" class="tinput" placeholder="Casa"/></div>
           <p class="hint" style="opacity:.65;font-size:11.5px;margin:0 0 6px">Al crear, el robot recorrerá toda la casa para mapearla (tarda un rato). El mapa nuevo empieza en blanco (sin zonas ni horarios).</p>
@@ -878,6 +878,7 @@
   "Falta el agitador de la mopa":{en:"Mop agitator missing",pt:"Falta o agitador da mopa",fr:"Agitateur de la serpillière absent",pl:"Brak mieszadła mopa",de:"Wischpad-Rüttler fehlt",it:"Manca l'agitatore del mop",nl:"Dweilaandrijving ontbreekt",ca:"Falta l'agitador de la mopa"},
   "Parada de seguridad: reinicia el robot":{en:"Safety stop: restart the robot",pt:"Paragem de segurança: reinicia o robô",fr:"Arrêt de sécurité : redémarrez le robot",pl:"Zatrzymanie bezpieczeństwa: uruchom robota ponownie",de:"Sicherheitsstopp: starte den Roboter neu",it:"Arresto di sicurezza: riavvia il robot",nl:"Veiligheidsstop: herstart de robot",ca:"Parada de seguretat: reinicia el robot"},
   "Error interno del robot: reinícialo":{en:"Internal robot error: restart it",pt:"Erro interno do robô: reinicia-o",fr:"Erreur interne du robot : redémarrez-le",pl:"Błąd wewnętrzny robota: uruchom go ponownie",de:"Interner Roboterfehler: starte ihn neu",it:"Errore interno del robot: riavvialo",nl:"Interne robotfout: herstart hem",ca:"Error intern del robot: reinicia'l"},
+  "Silencio":{en:"Quiet",pt:"Silêncio",fr:"Silence",pl:"Cichy",de:"Leise",it:"Silenzioso",nl:"Stil",ca:"Silenci"},
   "Sensor infrarrojo de esquinas anormal":{en:"Abnormal infrared corner sensor",pt:"Sensor infravermelho de cantos anómalo",fr:"Capteur infrarouge d'angles anormal",pl:"Nieprawidłowy czujnik podczerwieni narożników",de:"Infrarot-Ecksensor auffällig",it:"Sensore a infrarossi degli angoli anomalo",nl:"Infraroodsensor voor hoeken afwijkend",ca:"Sensor infraroig de cantonades anormal"},
   "Se ha caído el depósito de polvo":{en:"The dust bin has fallen off",pt:"O depósito de pó caiu",fr:"Le bac à poussière est tombé",pl:"Pojemnik na kurz wypadł",de:"Der Staubbehälter ist herausgefallen",it:"Il contenitore della polvere è caduto",nl:"Het stofreservoir is losgeraakt",ca:"S'ha caigut el dipòsit de pols"},
   "Se ha caído el depósito de agua 2 en 1":{en:"The 2-in-1 water tank has fallen off",pt:"O depósito de água 2 em 1 caiu",fr:"Le réservoir d'eau 2 en 1 est tombé",pl:"Zbiornik na wodę 2 w 1 wypadł",de:"Der 2-in-1-Wassertank ist herausgefallen",it:"Il serbatoio dell'acqua 2 in 1 è caduto",nl:"Het 2-in-1-waterreservoir is losgeraakt",ca:"S'ha caigut el dipòsit d'aigua 2 en 1"},
@@ -2525,7 +2526,7 @@
   document.getElementById('nmCreate').addEventListener('click',async function(){
     var name=document.getElementById('nmName').value.trim(), house=document.getElementById('nmHouse').value.trim();
     if(!name){ uiAlert(t('Ponle un nombre al mapa.')); return; }
-    var wipe=((HOUSE_MAPS.maps||[]).length===0);   // primer mapa: se borran los previos del robot
+    var wipe=((HOUSE_MAPS.maps||[]).length===0)&&!document.body.classList.contains('robeye');   // primer mapa: se borran los previos del robot
     var msg=wipe
       ? t('¿Crear el mapa "{name}"? Se borrarán los mapas, zonas y horarios que el robot tenga ahora y empezará a mapear la casa de cero.',{name:name})
       : t('¿Crear el mapa "{name}"? El robot empezará a recorrer la casa para mapearla (se añadirá a los mapas que ya tienes).',{name:name});
@@ -2709,7 +2710,8 @@
     // El botón de succión "Off" (seg[data-cmd=fan]) es un apagado real SOLO en el backend nuevo.
     // En el legacy, conga_core/legacy/robot.py remapea ese mismo valor a "máximo" de verdad
     // (ver FAN_LABELS_LEGACY en mqtt_bridge.py) -- ahí el botón vuelve a decir "Máx", traducido.
-    if(info.backend==='legacy'||info.backend==='robeye'){ var fb=document.getElementById('fanOffBtn'); if(fb){ fb.textContent=t('Máx');
+    if(info.backend==='robeye'){ var fr=document.getElementById('fanOffBtn'); if(fr) fr.textContent=t('Silencio'); }
+    else if(info.backend==='legacy'){ var fb=document.getElementById('fanOffBtn'); if(fb){ fb.textContent=t('Máx');
       fb.parentNode.appendChild(fb); } }   // relabelled "Máx" reads better at the end, not first (review #18)
     var ml=document.getElementById('mapLiveTog'); if(ml) ml.setAttribute('aria-pressed',!!info.map_image_live);
     var el=document.getElementById('entityLangSel'); if(el&&info.lang){ el.value=info.lang; el.setAttribute('data-prev',info.lang); }
