@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34.4
+- Rowenta (backend `robeye`): ya no aparece un falso «Error interno del robot» un par de segundos al
+  quitar el depósito, levantar el robot o dejarlo en el suelo. El robot emite un instante unos
+  indicadores internos en cada cambio; ahora solo cuentan si duran.
+
 ## 0.34.3
 - **Consumibles en Home Assistant (todos los modelos):** los sensores de cepillo central, cepillo lateral,
   filtro y mopa ahora dan el **% de vida restante**, como la interfaz web. Antes enviaban las horas de uso

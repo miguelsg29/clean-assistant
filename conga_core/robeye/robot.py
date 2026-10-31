@@ -99,6 +99,11 @@ WARN_MESSAGES.update({
 })
 # avisos que paran al robot aunque lleguen como notificación (stuck_* también)
 _BLOCKING_FLAGS = {"lifted", "toplid_open", "safety_supervisor_safety_stop", "safety_supervisor_eternal_stop"}
+# indicadores internos que el robot emite un instante en cada transición (quitar el depósito,
+# levantarlo, dejarlo en el suelo…): solo cuentan si duran (prueba real, 31-oct-2026)
+_TRANSIENT_FLAGS = {"layers_not_running", "missing_camera_data", "missing_imu_data",
+                    "safety_supervisor_safety_stop"}
+TRANSIENT_S = 30.0
 # avisos que NO son error (el robot sigue operativo)
 _NOTICE_CODES = {502, 527, 525, 530}
 
@@ -285,6 +290,7 @@ class RobEyeRobot:
         self._twice = False
         self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
         self._paused_ts = 0.0
+        self._flag_since = {}              # desde cuándo está cada indicador del robot
         self._resume_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
@@ -521,8 +527,14 @@ class RobEyeRobot:
             s.battery = int(st["battery_level"])
         if not was[0] and st.get("cleaning_parameter_set") in ROBOT_TO_FAN:
             self._fan = st["cleaning_parameter_set"]      # al conectar; luego manda la de CA
+        now = time.time()
+        present = {f for k in ("error", "not_ready", "notification") for f in (flags or {}).get(k) or []}
+        self._flag_since = {f: self._flag_since.get(f, now) for f in present}
+        flags = {k: [f for f in (flags or {}).get(k) or []
+                     if f not in _TRANSIENT_FLAGS or now - self._flag_since[f] >= TRANSIENT_S]
+                 for k in ("error", "not_ready", "notification")}
         codes = [FLAG_CODES[f] for k in ("error", "not_ready", "notification")
-                 for f in (flags or {}).get(k) or [] if f in FLAG_CODES]
+                 for f in flags[k] if f in FLAG_CODES]
         s.fault = codes[0] if codes else 0
         s.warning = WARN_MESSAGES.get(s.fault) if s.fault else None
         # el robot manda «atascado» como notificación, pero interrumpe la limpieza: cuenta como error
