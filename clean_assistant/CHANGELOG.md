@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.2
+- Rowenta (backend `robeye`): al dividir una habitación, el mapa se actualiza al momento (antes tardaba
+  hasta un minuto).
+
 ## 0.34.1
 - Rowenta (backend `robeye`): las zonas prohibidas creadas en Clean Assistant ya quedan como
   prohibidas en el robot (el robot tarda un momento en crear el área y Clean Assistant no la esperaba).

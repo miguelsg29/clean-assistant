@@ -420,9 +420,11 @@ class RobEyeRobot:
             ids = [self._rid(r) for r in control.get("roomsId") or []]
             return self._in_background(self._merge, ids)
         elif c == "splitRoom":
-            return self._set("split_area", map_id=self._map_id, area_id=self._rid(control["roomId"]),
-                             **self._robot_xy(1, control["startX"], control["startY"]),
-                             **self._robot_xy(2, control["endX"], control["endY"]))
+            r = self._set("split_area", map_id=self._map_id, area_id=self._rid(control["roomId"]),
+                          **self._robot_xy(1, control["startX"], control["startY"]),
+                          **self._robot_xy(2, control["endX"], control["endY"]))
+            self._map_ts = 0.0                       # relee el mapa ya (habitaciones nuevas)
+            return r
         elif c == "setSaveMap":                              # tras explorar: guardar o descartar
             self.state.pending_map = False
             new = self._new_map_id()
