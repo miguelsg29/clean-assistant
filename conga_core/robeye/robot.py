@@ -187,6 +187,7 @@ class RobEyeRobot:
         self._fan = 1                      # cleaning_parameter_set para la próxima limpieza
         self._mode = 0                     # commands.CLEAN_MODES elegido en la interfaz
         self._twice = False
+        self._paused = False               # parado con «pausa»: el robot dice 'ready', CA «paused»
         self._areas, self._lines, self._dock, self._map_id, self._maps = [], [], None, None, []
         self._map_ts = 0.0
         self._fails = 0
@@ -226,21 +227,25 @@ class RobEyeRobot:
         if c == "set_mode":
             typ, val = control.get("type"), control.get("value")
             if typ == 3:                                     # volver a la base / cancelarlo
+                self._paused = False
                 return self._set("go_home" if val else "stop")
             if val == 4:                                     # elegir modo
                 self._mode = int(typ)
                 return {"result": 0}
             if val == 2:                                     # pausa = parar (luego «continuar»)
+                self._paused = True
                 return self._set("stop")
             if typ == 2 and val == 1:
+                self._paused = False
                 return self._set("continue")
             if typ in (0, 14) and val == 1:                  # limpiar todo
+                self._paused = False
                 return self._set("clean_all", **self._clean_params())
         elif c == "setRoomClean":
             ids = [int(r) for r in control.get("roomsID") or []]
             if not ids or self._map_id is None:
                 return {"ok": False, "error": "sin mapa o sin habitaciones"}
-            self._twice = bool(control.get("clean_type"))
+            self._twice, self._paused = bool(control.get("clean_type")), False
             return self._set("clean_map", map_id=self._map_id,
                              area_ids=",".join(str(i) for i in ids), **self._clean_params())
         elif c == "set_preference" and control.get("ctrltype") == 1:   # succión
@@ -342,6 +347,11 @@ class RobEyeRobot:
         real_err = {"error": [f for f in (flags or {}).get("error") or []
                               if FLAG_CODES.get(f) not in _NOTICE_CODES]}
         s.state = robot_state(mode, st.get("charging"), real_err)
+        # el robot no tiene pausa: CA la hace con stop y el robot queda en 'ready' fuera de la base
+        if s.state != "idle":
+            self._paused = False
+        elif self._paused:
+            s.state = "paused"
         if (s.online, s.state, s.battery, s.fault) != was:
             self._fire(self.on_update)
 

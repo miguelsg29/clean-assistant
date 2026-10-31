@@ -246,7 +246,17 @@ class MqttBridge:
         if self.client:
             self.client.publish(topic, payload, retain=retain)
 
+    # entidades del Conga que no existen en un RobEye (Rowenta…): no se publican (y se retiran)
+    ROBEYE_SKIP = ("_low_water", "_cons_", "_creset_", "_sel_water", "_sel_mop", "_sel_base_type",
+                   "_volume", "_quiet", "_voice", "_ota", "_dust", "_turbo_carpet")
+
     def _disc(self, comp, obj, cfg):
+        if getattr(self.robot, "robeye", False):
+            if any(k in obj for k in self.ROBEYE_SKIP):
+                self._pub(f"{self.disc}/{comp}/{obj}/config", "")
+                return
+            if isinstance(cfg.get("name"), str) and cfg["name"].startswith("Conga "):
+                cfg["name"] = cfg["name"][len("Conga "):]      # «Batería», no «Conga Batería»
         cfg.setdefault("availability_topic", self.t_avail)
         cfg.setdefault("payload_available", "online")
         cfg.setdefault("payload_not_available", "offline")
@@ -274,7 +284,8 @@ class MqttBridge:
                 self._clear_discovery(legacy)
         lang = self._lang()
         dev_name, dev_model = self._model_names()
-        device = {"identifiers": [uid], "name": dev_name, "manufacturer": "Cecotec",
+        device = {"identifiers": [uid], "name": dev_name,
+                  "manufacturer": "Rowenta" if getattr(self.robot, "robeye", False) else "Cecotec",
                   "model": dev_model, "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
             "name": dev_name, "unique_id": uid, "schema": "state",

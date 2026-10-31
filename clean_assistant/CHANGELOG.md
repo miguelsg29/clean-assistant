@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.1
+- **Rowenta (backend `robeye`), tras la primera prueba con el robot real:**
+  - el mapa ya no sale en espejo por defecto (en el Rowenta sale como la casa);
+  - la pausa se muestra como «En pausa» (el robot no tiene pausa propia y se quedaba en «Parado»);
+  - en Home Assistant: fabricante Rowenta, nombres sin «Conga» y sin las entidades que este robot
+    no tiene (agua, mopa, consumibles, autovaciado, volumen, no molestar…).
+
 ## 0.32.0
 - **Nuevo backend experimental `robeye`: Rowenta X-plorer Serie 80** (y otros robots con plataforma
   RobArt «RobEye»). Habla con la API HTTP local del robot (puerto 8080), sin nube ni DNS: mapa con

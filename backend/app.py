@@ -218,7 +218,8 @@ def _load_view() -> dict:
     except Exception:
         # por defecto (instalación nueva) con espejo: el mapa del Conga sale invertido
         # respecto a la casa real, así el usuario no tiene que darle al botón cada vez.
-        return {"rot": 0, "flip": 1}
+        # El de un RobEye (Rowenta) ya sale como la casa.
+        return {"rot": 0, "flip": 0 if ROBEYE else 1}
 
 
 view_settings = _load_view()
@@ -1104,7 +1105,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.32.0", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.32.1", lifespan=lifespan)
 
 
 @app.get("/api/state")
