@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.5
+- **Rowenta (backend `robeye`): «Limpieza completa de la casa» usa el mapa guardado.** Antes mandaba
+  la orden de limpiar sin mapa: el robot creaba un mapa temporal y al terminar no encontraba la base.
+  Ahora limpia todas las habitaciones del mapa guardado, como la app de Rowenta.
+- El mapa y la posición del robot se leen del mapa guardado aunque, al empezar a limpiar, el robot
+  trabaje unos segundos en uno temporal mientras se sitúa.
+
 ## 0.32.4
 - **Rowenta (backend `robeye`): la pausa desde Home Assistant ya no se pierde.** Justo después de
   parar, el robot sigue diciendo «limpiando» unos segundos y Clean Assistant olvidaba la pausa; así

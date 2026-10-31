@@ -152,6 +152,20 @@ def parse_schedule(sched: list) -> list:
     return out
 
 
+def pick_map(ms: dict, maps: list):
+    """Mapa a mostrar: el guardado (permanente) en el que trabaja el robot. get/map_status da
+    operation_map_id (el guardado que usa la tarea) y active_map_id (el de trabajo: al empezar a
+    limpiar es uno temporal hasta que se sitúa). Si ninguno es permanente, el primer permanente."""
+    perm = [m.get("map_id") for m in maps or [] if m.get("permanent_flag") in (True, "true")]
+    for k in ("operation_map_id", "active_map_id"):
+        if (ms or {}).get(k) in perm:
+            return ms[k]
+    if perm:
+        return perm[0]
+    mid = (ms or {}).get("active_map_id")
+    return mid if mid is not None and mid >= 0 else None
+
+
 def _pip(x, y, poly) -> bool:
     """¿Está (x, y) dentro del polígono? (par-impar)"""
     inside = False
@@ -290,8 +304,12 @@ class RobEyeRobot:
             if typ == 2 and val == 1:
                 self._paused = False
                 return self._set("continue")
-            if typ in (0, 14) and val == 1:                  # limpiar todo
+            if typ in (0, 14) and val == 1:                  # limpiar toda la casa
                 self._paused = False
+                # clean_map del mapa guardado sin habitaciones = todas (como la app). set/clean_all
+                # limpia SIN mapa: crea uno temporal y luego no encuentra la base (prueba real)
+                if self._map_id is not None:
+                    return self._set("clean_map", map_id=self._map_id, **self._clean_params())
                 return self._set("clean_all", **self._clean_params())
         elif c == "setRoomClean":
             ids = [int(r) for r in control.get("roomsID") or []]
@@ -433,6 +451,8 @@ class RobEyeRobot:
             return
         if not p or not p.get("valid") or self.map is None:
             return
+        if p.get("map_id") is not None and p["map_id"] != self._map_id:
+            return                             # aún situándose (pose en el mapa temporal)
         w, b = self.map["world"], self.map["bbox"]
         x, y = p["x1"] * UNIT_M, -p["y1"] * UNIT_M
         cellp = {"x": round((x - w["min_x"]) / w["res"] - b[0], 1),
@@ -529,14 +549,14 @@ class RobEyeRobot:
         try:
             if not force:
                 ms = self._get("get/map_status") or {}
-                mid = ms.get("active_map_id")
-                if mid is None or mid < 0:
+                maps = (self._get("get/maps") or {}).get("maps") or []
+                mid = pick_map(ms, maps)
+                if mid is None:
                     self._map_ts = time.time()
                     self.map_empty = True
                     return
                 areas = (self._get("get/areas", {"map_id": mid}) or {}).get("areas") or []
                 fm = (self._get("get/feature_map", {"map_id": mid}) or {}).get("map") or {}
-                maps = (self._get("get/maps") or {}).get("maps") or []
                 self._map_id, self._areas = mid, _flip_areas(areas)
                 self._lines = _flip_lines(fm.get("lines") or [])
                 dock = fm.get("docking_pose")
