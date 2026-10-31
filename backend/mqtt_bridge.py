@@ -111,6 +111,9 @@ class MqttBridge:
         self.legacy = backend in ("legacy", "robeye")
         self._fan_labels = (FAN_LABELS_ROBEYE if backend == "robeye" else
                             FAN_LABELS_LEGACY if self.legacy else FAN_LABELS_NEW)
+        # modos que tiene cada robot: el Rowenta solo limpia normal o por bordes
+        self._mode_labels = ({k: CLEAN_MODE_LABELS[k] for k in ("Auto", "Bordes")}
+                             if backend == "robeye" else CLEAN_MODE_LABELS)
         self.log = log
         self._persist = persist        # callback opcional para persistir prefs (frecuencia/base)
         self.host = env("MQTT_HOST")
@@ -443,7 +446,7 @@ class MqttBridge:
             ("fan", "Potencia succión", self._fan_labels, "mdi:fan"),
             ("water", "Nivel agua", WATER_LABELS, "mdi:water"),
             ("mop", "Vibración mopa", MOP_LABELS, "mdi:vibrate"),
-            ("mode", "Modo de limpieza", CLEAN_MODE_LABELS, "mdi:broom"),
+            ("mode", "Modo de limpieza", self._mode_labels, "mdi:broom"),
             ("base_type", "Tipo de base", BASE_TYPE_LABELS, "mdi:home-import-outline"),
         ):
             opts, reverse = self._localized_options(labels)
@@ -586,7 +589,7 @@ class MqttBridge:
             # inglés, p. ej.) o, en el backend legacy, incluso en español ("Off" cuando la
             # opción publicada es "Máx"). Mismo patrón que _pub_dust_freq(). (review PR #18)
             labels = {"fan": self._fan_labels, "water": WATER_LABELS, "mop": MOP_LABELS,
-                      "mode": CLEAN_MODE_LABELS, "base_type": BASE_TYPE_LABELS}[action]
+                      "mode": self._mode_labels, "base_type": BASE_TYPE_LABELS}[action]
             self._pub(f"conga/{node}/pref/{action}", t(self._lang(), labels.get(v, v)))
         elif action == "twice":
             self.prefs["twice"] = bool(v)

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.34.8
+- Rowenta (backend `robeye`): el selector **Modo de limpieza** de Home Assistant solo ofrece los modos que
+  tiene este robot (Auto y Bordes).
+
 ## 0.34.7
 - **Home Assistant (todos los modelos): nuevo botón «Limpiar toda la casa»**, como los de cada
   habitación, para paneles y automatizaciones.
