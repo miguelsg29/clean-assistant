@@ -49,6 +49,8 @@ DUST_FREQ_REV = {v: k for k, v in DUST_FREQ.items()}
 # realmente la succión. Ver MqttBridge.legacy / self._fan_labels (__init__).
 FAN_LABELS_NEW = {"Off": "Off", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
 FAN_LABELS_LEGACY = {"Off": "Máx", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
+# vida de cada consumible en horas: la MISMA que la interfaz web (index.html, CONS)
+CONSUMABLE_LIFE_H = {"main_brush": 300, "side_brush": 220, "filter": 100, "dishcloth": 160}
 # robeye (Rowenta): 4 niveles distintos; el «Off» de CA es su «Super Silent»
 FAN_LABELS_ROBEYE = {"Off": "Silencio", "Eco": "Eco", "Normal": "Normal", "Turbo": "Turbo"}
 WATER_LABELS = {"Off": "Off", "Bajo": "Bajo", "Medio": "Medio", "Alto": "Alto"}
@@ -794,9 +796,12 @@ class MqttBridge:
             self._pub(f"conga/{self.node}/ota", "on" if s.auto_upgrade else "off")
         self._pub_dust_freq()
         if s.consumables:
-            for key in ("main_brush", "side_brush", "filter", "dishcloth"):
-                if s.consumables.get(key) is not None:
-                    self._pub(f"conga/{self.node}/consumable/{key}", str(s.consumables[key]))
+            # el robot (y CA) dan HORAS de uso; el sensor de HA es «% de vida restante», como la web
+            for key, life in CONSUMABLE_LIFE_H.items():
+                used = s.consumables.get(key)
+                if used is not None:
+                    pct = max(0, round((life - float(used)) / life * 100))
+                    self._pub(f"conga/{self.node}/consumable/{key}", str(pct))
         stats = getattr(self.robot, "stats", None)       # robeye: totales del robot (get/statistics)
         if stats:
             self._pub(f"conga/{self.node}/stats", json.dumps(stats))

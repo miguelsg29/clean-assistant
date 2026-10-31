@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.34.3
+- **Consumibles en Home Assistant (todos los modelos):** los sensores de cepillo central, cepillo lateral,
+  filtro y mopa ahora dan el **% de vida restante**, como la interfaz web. Antes enviaban las horas de uso
+  aunque el sensor dijera «%» (una pieza nueva salía al 0 %). Si tienes una automatización con estos
+  sensores, revisa el umbral.
+
 ## 0.34.2
 - Rowenta (backend `robeye`): al dividir una habitación, el mapa se actualiza al momento (antes tardaba
   hasta un minuto).
