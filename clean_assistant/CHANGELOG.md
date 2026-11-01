@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.35.0
+- **Nuevo backend `tuya` (experimental): Conga sobre Tuya (8290 y otros)**, en local con el
+  protocolo de Tuya 3.3/3.4 y la local key del robot (opciones `TUYA_DEVICE_ID`,
+  `TUYA_LOCAL_KEY`, `TUYA_VERSION`; `ROBOT_IP` opcional, si no lo busca en la red). Estado, avisos
+  (30 códigos de fallo), limpieza completa, pausa/continuar/base, localizar, control manual,
+  succión y agua, modos (Auto, Limpieza completa, Fregado, Bordes, Espiral, Espiral cuadrada),
+  turbo en alfombras, no molestar, sonido y volumen, vaciar la base, consumibles y totales, todo
+  también en Home Assistant. Aún sin mapa (el robot solo lo manda a la nube de Tuya). Hecho con los
+  datos de @ftorrealbaa (#8); falta probarlo con un robot real.
+
 ## 0.34.10
 - Rowenta (backend `robeye`): al terminar la última habitación el estado pasa a **Volviendo a la base**
   (antes seguía en «Limpiando» hasta llegar, porque el robot no cambia de modo) y la habitación actual

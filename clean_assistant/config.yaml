@@ -1,7 +1,7 @@
 name: "Clean Assistant"
-version: "0.34.10"
+version: "0.35.0"
 slug: "clean_assistant"
-description: "Local (no-cloud) control for robot vacuums: Cecotec Conga (8090 / 6090 / 7090 / 4690 / 9090 Ultra and more; 3090/4090 experimental) and Rowenta X-plorer Serie 80 (experimental): live map, room cleaning, zones, schedules, MQTT & Home Assistant."
+description: "Local (no-cloud) control for robot vacuums: Cecotec Conga (8090 / 6090 / 7090 / 4690 / 9090 Ultra and more; 3090/4090 experimental) Rowenta X-plorer Serie 80 and Tuya-based Congas such as the 8290 (experimental): live map, room cleaning, zones, schedules, MQTT & Home Assistant."
 url: "https://github.com/miguelsg29/clean-assistant"
 # Imagen PRECOMPILADA (GitHub Actions -> GHCR). Con esto Home Assistant DESCARGA la imagen en vez
 # de compilarla en el dispositivo: actualizaciones rápidas y con barra de progreso. La publica el
@@ -43,6 +43,9 @@ services:
 options:
   BACKEND: "new"
   ROBOT_IP: ""
+  TUYA_DEVICE_ID: ""
+  TUYA_LOCAL_KEY: ""
+  TUYA_VERSION: "3.3"
   ROBOT_DID: 0
   ROBOT_USERID: 0
   ROBOT_SN: "PON_AQUI_EL_SN_DE_TU_ROBOT"
@@ -59,8 +62,11 @@ options:
   DEFAULT_MOP: "Estándar"
   DEFAULT_MODE: "Auto"
 schema:
-  BACKEND: list(new|legacy|robeye)
+  BACKEND: list(new|legacy|robeye|tuya)
   ROBOT_IP: str?
+  TUYA_DEVICE_ID: str?
+  TUYA_LOCAL_KEY: password?
+  TUYA_VERSION: list(3.3|3.4)
   ROBOT_DID: int
   ROBOT_USERID: int
   ROBOT_SN: str

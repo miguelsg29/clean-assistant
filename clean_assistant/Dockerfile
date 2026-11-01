@@ -7,7 +7,7 @@ FROM alpine:3.20
 ENV PYTHONUNBUFFERED=1
 # tzdata es imprescindible: sin la base de zonas horarias, poner TZ + time.tzset() no surte
 # efecto en Alpine y los horarios se disparan con desfase. Ver backend/app.py _apply_host_timezone.
-RUN apk add --no-cache python3 py3-pip openssl jq git curl tzdata
+RUN apk add --no-cache python3 py3-pip openssl jq git curl tzdata py3-cryptography
 
 # Código a instalar: el tag vX.Y.Z de esta versión (lo pasa el workflow como APP_REF; por defecto
 # 'main' para un build manual suelto).

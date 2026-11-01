@@ -276,6 +276,9 @@ def rasterize(areas: list, lines: list, to_ca: dict | None = None):
 
 class RobEyeRobot:
     robeye = True
+    manufacturer = "Rowenta"
+    stats_keys = ("distance_km", "time_h", "area_m2", "runs")
+    clean_modes = ("Auto", "Bordes")         # el Rowenta solo limpia normal o por bordes
 
     def __init__(self, cfg, logger=print, host: str = "", names_path: str = "robeye_rooms.json",
                  http_get=None, subnet_hint=None):

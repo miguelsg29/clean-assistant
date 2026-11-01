@@ -108,9 +108,14 @@ LEGACY = MODE == "real" and BACKEND == "legacy"
 # CONGA_BACKEND=robeye -> Rowenta X-plorer Serie 80 y demás RobArt «RobEye»: API HTTP local del
 # robot (puerto 8080, opción ROBOT_IP). Sin nube que suplantar.
 ROBEYE = MODE == "real" and BACKEND == "robeye"
+# CONGA_BACKEND=tuya -> robots sobre Tuya (Conga 8290…): protocolo local de Tuya (puerto 6668) con
+# la local key del robot (opciones TUYA_DEVICE_ID / TUYA_LOCAL_KEY / TUYA_VERSION). Sin nube.
+TUYA = MODE == "real" and BACKEND == "tuya"
+# backends a los que CA llama directamente (sin DNS que redirigir ni identidad que aprender)
+LOCAL_API = ROBEYE or TUYA
 # backends cuyos horarios lanza Clean Assistant a su hora (no el robot)
-CA_SCHEDULES = LEGACY or ROBEYE
-BACKEND_NAME = "legacy" if LEGACY else "robeye" if ROBEYE else "new"
+CA_SCHEDULES = LEGACY or LOCAL_API
+BACKEND_NAME = "legacy" if LEGACY else "robeye" if ROBEYE else "tuya" if TUYA else "new"
 if MODE == "real":
     from conga_core.config import RobotConfig
     if ROBEYE:
@@ -118,6 +123,12 @@ if MODE == "real":
         robot = RobEyeRobot(RobotConfig.from_env(), host=(env("ROBOT_IP", "") or "").strip(),
                             names_path=_data("robeye_rooms.json"),
                             subnet_hint=lambda: _server_ip())
+    elif TUYA:
+        from conga_core.tuya.robot import TuyaRobot
+        robot = TuyaRobot(RobotConfig.from_env(), host=(env("ROBOT_IP", "") or "").strip(),
+                          dev_id=env("TUYA_DEVICE_ID", "") or "", local_key=env("TUYA_LOCAL_KEY", "") or "",
+                          version=env("TUYA_VERSION", "3.3") or "3.3", data_dir=_data("."),
+                          subnet_hint=lambda: _server_ip())
     elif LEGACY:
         from conga_core.legacy.robot import LegacyRobot
         robot = LegacyRobot(RobotConfig.from_env())
@@ -1033,7 +1044,7 @@ async def lifespan(app: FastAPI):
         peticiones (via cloud_stub) y, cuando tiene los esenciales (DID + SN), completa MAC
         (ARP) + factory_id (por defecto 1003) + userid (acuñado del DID) y configura CA. Solo
         si aún no hay identidad; no toca instalaciones ya configuradas."""
-        if MODE != "real" or LEGACY or ROBEYE or robot.cfg.configured:
+        if MODE != "real" or LEGACY or LOCAL_API or robot.cfg.configured:
             return
         for k in ("did", "sn", "project_type", "factory_id"):
             if ident.get(k) and not _auto_ident.get(k):
@@ -1062,7 +1073,7 @@ async def lifespan(app: FastAPI):
     # en cloud como RESERVA (si solo se redirige tcp-cecotec, se captura del relay); en cuanto
     # llega la OTA al cloud_stub, _auto_provision configura CA y cambia a local por su cuenta.
     # (la gen. legacy no necesita provisión: el robot manda su identidad al registrarse)
-    if MODE == "real" and not LEGACY and not ROBEYE and not robot.cfg.configured:
+    if MODE == "real" and not LEGACY and not LOCAL_API and not robot.cfg.configured:
         robot.link = "cloud"
         print("[provision] primer arranque: aprendo la identidad del robot "
               "(local por OTA; cloud como reserva)")
@@ -1091,7 +1102,7 @@ async def lifespan(app: FastAPI):
     # y acepta las subidas de informes de limpieza, que ingerimos en el historial. Requiere
     # redirigir por DNS los dominios de Cecotec a este servidor (ver cloud_stub.py).
     # Solo gen. nueva: la legacy no usa estos servicios TLS (su OTA es HTTP en otros puertos).
-    if MODE == "real" and not LEGACY and not ROBEYE:
+    if MODE == "real" and not LEGACY and not LOCAL_API:
         def _on_report(rep):
             if _ingest_report(rep):
                 asyncio.run_coroutine_threadsafe(broadcast_history(), loop)
@@ -1108,7 +1119,7 @@ async def lifespan(app: FastAPI):
     mqtt.stop()
 
 
-app = FastAPI(title="Clean Assistant", version="0.34.10", lifespan=lifespan)
+app = FastAPI(title="Clean Assistant", version="0.35.0", lifespan=lifespan)
 
 
 @app.get("/api/state")
@@ -1235,7 +1246,7 @@ def _server_ip() -> str | None:
 def get_setup():
     """Datos para el asistente de primer arranque: IP a la que redirigir el DNS del robot,
     el hostname a reescribir, si el robot ya conecta, y si es primer arranque (sin mapas)."""
-    if ROBEYE:
+    if LOCAL_API:
         # sin DNS que redirigir: Clean Assistant llama al robot por su IP
         host, dns_hosts = getattr(robot, "host", ""), []
     elif LEGACY:

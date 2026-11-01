@@ -112,8 +112,8 @@ class MqttBridge:
         self._fan_labels = (FAN_LABELS_ROBEYE if backend == "robeye" else
                             FAN_LABELS_LEGACY if self.legacy else FAN_LABELS_NEW)
         # modos que tiene cada robot: el Rowenta solo limpia normal o por bordes
-        self._mode_labels = ({k: CLEAN_MODE_LABELS[k] for k in ("Auto", "Bordes")}
-                             if backend == "robeye" else CLEAN_MODE_LABELS)
+        modes = getattr(robot, "clean_modes", None) or (("Auto", "Bordes") if backend == "robeye" else None)
+        self._mode_labels = ({k: CLEAN_MODE_LABELS[k] for k in modes} if modes else CLEAN_MODE_LABELS)
         self.log = log
         self._persist = persist        # callback opcional para persistir prefs (frecuencia/base)
         self.host = env("MQTT_HOST")
@@ -170,6 +170,8 @@ class MqttBridge:
         add-on y las pruebas del PC convergen en UN solo Conga y no salen duplicados."""
         if getattr(self.robot, "robeye", False):   # sin DID: un único robot RobEye por instalación
             return "robeye"
+        if getattr(self.robot, "tuya", False):     # robots sobre Tuya: su id de dispositivo
+            return f"tuya_{getattr(self.robot, 'dev_id', '') or 'robot'}"
         did = getattr(getattr(self.robot, "cfg", None), "did", 0) or 0
         if did in (0, 123456):
             did = self._env_did
@@ -183,6 +185,8 @@ class MqttBridge:
             fw = cap.get("firmware") or ""
             model = "Rowenta X-plorer Serie 80" if fw.startswith("SER80") else "RobEye"
             return (cap.get("name") or "Robot", f"{model} ({fw.split('-release')[0]})" if fw else model)
+        if getattr(self.robot, "tuya", False):     # Conga 8290 y demás sobre Tuya
+            return ("Conga", f"Conga (Tuya {getattr(self.robot, 'version', '3.3')})")
         if getattr(self.robot, "legacy", False):   # gen. 3xxx/4xxx: no reporta project_type
             return ("Conga", "Conga 3xxx/4xxx (legacy)")
         pt = (getattr(getattr(self.robot, "cfg", None), "project_type", "") or "").strip()
@@ -259,10 +263,11 @@ class MqttBridge:
                    "_volume", "_quiet", "_voice", "_ota", "_dust", "_turbo_carpet")
 
     def _disc(self, comp, obj, cfg):
+        skip = getattr(self.robot, "ha_skip", None) or             (self.ROBEYE_SKIP if getattr(self.robot, "robeye", False) else ())
+        if any(k in obj for k in skip):
+            self._pub(f"{self.disc}/{comp}/{obj}/config", "")
+            return
         if getattr(self.robot, "robeye", False):
-            if any(k in obj for k in self.ROBEYE_SKIP):
-                self._pub(f"{self.disc}/{comp}/{obj}/config", "")
-                return
             if isinstance(cfg.get("name"), str) and cfg["name"].startswith("Conga "):
                 cfg["name"] = cfg["name"][len("Conga "):]      # «Batería», no «Conga Batería»
         cfg.setdefault("availability_topic", self.t_avail)
@@ -293,7 +298,8 @@ class MqttBridge:
         lang = self._lang()
         dev_name, dev_model = self._model_names()
         device = {"identifiers": [uid], "name": dev_name,
-                  "manufacturer": "Rowenta" if getattr(self.robot, "robeye", False) else "Cecotec",
+                  "manufacturer": getattr(self.robot, "manufacturer", None) or
+                                  ("Rowenta" if getattr(self.robot, "robeye", False) else "Cecotec"),
                   "model": dev_model, "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
             "name": dev_name, "unique_id": uid, "schema": "state",
@@ -316,12 +322,15 @@ class MqttBridge:
             if dclass:
                 cfg["device_class"] = dclass
             self._disc("sensor", f"{uid}_{sid}", cfg)
-        if getattr(self.robot, "robeye", False):          # totales del robot (como la app)
+        stats_keys = getattr(self.robot, "stats_keys", None) or             (("distance_km", "time_h", "area_m2", "runs") if getattr(self.robot, "robeye", False) else ())
+        if stats_keys:                                     # totales del robot (como la app)
             for sid, name, key, unit, dclass, icon in (
                 ("tot_distance", "Distancia total recorrida", "distance_km", "km", "distance", "mdi:map-marker-distance"),
                 ("tot_time", "Tiempo total de limpieza", "time_h", "h", "duration", "mdi:timer-outline"),
                 ("tot_area", "Área total limpiada", "area_m2", "m²", None, "mdi:texture-box"),
                 ("tot_runs", "Total de limpiezas", "runs", None, None, "mdi:counter")):
+                if key not in stats_keys:
+                    continue
                 cfg = {"name": t(lang, name), "unique_id": f"{uid}_{sid}",
                        "state_topic": f"conga/{node}/stats",
                        "value_template": "{{ value_json.%s }}" % key, "icon": icon,
