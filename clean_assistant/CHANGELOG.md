@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34.10
+- Rowenta (backend `robeye`): al terminar la última habitación el estado pasa a **Volviendo a la base**
+  (antes seguía en «Limpiando» hasta llegar, porque el robot no cambia de modo) y la habitación actual
+  deja de saltar a las que cruza de camino.
+
 ## 0.34.9
 - **Conga 3890: limpiar habitaciones pone antes el agua en Off.** El horario de un solo uso ya va sin
   agua, pero el robot parece comprobar su nivel de agua general al arrancar y pide la mopa (aviso 522,

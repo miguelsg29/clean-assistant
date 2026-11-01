@@ -146,15 +146,21 @@ def _dt(t):
 
 
 def task_summary(task: dict, now=None) -> dict:
-    """Tarea de get/task_history -> {area (m²), minutes, rooms (en orden)}. `area` va en unidades²
-    del robot: un piso completo de ~39 m² sale ~9,8 millones (2 mm/unidad)."""
+    """Tarea de get/task_history -> {area (m²), minutes, rooms (en orden), homing}. `area` va en
+    unidades² del robot: un piso completo de ~39 m² sale ~9,8 millones (2 mm/unidad). `homing`: la
+    tarea sigue en curso pero ya no le queda ninguna habitación, es decir, vuelve a la base (el
+    robot sigue diciendo mode 'cleaning' hasta que llega)."""
     start, end = _dt(task.get("start_time") or {}), _dt(task.get("end_time") or {})
     mins = round(((end or now or datetime.datetime.now()) - start).total_seconds() / 60) if start else None
     rooms = []
-    for h in task.get("area_history") or []:      # 'pending' = planificadas, aún sin empezar
+    hist = task.get("area_history") or []
+    for h in hist:                                 # 'pending' = planificadas, aún sin empezar
         if h.get("area_id") is not None and h.get("state") != "pending" and h["area_id"] not in rooms:
             rooms.append(int(h["area_id"]))
-    return {"area": round((task.get("area") or 0) * UNIT_M ** 2, 2), "minutes": mins, "rooms": rooms}
+    homing = (task.get("state") == "executing" and bool(hist)
+              and all(h.get("state") in ("done", "failed") for h in hist))
+    return {"area": round((task.get("area") or 0) * UNIT_M ** 2, 2), "minutes": mins, "rooms": rooms,
+            "homing": homing}
 
 
 # get/schedule: days_of_week 1=lunes … 7=domingo (0 también domingo) -> bits de CA (como el robot 8090)
@@ -304,6 +310,7 @@ class RobEyeRobot:
         self._resume_ts = 0.0
         self._task_ts = 0.0
         self._task_areas = set()           # habitaciones pedidas en la tarea en curso (vacío = todas)
+        self._homing = False               # tarea con todas sus habitaciones hechas: vuelve a la base
         self._to_ca, self._to_robot = {}, {}   # ids de habitación robot <-> CA (ver room_ids_to_ca)
         self._maps_before = None           # mapas guardados al empezar a explorar
         self._map_sig = None               # para avisar del mapa solo si cambia
@@ -573,6 +580,10 @@ class RobEyeRobot:
                     and FLAG_CODES.get(f) not in _NOTICE_CODES]
         real_err = {"error": blocking}
         new = robot_state(mode, st.get("charging"), real_err)
+        if new != "cleaning":
+            self._homing = False
+        elif self._homing:
+            new = "returning"                  # acabó la última habitación y va hacia la base
         if was[1] == "cleaning" and new != "cleaning" and self._task_floor is not None:
             self._poll_task()                  # m² y minutos finales antes de cerrar la sesión
         s.state = new
@@ -647,6 +658,9 @@ class RobEyeRobot:
         s.area, s.clean_time = t["area"], t["minutes"]
         if t["rooms"]:
             s.cleaning_room = self._to_ca.get(t["rooms"][-1], t["rooms"][-1])
+        if t["homing"] and not self._homing and s.state == "cleaning":
+            self._homing = True
+            s.state = "returning"
         self._fire(self.on_update)
 
     def _direct(self, d: int) -> dict:
