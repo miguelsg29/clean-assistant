@@ -74,6 +74,11 @@ class RealRobot:
         """Envía un objeto `control` al robot (envuelto en to_bind)."""
         if (control.get("control") == "setRoomClean" and control.get("ctrlValue") == 1
                 and self.cfg.project_type in cmd.ROOMS_AS_ORDER and self.state.map_head_id):
+            # el horario inmediato va sin agua, pero el 3890 parece comprobar su nivel de agua
+            # GENERAL al arrancar (estado con waterlevel 12) y pide la mopa (522, #14): se pone a Off
+            if self._prefs.get(2) != cmd.WATER["Off"]:
+                self.command(cmd.water("Off"))
+                self.log("  [robot] agua general a Off antes de limpiar habitaciones (sin mopa)")
             control = cmd.immediate_order(control.get("roomsID") or [], self.state.map_head_id,
                                           self.rooms_meta(), self.cfg.project_type)
             self._oneoff = {"orderid": control["order"]["orderid"], "ts": time.time(), "started": False}

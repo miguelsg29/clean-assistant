@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34.9
+- **Conga 3890: limpiar habitaciones pone antes el agua en Off.** El horario de un solo uso ya va sin
+  agua, pero el robot parece comprobar su nivel de agua general al arrancar y pide la mopa (aviso 522,
+  #14). Para los horarios, pon el agua en Off en los controles de Clean Assistant.
+
 ## 0.34.8
 - Rowenta (backend `robeye`): el selector **Modo de limpieza** de Home Assistant solo ofrece los modos que
   tiene este robot (Auto y Bordes).
