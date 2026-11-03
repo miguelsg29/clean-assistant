@@ -23,6 +23,7 @@ from .proto import PORT, HEARTBEAT_S, TuyaDevice, TuyaError
 
 RETRY_S = 10.0               # reintento de conexión
 OFFLINE_AFTER_S = 30.0       # sin conexión tanto tiempo -> robot desconectado
+SILENT_S = 15.0              # conectado pero sin ningún dato del robot -> avisar en el registro
 REDISCOVER_S = 120.0         # IP cambiada: buscar al robot por la subred
 PROBE_TIMEOUT = 0.6
 DIRECT_STOP_S = 0.6          # mando manual: sin pulsos -> parar
@@ -162,6 +163,7 @@ class TuyaRobot:
         self._link_path = os.path.join(data_dir, "tuya_link.json")
         self._link = self._load_json(self._link_path, {})
         self._down_since = None
+        self._rx = False
         self._last_scan = 0.0
         self._direct_mode, self._direct_ts, self._direct_moving = False, 0.0, False
         self._stop = threading.Event()
@@ -336,10 +338,16 @@ class TuyaRobot:
                     self._link["ip"] = self.host
                     self._save_json(self._link_path, self._link)
                 self.log(f"[tuya] conectado con el robot ({self.host})")
-                beat = time.time()
+                beat = since = time.time()
+                self._rx = False
                 while not self._stop.is_set():
                     dev.poll(0.3)
                     self._direct_watch()
+                    if not self._rx and since and time.time() - since > SILENT_S:
+                        since = 0
+                        self.log("  [tuya] el robot acepta la conexión pero no contesta: revisa la local key y "
+                                 "la versión (3.3/3.4), y que no haya otra integración local conectada a la vez "
+                                 "(LocalTuya, tuya-local, tinytuya monitor)")
                     if time.time() - beat > HEARTBEAT_S:
                         dev.heartbeat()
                         beat = time.time()
@@ -361,6 +369,7 @@ class TuyaRobot:
             self._fire(self.on_update)
 
     def _on_dps(self, dps: dict):
+        self._rx = True
         self.dps.update(dps)
         st = dps.get(DP_STATUS)
         if st and st not in self._seen_status:

@@ -1,6 +1,6 @@
 """Protocolo local de Tuya (puerto TCP 6668), versiones 3.3 y 3.4, sin tinytuya.
 
-Trama 55AA:  prefijo 000055AA | seq | cmd | longitud | [retcode] payload | CRC32 o HMAC | 0000AA99
+Trama 55AA:  prefijo 000055AA | seq | cmd | longitud | [retcode] payload | CRC32 o HMAC | 0000AA55
   - 3.3: payload cifrado AES-128-ECB con la local key; CRC32 de cabecera+payload.
   - 3.4: primero se negocia una clave de sesión (cmd 3/4/5) y luego todo va cifrado con ella;
     HMAC-SHA256 en lugar de CRC32. Las órdenes son CONTROL_NEW (13) y las consultas DP_QUERY_NEW (16).
@@ -19,7 +19,7 @@ import threading
 import time
 
 PORT = 6668
-PREFIX, SUFFIX = 0x000055AA, 0x0000AA99
+PREFIX, SUFFIX = 0x000055AA, 0x0000AA55
 SESS_KEY_NEG_START, SESS_KEY_NEG_RESP, SESS_KEY_NEG_FINISH = 3, 4, 5
 CONTROL, STATUS, HEART_BEAT, DP_QUERY = 7, 8, 9, 10
 CONTROL_NEW, DP_QUERY_NEW, UPDATEDPS = 13, 16, 18
@@ -197,7 +197,7 @@ class TuyaDevice:
                                  "t": str(int(time.time())), "dps": dps})
 
     def heartbeat(self):
-        self._send(HEART_BEAT, {} if self.v34 else {"gwId": self.dev_id, "devId": self.dev_id})
+        self._send(HEART_BEAT, {"gwId": self.dev_id, "devId": self.dev_id})
 
     # ---------------- recepción ----------------
     def _read_frame(self, hmac_key: bytes | None = None, timeout: float = TIMEOUT_S):

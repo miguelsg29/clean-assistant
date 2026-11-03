@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.35.1
+- **Backend `tuya`: arreglado que el robot no hiciera caso.** Las tramas acababan en `0000AA99` en vez de
+  `0000AA55`; el robot las descartaba todas y cortaba la conexión a los 30 s (conectaba y se desconectaba
+  en bucle, #8). Ahora las tramas son idénticas byte a byte a las de tinytuya, también el latido en 3.4.
+- Si el robot acepta la conexión pero no contesta en 15 s, el registro lo dice y sugiere revisar la local
+  key, la versión y que no haya otra integración local (LocalTuya, tuya-local) conectada a la vez.
+
 ## 0.35.0
 - **Nuevo backend `tuya` (experimental): Conga sobre Tuya (8290 y otros)**, en local con el
   protocolo de Tuya 3.3/3.4 y la local key del robot (opciones `TUYA_DEVICE_ID`,
