@@ -115,7 +115,7 @@ def run(version):
     assert r.command(cmd.clean_rooms([2]))["ok"] is False and r.map is None and r.map_empty
     # se cae el robot -> reconecta solo
     TR.RETRY_S = 0.3
-    for c in dev.conns: c.close()
+    dev.drop()
     assert wait(lambda: len(dev.conns) >= 2, 4), "no reconectó"
     assert wait(lambda: s.online)
     r.stop(); dev.close()

@@ -35,11 +35,20 @@ class FakeTuya:
             self.conns.append(c)
             threading.Thread(target=self._serve, args=(c,), daemon=True).start()
 
-    def close(self):
-        self.srv.close()
+    def drop(self):
+        """Corta las conexiones abiertas. shutdown() avisa al cliente también en Linux, donde un
+        close() con otro hilo bloqueado en recv() no manda el FIN."""
         for c in self.conns:
+            try: c.shutdown(socket.SHUT_RDWR)
+            except OSError: pass
             try: c.close()
             except OSError: pass
+
+    def close(self):
+        try: self.srv.shutdown(socket.SHUT_RDWR)
+        except OSError: pass
+        self.srv.close()
+        self.drop()
 
     def _serve(self, c):
         buf, sess, seq = b"", None, 100
