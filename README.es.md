@@ -161,7 +161,7 @@ para desarrollar la interfaz sin un Conga.
 - **El mapa como imagen** (entidad `image` **Conga Mapa imagen**), lista para una tarjeta de
   imagen o de aspiradora, con los mismos colores y orientación que Clean Assistant. Solo se
   publica cuando cambia el mapa, así que es muy ligera (~10 KB). **Mapa en vivo** opcional
-  (Ajustes → Mapas de la casa): robot y recorrido cada 30 s mientras limpia. En sus atributos
+  (Ajustes → Mapas de la casa): robot y recorrido cada 5–30 s (lo eliges tú) mientras limpia. En sus atributos
   van los `calibration_points` píxel ↔ metros para tarjetas de mapa interactivas. Ejemplo:
   ```yaml
   type: picture-entity
@@ -176,6 +176,10 @@ para desarrollar la interfaz sin un Conga.
   map: image.conga_conga_mapa_imagen
   map_refresh: 30
   ```
+- **Extras listos para usar** ([guía](docs/home-assistant.es.md)): **blueprints** de un clic
+  (limpiar cuando salgáis todos, avisar cuando el robot necesita ayuda, recordatorio de
+  consumibles), **tarjetas de mapa** con un marcador del robot que se mueve al momento, botones de
+  habitación sobre el mapa y **órdenes de voz** con Assist (*«limpia la cocina»*).
 - **Salud de la batería** (todos los modelos, Ajustes → Consumibles): ciclos de carga, consumo por
   m² y por minuto al limpiar, velocidad de carga por debajo y por encima del 80 % y una **salud
   estimada** que compara las limpiezas recientes con las primeras (aparece a partir de 10
@@ -242,6 +246,7 @@ puente MQTT se montan sobre el mismo robot. Hay un `MockRobot` con la misma inte
 ```bash
 pip install -r requirements.txt
 uvicorn backend.app:app --reload --port 8000   # robot simulado (CONGA_MODE por defecto)
+python tests/run.py                             # pruebas (robots simulados, sin datos reales)
 ```
 
 Abre **http://localhost:8000**: pulsa *Iniciar* y observa el estado en vivo (WebSocket).

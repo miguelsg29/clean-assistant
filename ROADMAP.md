@@ -41,20 +41,21 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
   *(v0.28–v0.36)*
 - **Multiidioma**: 9 idiomas (ES/EN/DE/IT/FR/PT/NL/CA/PL); imagen precompilada en GHCR.
 - Asistente de primer arranque (DNS + crear mapa).
+- **Extras para Home Assistant** ([guía](docs/home-assistant.es.md)): 3 blueprints (limpiar al
+  salir todos, avisar cuando necesita ayuda, recordatorio de consumibles), tarjetas de mapa con
+  marcador del robot y botones de habitación, y «limpia la cocina» por voz con Assist.
+- **Pruebas automáticas en el repositorio** (`tests/`, robots simulados y datos inventados) que se
+  ejecutan en la CI en cada push y PR.
 
 ---
 
 ## 🧭 Pendiente / próximas mejoras
 
 ### Rápidas (poco esfuerzo, buen valor)
-- **Blueprints de Home Assistant** listos para importar: limpiar al salir todos de casa, avisar
-  si el robot se atasca o pide algo, recordar consumibles gastados, limpiar después de comer.
-- **Guía para tarjetas de mapa**: configuración de ejemplo de `xiaomi-vacuum-map-card` y de
-  «Picture Elements» con la imagen, la calibración y `x_pct/y_pct`.
-- **Frases para Assist (voz de HA)**: «limpia la cocina», «manda la aspiradora a la base».
 - **Más modelos** en el mapa de `project_type` y más Conga sobre Tuya (según los confirmen
   usuarios).
 - **Revisión de traducciones** por hablantes nativos.
+- **Más blueprints** según lo que pida la comunidad (p. ej. limpiar después de comer).
 
 ### Medianas
 - **Limpiar una zona dibujada a demanda** (`set_area`), no solo habitaciones.
@@ -81,7 +82,8 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 ### Robustez / adopción
 - **Página de diagnóstico**: log en vivo, últimas órdenes, estado de conexión, firmware.
 - **Estado «reconectando»** visible cuando el robot se cae.
-- **Pruebas automáticas en el repositorio** (hoy viven fuera) y en la CI.
+- **Más pruebas**: un mapa de RobEye inventado (la prueba actual usa una casa real y no se sube) y
+  pruebas de la app completa (zonas, horarios, borrado de mapas).
 - **Documentación/ayuda en la app** (tooltips, FAQ).
 - **awesome-home-assistant**: enviar el PR a partir del **18-ene-2027** (regla de 6 meses).
 
@@ -94,6 +96,6 @@ Ideas y trabajo pendiente para seguir mejorando Clean Assistant. Estado de refer
 
 | Prioridad | Ítems |
 |---|---|
-| **Alta** | DNS integrado · Blueprints + guía de tarjetas de mapa · Zona dibujada |
+| **Alta** | DNS integrado · Zona dibujada |
 | **Media** | «Limpiar lo que toca» · Ir a un punto · Estadísticas en el tiempo · Fecha de consumibles |
-| **Baja** | Diagnóstico · pruebas en la CI · orden de habitaciones · exportar · nice-to-have |
+| **Baja** | Diagnóstico · más pruebas · orden de habitaciones · exportar · nice-to-have |

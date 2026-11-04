@@ -1,0 +1,13 @@
+# Clean Assistant: limpiar una habitación por voz con Assist.
+# Copia este archivo a <config>/custom_sentences/es/ y el bloque de intent_script.yaml a tu
+# configuration.yaml. Ver docs/home-assistant.es.md.
+language: "es"
+intents:
+  CleanAssistantRoom:
+    data:
+      - sentences:
+          - "(limpia|aspira|friega) [el|la|los|las] {room}"
+          - "pasa la aspiradora (por|en) [el|la|los|las] {room}"
+lists:
+  room:
+    wildcard: true

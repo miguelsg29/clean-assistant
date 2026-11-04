@@ -1,0 +1,41 @@
+# Clean Assistant: what Assist does with "clean the kitchen" / "limpia la cocina".
+# Add this to configuration.yaml (if you already have `intent_script:`, add only the
+# CleanAssistantRoom block) and restart Home Assistant.
+#
+# It looks for the Clean Assistant button whose name ends with the spoken room
+# ("Clean Kitchen" / "Limpiar Cocina", also "Clean the whole house" / "Limpiar toda la casa")
+# and presses it. Nothing to configure: new rooms work as soon as they show up in HA.
+intent_script:
+  CleanAssistantRoom:
+    action:
+      - variables:
+          target: >-
+            {%- set r = room | lower | trim -%}
+            {%- set ns = namespace(hit='') -%}
+            {%- for e in integration_entities('mqtt') | select('match', 'button\.') -%}
+              {%- set n = (state_attr(e, 'friendly_name') or '') | lower -%}
+              {%- if not ns.hit and n.endswith(' ' ~ r) and ('limpiar' in n or 'clean' in n) -%}
+                {%- set ns.hit = e -%}
+              {%- endif -%}
+            {%- endfor -%}
+            {{ ns.hit }}
+      - if:
+          - condition: template
+            value_template: "{{ target != '' }}"
+        then:
+          - action: button.press
+            target:
+              entity_id: "{{ target }}"
+    speech:
+      text: >-
+        {%- set r = room | lower | trim -%}
+        {%- set ns = namespace(hit=false, es=false) -%}
+        {%- for e in integration_entities('mqtt') | select('match', 'button\.') -%}
+          {%- set n = (state_attr(e, 'friendly_name') or '') | lower -%}
+          {%- if 'limpiar' in n -%}{%- set ns.es = true -%}{%- endif -%}
+          {%- if n.endswith(' ' ~ r) and ('limpiar' in n or 'clean' in n) -%}
+            {%- set ns.hit = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if ns.hit -%}{{ 'Vale, limpio ' if ns.es else 'OK, cleaning ' }}{{ room }}
+        {%- else -%}{{ 'No encuentro ' if ns.es else "I can't find " }}{{ room }}{%- endif -%}

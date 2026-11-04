@@ -1,0 +1,12 @@
+# Clean Assistant: clean one room by voice with Assist.
+# Copy this file to <config>/custom_sentences/en/ and the block in intent_script.yaml to your
+# configuration.yaml. See docs/home-assistant.md.
+language: "en"
+intents:
+  CleanAssistantRoom:
+    data:
+      - sentences:
+          - "(clean|vacuum|mop) [the] {room}"
+lists:
+  room:
+    wildcard: true

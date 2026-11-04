@@ -1,0 +1,76 @@
+blueprint:
+  name: Clean Assistant — notify when the robot needs help
+  description: >
+    Sends a notification to your phone when the robot reports a warning (stuck, dustbin
+    full, mop missing, low water…) or goes into error. The message is the warning text from
+    Clean Assistant, already translated to your language.
+  domain: automation
+  source_url: https://github.com/miguelsg29/clean-assistant/blob/main/blueprints/automation/clean_assistant/notify_attention.yaml
+  input:
+    vacuum:
+      name: Robot
+      selector:
+        entity:
+          filter:
+            - domain: vacuum
+    warning:
+      name: Warning sensor
+      description: The "Warning" sensor of your robot (sensor.*_aviso / sensor.*_warning).
+      selector:
+        entity:
+          filter:
+            - domain: sensor
+              integration: mqtt
+    notify_device:
+      name: Phone
+      description: Device with the Home Assistant app that gets the notification.
+      selector:
+        device:
+          filter:
+            - integration: mobile_app
+    extra_actions:
+      name: Extra actions (optional)
+      description: >
+        Anything else to run, e.g. announce it on a speaker. The text is in the `message`
+        variable.
+      default: []
+      selector:
+        action: {}
+
+mode: queued
+max: 5
+
+variables:
+  vacuum: !input vacuum
+  warning: !input warning
+  robot_name: "{{ state_attr(vacuum, 'friendly_name') or 'Robot' }}"
+  warning_text: >
+    {% set w = states(warning) %}
+    {{ '' if w in ('', 'unknown', 'unavailable', 'none', 'None') else w }}
+  message: >
+    {% if warning_text %}{{ warning_text }}{% else %}{{ robot_name }}: error{% endif %}
+
+triggers:
+  - trigger: state
+    entity_id: !input warning
+    not_to: [unknown, unavailable]
+  - trigger: state
+    entity_id: !input vacuum
+    to: error
+    for:
+      seconds: 30
+
+conditions:
+  # el robot en error sin aviso nuevo, o un aviso nuevo con texto
+  - condition: template
+    value_template: >
+      {{ trigger.entity_id == vacuum or warning_text != '' }}
+
+actions:
+  - device_id: !input notify_device
+    domain: mobile_app
+    type: notify
+    title: "{{ robot_name }}"
+    message: "{{ message }}"
+  - choose: []
+    default: !input extra_actions

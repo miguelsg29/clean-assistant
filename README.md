@@ -163,7 +163,7 @@ develop the interface without a Conga.
 - **The map as an image** (`image` entity **Conga Mapa imagen**), ready for a picture or
   vacuum card, with the same colors and orientation as Clean Assistant. It's only published
   when the map changes, so it's very light (~10 KB). Optional **live map** (Settings → House
-  maps): robot and path every 30 s while cleaning. Its attributes include the pixel ↔ meter
+  maps): robot and path every 5–30 s (you choose) while cleaning. Its attributes include the pixel ↔ meter
   `calibration_points` for interactive map cards. Example:
   ```yaml
   type: picture-entity
@@ -178,6 +178,10 @@ develop the interface without a Conga.
   map: image.conga_conga_mapa_imagen
   map_refresh: 30
   ```
+- **Ready-made extras** ([guide](docs/home-assistant.md)): one-click **blueprints** (clean when
+  everyone leaves, notify when the robot needs help, consumables reminder), **map cards** with a
+  robot marker that moves right away, room buttons on the map, and **voice commands** with Assist
+  (*"clean the kitchen"*).
 - **Battery health** (all models, Settings → Consumables): charge cycles, drain per m² and per
   minute while cleaning, charging speed below/above 80 %, and an **estimated health** that
   compares recent cleanings with the first ones (shown after 10 valid cleanings). Also as Home
@@ -239,6 +243,7 @@ interface (`.state`, `command(control)`, `tick()`) to develop without a Conga.
 ```bash
 pip install -r requirements.txt
 uvicorn backend.app:app --reload --port 8000   # simulated robot (default CONGA_MODE)
+python tests/run.py                             # tests (simulated robots, no real data)
 ```
 
 Open **http://localhost:8000**: press *Start* and watch the live status (WebSocket).

@@ -1,0 +1,141 @@
+blueprint:
+  name: Clean Assistant — clean when everyone leaves
+  description: >
+    Starts the robot when nobody is home and, optionally, sends it back to the dock when
+    someone comes back. You can clean the whole house or press one of the buttons Clean
+    Assistant creates (a room, a saved plan or "Clean the whole house").
+    At most one run per day, only inside the time window and days you choose.
+  domain: automation
+  source_url: https://github.com/miguelsg29/clean-assistant/blob/main/blueprints/automation/clean_assistant/clean_when_away.yaml
+  input:
+    vacuum:
+      name: Robot
+      selector:
+        entity:
+          filter:
+            - domain: vacuum
+    home_zone:
+      name: Home zone
+      description: The robot starts when the number of people in this zone drops to 0.
+      default: zone.home
+      selector:
+        entity:
+          filter:
+            - domain: zone
+    delay:
+      name: Wait after the last person leaves
+      default:
+        minutes: 10
+      selector:
+        duration: {}
+    what:
+      name: What to clean (optional)
+      description: >
+        A Clean Assistant button: a room ("Clean Kitchen"), a plan ("Run Weekdays")…
+        Leave it empty to clean the whole house.
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: button
+              integration: mqtt
+    after:
+      name: Not before
+      default: "09:00:00"
+      selector:
+        time: {}
+    before:
+      name: Not after
+      default: "20:00:00"
+      selector:
+        time: {}
+    weekdays:
+      name: Days
+      default: [mon, tue, wed, thu, fri, sat, sun]
+      selector:
+        select:
+          multiple: true
+          mode: list
+          options:
+            - { label: Monday, value: mon }
+            - { label: Tuesday, value: tue }
+            - { label: Wednesday, value: wed }
+            - { label: Thursday, value: thu }
+            - { label: Friday, value: fri }
+            - { label: Saturday, value: sat }
+            - { label: Sunday, value: sun }
+    return_home:
+      name: Send it back to the dock when someone comes home
+      default: true
+      selector:
+        boolean: {}
+
+mode: single
+max_exceeded: silent
+
+variables:
+  vacuum: !input vacuum
+  what: !input what
+  return_home: !input return_home
+
+triggers:
+  - trigger: numeric_state
+    entity_id: !input home_zone
+    below: 1
+    for: !input delay
+    id: left
+  - trigger: numeric_state
+    entity_id: !input home_zone
+    above: 0
+    id: back
+
+conditions:
+  - condition: or
+    conditions:
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: left
+          - condition: state
+            entity_id: !input vacuum
+            state: docked
+          - condition: time
+            after: !input after
+            before: !input before
+            weekday: !input weekdays
+          # una vez al día como mucho
+          - condition: template
+            value_template: >
+              {{ this.attributes.last_triggered is none
+                 or as_local(this.attributes.last_triggered).date() < now().date() }}
+      - condition: and
+        conditions:
+          - condition: trigger
+            id: back
+          - condition: template
+            value_template: "{{ return_home and is_state(vacuum, 'cleaning') }}"
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: left
+        sequence:
+          - if:
+              - condition: template
+                value_template: "{{ what not in ('', none) }}"
+            then:
+              - action: button.press
+                target:
+                  entity_id: "{{ what }}"
+            else:
+              - action: vacuum.start
+                target:
+                  entity_id: "{{ vacuum }}"
+      - conditions:
+          - condition: trigger
+            id: back
+        sequence:
+          - action: vacuum.return_to_base
+            target:
+              entity_id: "{{ vacuum }}"
