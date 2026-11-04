@@ -342,8 +342,10 @@ class MqttBridge:
                 if dclass:
                     cfg["device_class"] = dclass
                 self._disc("sensor", f"{uid}_{sid}", cfg)
-        # posición del robot (x/y/ángulo en celdas del mapa) para floorplans/tarjetas externas.
-        # El estado es "x,y"; x, y y angle van también como atributos (json_attributes_topic).
+        # posición del robot (x/y/ángulo en celdas del mapa, + x_pct/y_pct ya convertidos a % de
+        # la imagen de conga/<node>/map_image para superponer un marcador en una tarjeta "Picture
+        # Elements") para floorplans/tarjetas externas. El estado es "x,y"; todo lo demás va como
+        # atributos (json_attributes_topic).
         self._disc("sensor", f"{uid}_pose", {
             "name": f"Conga {t(lang, 'Posición')}", "unique_id": f"{uid}_pose",
             "state_topic": f"conga/{node}/pose",
@@ -639,16 +641,46 @@ class MqttBridge:
             self._pub(f"conga/{self.node}/dust_freq", t(self._lang(), name))
 
     def publish_pose(self):
-        """Publica la posición del robot {x, y, angle} (celdas del mapa) en conga/<node>/pose,
-        para tarjetas/floorplans externos en Home Assistant. Retenido: la última posición queda
-        disponible al recargar. Solo cambia mientras el robot se mueve (limpiando)."""
+        """Publica la posición del robot en conga/<node>/pose, para tarjetas/floorplans externos en
+        Home Assistant. Retenido: la última posición queda disponible al recargar. Solo cambia
+        mientras el robot se mueve (limpiando).
+
+        x/y van en celdas del mapa (recortado, SIN aplicar el giro/volteo de la vista actual -- la
+        misma convención que robot.map["robot"]). Además se incluyen x_pct/y_pct: la misma posición
+        ya convertida a % del ancho/alto de la imagen publicada en conga/<node>/map_image (con el
+        giro/volteo de la vista YA aplicado, igual que hace render_png para dibujar el punto del
+        robot), pensados para superponer un marcador sobre esa imagen en una tarjeta "Picture
+        Elements" de HA sin tener que repetir esa transformación en el lado de HA."""
         if not self.client:
             return
         p = getattr(self.robot, "pose", None)
         if not p or p.get("x") is None:
             return
-        self._pub(f"conga/{self.node}/pose",
-                  json.dumps({"x": p.get("x"), "y": p.get("y"), "angle": p.get("angle")}))
+        payload = {"x": p.get("x"), "y": p.get("y"), "angle": p.get("angle")}
+        pct = self._pose_pct(p)
+        if pct:
+            payload["x_pct"], payload["y_pct"] = pct
+        self._pub(f"conga/{self.node}/pose", json.dumps(payload))
+
+    def _pose_pct(self, p):
+        """x/y del robot (celdas, sin girar) -> (x_pct, y_pct) en la imagen YA mostrada en HA, es
+        decir aplicando el mismo giro/volteo de vista que usa render_png() para la imagen. None si
+        todavía no hay mapa (bbox) con el que ubicarlo."""
+        m = getattr(self.robot, "map", None)
+        if not m or not m.get("bbox"):
+            return None
+        try:
+            from conga_core.mapimage import _s2v, _view_dims
+            _, _, W, H = m["bbox"]
+            if not W or not H:
+                return None
+            view = (self.view_provider() if self.view_provider else None) or {}
+            rot, flip = int(view.get("rot", 0)) % 4, 1 if view.get("flip") else 0
+            vx, vy = _s2v(p["x"], p["y"], W, H, rot, flip)
+            Wv, Hv = _view_dims(W, H, rot)
+            return round(100 * vx / Wv, 2), round(100 * vy / Hv, 2)
+        except Exception:
+            return None
 
     def publish_map(self, force=False):
         """Publica la geometría del mapa + la traza en conga/<node>/map (retenido), para tarjetas
