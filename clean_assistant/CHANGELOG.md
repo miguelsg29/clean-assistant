@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.36.0
+- **Mapa en vivo en Home Assistant: intervalo configurable de 5 a 30 s** (antes fijo en 30 s), con un
+  deslizador bajo «Mapa en vivo en Home Assistant». Gracias a @m-l (#25).
+- **Sensor de posición con `x_pct`/`y_pct`**: la posición del robot en % de la imagen del mapa, con el giro
+  y volteo de la vista ya aplicados. Sirve para poner un marcador del robot sobre el mapa en una tarjeta
+  «Picture Elements» que se mueve en cuanto el robot informa su posición, sin esperar a la imagen. Gracias
+  a @m-l (#25).
+
 ## 0.35.1
 - **Backend `tuya`: arreglado que el robot no hiciera caso.** Las tramas acababan en `0000AA99` en vez de
   `0000AA55`; el robot las descartaba todas y cortaba la conexión a los 30 s (conectaba y se desconectaba
