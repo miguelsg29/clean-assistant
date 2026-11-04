@@ -553,7 +553,8 @@
           <div class="btnrow"><button class="btn" id="nmCreate">Crear y mapear</button><button class="btn ghost" id="nmCancel">Cancelar</button></div>
         </div>
 
-        <div class="row notuya"><div class="rt"><div class="t">Mapa en vivo en Home Assistant</div><div class="d">Publica por MQTT la imagen del mapa con el robot y el recorrido mientras limpia (cada 30 s)</div></div><button class="toggle" id="mapLiveTog"></button></div>
+        <div class="row notuya"><div class="rt"><div class="t">Mapa en vivo en Home Assistant</div><div class="d">Publica por MQTT la imagen del mapa con el robot y el recorrido mientras limpia</div></div><button class="toggle" id="mapLiveTog"></button></div>
+        <div class="field notuya" style="margin-top:4px"><label>Intervalo del mapa en vivo</label><div class="slider"><input type="range" min="5" max="30" step="1" value="30" id="mapLiveInterval" aria-label="Intervalo del mapa en vivo"/><span class="v" id="mapLiveIntervalV">30 s</span></div><p class="hint" style="opacity:.65;font-size:11.5px;margin:4px 0 0">Como mucho cada cuántos segundos se actualiza mientras limpia; también se actualiza al momento cuando el robot informa una posición nueva</p></div>
         <div class="btnrow onlylegacy"><button class="btn ghost" id="resetMapBtn" style="color:var(--critical)">Reiniciar mapa</button></div>
 
         <div class="phead norobeye">Robot</div>
@@ -993,7 +994,9 @@
   "Ir aquí":{en:"Go here",pt:"Ir aqui",fr:"Aller ici",pl:"Jedź tutaj",de:"Hierhin",it:"Vai qui",nl:"Ga hierheen",ca:"Anar-hi"},
   "Reiniciar mapa":{en:"Reset map",pt:"Reiniciar mapa",fr:"Réinitialiser la carte",pl:"Zresetuj mapę",de:"Karte zurücksetzen",it:"Reimposta mappa",nl:"Kaart resetten",ca:"Reinicia el mapa"},
   "Mapa en vivo en Home Assistant":{en:"Live map in Home Assistant",pt:"Mapa ao vivo no Home Assistant",fr:"Carte en direct dans Home Assistant",pl:"Mapa na żywo w Home Assistant",de:"Live-Karte in Home Assistant",it:"Mappa dal vivo in Home Assistant",nl:"Live kaart in Home Assistant",ca:"Mapa en directe a Home Assistant"},
-  "Publica por MQTT la imagen del mapa con el robot y el recorrido mientras limpia (cada 30 s)":{en:"Publishes the map image over MQTT with the robot and its path while cleaning (every 30 s)",pt:"Publica por MQTT a imagem do mapa com o robô e o percurso enquanto limpa (a cada 30 s)",fr:"Publie par MQTT l'image de la carte avec le robot et son trajet pendant le nettoyage (toutes les 30 s)",pl:"Publikuje przez MQTT obraz mapy z robotem i trasą podczas sprzątania (co 30 s)",de:"Veröffentlicht das Kartenbild per MQTT mit Roboter und Weg während der Reinigung (alle 30 s)",it:"Pubblica via MQTT l'immagine della mappa con il robot e il percorso durante la pulizia (ogni 30 s)",nl:"Publiceert de kaartafbeelding via MQTT met de robot en zijn route tijdens het schoonmaken (elke 30 s)",ca:"Publica per MQTT la imatge del mapa amb el robot i el recorregut mentre neteja (cada 30 s)"},
+  "Publica por MQTT la imagen del mapa con el robot y el recorrido mientras limpia":{en:"Publishes the map image over MQTT with the robot and its path while cleaning",pt:"Publica por MQTT a imagem do mapa com o robô e o percurso enquanto limpa",fr:"Publie par MQTT l'image de la carte avec le robot et son trajet pendant le nettoyage",pl:"Publikuje przez MQTT obraz mapy z robotem i trasą podczas sprzątania",de:"Veröffentlicht das Kartenbild per MQTT mit Roboter und Weg während der Reinigung",it:"Pubblica via MQTT l'immagine della mappa con il robot e il percorso durante la pulizia",nl:"Publiceert de kaartafbeelding via MQTT met de robot en zijn route tijdens het schoonmaken",ca:"Publica per MQTT la imatge del mapa amb el robot i el recorregut mentre neteja"},
+  "Intervalo del mapa en vivo":{en:"Live map interval",pt:"Intervalo do mapa ao vivo",fr:"Intervalle de la carte en direct",pl:"Odstęp mapy na żywo",de:"Intervall der Live-Karte",it:"Intervallo della mappa dal vivo",nl:"Interval van de live kaart",ca:"Interval del mapa en directe"},
+  "Como mucho cada cuántos segundos se actualiza mientras limpia; también se actualiza al momento cuando el robot informa una posición nueva":{en:"At most how often it updates while cleaning, in seconds; it also updates right away whenever the robot reports a new position",pt:"No máximo de quantos em quantos segundos se atualiza enquanto limpa; também se atualiza de imediato sempre que o robô informa uma posição nova",fr:"Au plus toutes les combien de secondes elle se met à jour pendant le nettoyage ; elle se met aussi à jour immédiatement dès que le robot signale une nouvelle position",pl:"Najwyżej co ile sekund aktualizuje się podczas sprzątania; aktualizuje się też od razu, gdy robot zgłosi nową pozycję",de:"Höchstens alle wie viele Sekunden sie sich während der Reinigung aktualisiert; sie aktualisiert sich außerdem sofort, sobald der Roboter eine neue Position meldet",it:"Al massimo ogni quanti secondi si aggiorna durante la pulizia; si aggiorna anche subito ogni volta che il robot segnala una nuova posizione",nl:"Hoogstens om de hoeveel seconden deze wordt bijgewerkt tijdens het schoonmaken; wordt ook direct bijgewerkt zodra de robot een nieuwe positie doorgeeft",ca:"Com a màxim cada quants segons s'actualitza mentre neteja; també s'actualitza a l'instant quan el robot informa d'una posició nova"},
   "Batería":{en:"Battery",pt:"Bateria",fr:"Batterie",pl:"Bateria",de:"Akku",it:"Batteria",nl:"Accu",ca:"Bateria"},
   "Estimación de Clean Assistant a partir de las limpiezas y cargas que va viendo.":{en:"Clean Assistant's estimate, based on the cleanings and charges it has seen.",pt:"Estimativa do Clean Assistant a partir das limpezas e cargas que vai vendo.",fr:"Estimation de Clean Assistant à partir des nettoyages et des charges observés.",pl:"Szacunek Clean Assistant na podstawie zaobserwowanych sprzątań i ładowań.",de:"Schätzung von Clean Assistant anhand der beobachteten Reinigungen und Ladevorgänge.",it:"Stima di Clean Assistant in base alle pulizie e alle ricariche osservate.",nl:"Schatting van Clean Assistant op basis van de waargenomen schoonmaakbeurten en laadbeurten.",ca:"Estimació de Clean Assistant a partir de les neteges i càrregues que va veient."},
   "Ciclos de carga":{en:"Charge cycles",pt:"Ciclos de carga",fr:"Cycles de charge",pl:"Cykle ładowania",de:"Ladezyklen",it:"Cicli di carica",nl:"Laadcycli",ca:"Cicles de càrrega"},
@@ -1509,6 +1512,13 @@
   wireToggle('persistTog',function(on){api('persistent_map',{value:on});});
   // imagen del mapa por MQTT: la base se publica siempre (solo al cambiar); esto añade robot + recorrido
   wireToggle('mapLiveTog',function(on){fetch(BASE+'api/prefs/map_image_live',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:on})});});
+  // intervalo del mapa en vivo (5-30 s): se intenta en cada pose que informa el robot, esto solo
+  // acota cuán seguido se publica de verdad (ver publish_map_image() en mqtt_bridge.py)
+  var mli=document.getElementById('mapLiveInterval'),mliv=document.getElementById('mapLiveIntervalV');
+  if(mli){
+    mli.addEventListener('input',function(){mliv.textContent=mli.value+' s';});
+    mli.addEventListener('change',function(){fetch(BASE+'api/prefs/map_image_interval',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({value:+mli.value})});});
+  }
   // ---- solo gen. legacy: mapa nuevo pendiente, reiniciar mapa e "ir aquí" (como Congatudo) ----
   document.getElementById('pendSave').addEventListener('click',async function(){
     if(await uiConfirm(t('¿Guardar el mapa nuevo? Se guarda como un mapa aparte y pasa a ser el activo; el que tenías se conserva en la lista.'))){ document.getElementById('pendMap').hidden=true; api('pending_map',{save:true}); }
@@ -2733,6 +2743,8 @@
     else if(info.backend==='legacy'){ var fb=document.getElementById('fanOffBtn'); if(fb){ fb.textContent=t('Máx');
       fb.parentNode.appendChild(fb); } }   // relabelled "Máx" reads better at the end, not first (review #18)
     var ml=document.getElementById('mapLiveTog'); if(ml) ml.setAttribute('aria-pressed',!!info.map_image_live);
+    var mli=document.getElementById('mapLiveInterval'),mliv=document.getElementById('mapLiveIntervalV');
+    if(mli&&info.map_image_interval&&document.activeElement!==mli){ mli.value=info.map_image_interval; if(mliv)mliv.textContent=info.map_image_interval+' s'; }
     var el=document.getElementById('entityLangSel'); if(el&&info.lang){ el.value=info.lang; el.setAttribute('data-prev',info.lang); }
   }).catch(function(){});
   connect();
