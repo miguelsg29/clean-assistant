@@ -131,6 +131,8 @@ class MqttBridge:
         # imagen del mapa (entidad `image`): la base solo cuando cambia; en vivo (robot + recorrido)
         # solo si el usuario lo activa, mientras limpia y como mucho cada MAP_IMAGE_LIVE_S
         self.map_image_live = False     # preferencia (prefs.json), OFF por defecto
+        self.map_image_live_s = self.MAP_IMAGE_LIVE_S  # preferencia (prefs.json): intervalo
+                                                         # mínimo entre imágenes en vivo, 5-30 s
         self.view_provider = None       # callback -> {"rot", "flip"} (la vista de la interfaz)
         self._img_sig = None            # firma de la última imagen BASE publicada
         self._img_live_ts = 0.0         # última imagen EN VIVO publicada
@@ -694,14 +696,17 @@ class MqttBridge:
             self._sensors_last = s
             self._pub(f"conga/{self.node}/sensor_care", s)
 
-    MAP_IMAGE_LIVE_S = 30
+    MAP_IMAGE_LIVE_S = 30   # valor por defecto de map_image_live_s (configurable, 5-30 s)
 
     def publish_map_image(self, force=False):
         """Publica el mapa como PNG en conga/<node>/map_image (retenido) + atributos (calibración).
 
         - Base (habitaciones, base, paredes virtuales): SOLO cuando cambia el mapa o la vista.
-        - En vivo (robot + recorrido): solo si `map_image_live` está activado, mientras limpia y
-          como mucho cada MAP_IMAGE_LIVE_S. Al terminar se vuelve a publicar la base.
+        - En vivo (robot + recorrido): solo si `map_image_live` está activado, mientras limpia. Se
+          intenta en cada pose que informa el robot (ver broadcast_pose() en app.py) pero se acota
+          a lo sumo a una vez cada `map_image_live_s` segundos (ajustable, 5-30 s, por defecto
+          MAP_IMAGE_LIVE_S) para no saturar MQTT si el robot informa posición más a menudo. Al
+          terminar se vuelve a publicar la base.
         El dibujo va en un hilo aparte para no bloquear el bucle de la interfaz."""
         if not self.client:
             return
@@ -713,7 +718,7 @@ class MqttBridge:
         live = self.map_image_live and state in ("cleaning", "mapping", "paused", "returning")
         now = time.time()
         if live:
-            if not force and now - self._img_live_ts < self.MAP_IMAGE_LIVE_S:
+            if not force and now - self._img_live_ts < self.map_image_live_s:
                 return
         sig = None
         if not live:

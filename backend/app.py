@@ -257,7 +257,19 @@ PREFS_PATH = _data("prefs.json")
 # Es el selector de "idioma de entidades" de la Zona de peligro (entityLangSel), NO el selector
 # de idioma de la propia interfaz web (langSel, puramente client-side) -- el front llama a
 # /api/prefs/lang cuando el usuario lo cambia ahí.
-_ui_prefs = {"map_image_live": False, "lang": "es"}
+_ui_prefs = {"map_image_live": False, "map_image_interval": 30, "lang": "es"}
+# rango permitido para map_image_interval (ver MqttBridge.map_image_live_s / MAP_IMAGE_LIVE_S):
+# por debajo de 5 s se arriesga a saturar MQTT si el robot informa posición muy seguido; por
+# encima de 30 s (el valor por defecto de siempre) deja de sentirse "en vivo".
+MAP_LIVE_INTERVAL_MIN, MAP_LIVE_INTERVAL_MAX = 5, 30
+
+
+def _clamp_map_interval(v):
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return 30
+    return max(MAP_LIVE_INTERVAL_MIN, min(MAP_LIVE_INTERVAL_MAX, v))
 
 # sombra de "próxima limpieza" (mqtt.prefs: fan/water/mop/mode/twice/turbo_carpet -- ver
 # mqtt_bridge.py). Se cargan aquí pero el puente MQTT todavía no existe en este punto del
@@ -288,6 +300,7 @@ def _load_prefs():
             robot.ota_enforce = 0
         robot.state.auto_upgrade = robot.ota_enforce
     _ui_prefs["map_image_live"] = bool(p.get("map_image_live", False))
+    _ui_prefs["map_image_interval"] = _clamp_map_interval(p.get("map_image_interval", 30))
     _ui_prefs["lang"] = p.get("lang") if p.get("lang") in VALID_LANGS else "es"
     cp = p.get("clean_prefs")
     if isinstance(cp, dict):
@@ -303,6 +316,7 @@ def _save_prefs():
                        "base_type": robot.state.base_type,
                        "ota": getattr(robot, "ota_enforce", 0),
                        "map_image_live": _ui_prefs["map_image_live"],
+                       "map_image_interval": _ui_prefs["map_image_interval"],
                        "lang": _ui_prefs["lang"],
                        "clean_prefs": {k: mqtt.prefs.get(k) for k in _CLEAN_PREF_KEYS}}, f)
     except Exception:
@@ -610,6 +624,7 @@ def _ingest_report(rep: dict):
 # activa si MQTT_HOST está definido; si no, todos sus métodos son no-ops.
 mqtt = MqttBridge(robot, schedules, env, _map_head_id, _rooms_meta, persist=_save_prefs)
 mqtt.map_image_live = _ui_prefs["map_image_live"]     # mapa en vivo como imagen: OFF por defecto
+mqtt.map_image_live_s = _ui_prefs["map_image_interval"]  # intervalo del mapa en vivo, 5-30 s
 mqtt.view_provider = lambda: view_settings            # la imagen sale con la misma vista que la UI
 mqtt.battery_provider = battery_health.summary
 mqtt.sensors_provider = sensor_care.summary
@@ -725,7 +740,7 @@ async def broadcast_pose():
         return
     mqtt.publish_pose()                       # expone x/y/ángulo por MQTT (floorplans externos)
     mqtt.publish_map()                         # geometría + traza por MQTT (con throttle de 10 s)
-    mqtt.publish_map_image()                   # imagen en vivo si está activada (cada 30 s)
+    mqtt.publish_map_image()                   # imagen en vivo si está activada (map_image_interval)
     msg = json.dumps({"type": "pose", "pose": pose,
                       "trail": list(getattr(robot, "trail", None) or [])})
     for ws in list(clients):
@@ -1139,6 +1154,7 @@ def get_info():
             "mode": getattr(robot, "link", "local"),
             "backend": BACKEND_NAME,   # la interfaz oculta lo que no aplica
             "map_image_live": mqtt.map_image_live,
+            "map_image_interval": mqtt.map_image_live_s,
             "lang": _ui_prefs["lang"]}
 
 
@@ -1368,12 +1384,23 @@ def reset_sensors():
 
 @app.post("/api/prefs/map_image_live")
 async def set_map_image_live(payload: dict):
-    """Mapa en vivo como imagen por MQTT (robot + recorrido cada 30 s mientras limpia). OFF
-    por defecto: el mapa base (sin robot) se publica siempre, solo cuando cambia."""
+    """Mapa en vivo como imagen por MQTT (robot + recorrido, como mucho cada map_image_interval
+    segundos mientras limpia -- ver set_map_image_interval). OFF por defecto: el mapa base (sin
+    robot) se publica siempre, solo cuando cambia."""
     _ui_prefs["map_image_live"] = mqtt.map_image_live = bool(payload.get("value"))
     _save_prefs()
     mqtt.publish_map_image(force=True)
     return {"ok": True, "map_image_live": mqtt.map_image_live}
+
+
+@app.post("/api/prefs/map_image_interval")
+async def set_map_image_interval(payload: dict):
+    """Intervalo mínimo (5-30 s) entre imágenes EN VIVO del mapa mientras limpia. El robot puede
+    disparar un intento de actualización más a menudo (en cada pose que informa, ver
+    broadcast_pose()); este valor solo acota cuán seguido se publica de verdad."""
+    _ui_prefs["map_image_interval"] = mqtt.map_image_live_s = _clamp_map_interval(payload.get("value"))
+    _save_prefs()
+    return {"ok": True, "map_image_interval": mqtt.map_image_live_s}
 
 
 @app.post("/api/prefs/lang")
