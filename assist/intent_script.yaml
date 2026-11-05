@@ -5,6 +5,7 @@
 # It looks for the Clean Assistant button whose name ends with the spoken room
 # ("Clean Kitchen" / "Limpiar Cocina", also "Clean the whole house" / "Limpiar toda la casa")
 # and presses it. Nothing to configure: new rooms work as soon as they show up in HA.
+# Uses entity_name() (HA 2026.11+) and falls back to friendly_name on older versions.
 intent_script:
   CleanAssistantRoom:
     action:
@@ -13,7 +14,8 @@ intent_script:
             {%- set r = room | lower | trim -%}
             {%- set ns = namespace(hit='') -%}
             {%- for e in integration_entities('mqtt') | select('match', 'button\.') -%}
-              {%- set n = (state_attr(e, 'friendly_name') or '') | lower -%}
+              {%- set n = ((entity_name(e) if entity_name is defined else '') or state_attr(e, 'friendly_name')
+                             or '') | lower -%}
               {%- if not ns.hit and n.endswith(' ' ~ r) and ('limpiar' in n or 'clean' in n) -%}
                 {%- set ns.hit = e -%}
               {%- endif -%}
@@ -31,7 +33,8 @@ intent_script:
         {%- set r = room | lower | trim -%}
         {%- set ns = namespace(hit=false, es=false) -%}
         {%- for e in integration_entities('mqtt') | select('match', 'button\.') -%}
-          {%- set n = (state_attr(e, 'friendly_name') or '') | lower -%}
+          {%- set n = ((entity_name(e) if entity_name is defined else '') or state_attr(e, 'friendly_name')
+                             or '') | lower -%}
           {%- if 'limpiar' in n -%}{%- set ns.es = true -%}{%- endif -%}
           {%- if n.endswith(' ' ~ r) and ('limpiar' in n or 'clean' in n) -%}
             {%- set ns.hit = true -%}

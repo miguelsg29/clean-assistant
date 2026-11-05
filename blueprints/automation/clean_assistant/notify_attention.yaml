@@ -43,7 +43,9 @@ max: 5
 variables:
   vacuum: !input vacuum
   warning: !input warning
-  robot_name: "{{ state_attr(vacuum, 'friendly_name') or 'Robot' }}"
+  robot_name: >-
+    {{ (device_name(vacuum) if device_name is defined else '') or state_attr(vacuum, 'friendly_name')
+       or 'Robot' }}
   warning_text: >
     {% set w = states(warning) %}
     {{ '' if w in ('', 'unknown', 'unavailable', 'none', 'None') else w }}

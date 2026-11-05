@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.36.1
+- **Home Assistant: nombres sin «Conga» repetido.** Las entidades ya no llevan «Conga» delante
+  («Batería», «Mapa imagen»…) y el aspirador toma el nombre del dispositivo. Home Assistant antepone el
+  nombre del dispositivo, así que se ve «Conga 8090 Batería» y no «Conga 8090 Conga Batería» (más visible
+  desde la 2026.11, que muestra así los nombres en todas las tarjetas). **Los entity_id ya creados no
+  cambian**: automatizaciones, paneles e historial siguen igual; si renombraste alguna entidad a mano, se
+  respeta tu nombre.
+- Blueprints y frases de Assist preparados para `entity_name()`/`device_name()` (HA 2026.11), con
+  `friendly_name` como respaldo en versiones anteriores.
+
 ## 0.36.0
 - **Mapa en vivo en Home Assistant: intervalo configurable de 5 a 30 s** (antes fijo en 30 s), con un
   deslizador bajo «Mapa en vivo en Home Assistant». Gracias a @m-l (#25).

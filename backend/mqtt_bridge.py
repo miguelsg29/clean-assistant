@@ -269,9 +269,10 @@ class MqttBridge:
         if any(k in obj for k in skip):
             self._pub(f"{self.disc}/{comp}/{obj}/config", "")
             return
-        if getattr(self.robot, "robeye", False):
-            if isinstance(cfg.get("name"), str) and cfg["name"].startswith("Conga "):
-                cfg["name"] = cfg["name"][len("Conga "):]      # «Batería», no «Conga Batería»
+        # HA ya antepone el nombre del dispositivo («Conga 8090 Batería»); con el prefijo saldría
+        # «Conga 8090 Conga Batería». Quitarlo no cambia los entity_id ya creados (van por unique_id).
+        if isinstance(cfg.get("name"), str) and cfg["name"].startswith("Conga "):
+            cfg["name"] = cfg["name"][len("Conga "):]
         cfg.setdefault("availability_topic", self.t_avail)
         cfg.setdefault("payload_available", "online")
         cfg.setdefault("payload_not_available", "offline")
@@ -304,7 +305,7 @@ class MqttBridge:
                                   ("Rowenta" if getattr(self.robot, "robeye", False) else "Cecotec"),
                   "model": dev_model, "sw_version": "clean-assistant"}
         self._disc("vacuum", node, {
-            "name": dev_name, "unique_id": uid, "schema": "state",
+            "name": None, "unique_id": uid, "schema": "state",   # None = el nombre del dispositivo
             "supported_features": ["start", "pause", "stop", "return_home", "status"] +
                                   ([] if getattr(self.robot, "robeye", False) else ["locate"]),
             "command_topic": self.t_cmd, "state_topic": self.t_state, "device": device})

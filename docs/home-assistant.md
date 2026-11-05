@@ -7,7 +7,8 @@ blueprints**, **map cards** and **voice commands**. Everything is local and work
 Clean Assistant supports.
 
 > Entity IDs below (`vacuum.conga_conga`, `image.conga_conga_mapa_imagen`…) are examples: yours
-> depend on the robot's name and the entity language. Look them up in
+> depend on the robot's name and the entity language (installs from v0.36.1 on get shorter ones,
+> e.g. `image.conga_8090_mapa_imagen`). Look them up in
 > *Settings → Devices & services → MQTT → your robot*.
 
 ---

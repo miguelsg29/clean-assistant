@@ -7,8 +7,9 @@ automatización**, **tarjetas de mapa** y **órdenes de voz**. Todo en local y c
 compatible con Clean Assistant.
 
 > Los ID de entidad de abajo (`vacuum.conga_conga`, `image.conga_conga_mapa_imagen`…) son
-> ejemplos: los tuyos dependen del nombre del robot y del idioma de las entidades. Búscalos en
-> *Ajustes → Dispositivos y servicios → MQTT → tu robot*.
+> ejemplos: los tuyos dependen del nombre del robot y del idioma de las entidades (las
+> instalaciones desde la v0.36.1 los tienen más cortos, p. ej. `image.conga_8090_mapa_imagen`).
+> Búscalos en *Ajustes → Dispositivos y servicios → MQTT → tu robot*.
 
 ---
 

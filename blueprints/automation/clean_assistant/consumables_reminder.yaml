@@ -60,7 +60,7 @@ variables:
     {%- for e in consumables -%}
       {%- set v = states(e) -%}
       {%- if is_number(v) and v | float < threshold | float -%}
-        {%- set ns.items = ns.items + [(state_attr(e, 'friendly_name') or e) ~ ' (' ~ (v | float | round(0) | int) ~ ' %)'] -%}
+        {%- set ns.items = ns.items + [((entity_name(e) if entity_name is defined else '') or state_attr(e, 'friendly_name') or e) ~ ' (' ~ (v | float | round(0) | int) ~ ' %)'] -%}
       {%- endif -%}
     {%- endfor -%}
     {{ ns.items }}
