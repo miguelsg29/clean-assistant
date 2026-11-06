@@ -144,6 +144,9 @@ class MqttBridge:
         self._sensors_last = None
         self._battery_last = None
         self.lang_provider = None       # callback -> código de idioma ('es','en',...), ver backend/i18n.py
+        self.pre_clean_resend = None    # callback opcional (resend_before_clean): reenvía zonas y
+                                         # fan/water/mop/mode al robot justo antes de un arranque
+                                         # "en frío" -- ver _resend_zones_and_prefs en app.py
         self._opt_reverse = {}          # {clave select: {opción traducida -> clave canónica}}, por idioma actual
         self.ha_notify_provider = None  # callback(connected: bool) -> avisa a HA de la propia
                                          # conexión MQTT de la app (distinto de la disponibilidad
@@ -965,6 +968,8 @@ class MqttBridge:
 
             if topic == f"conga/{node}/room_command":
                 rid = int(payload)
+                if self.pre_clean_resend:
+                    self.pre_clean_resend()
                 self._cmd(cmd.fan(self.prefs["fan"]))
                 self._cmd(cmd.water(self.prefs["water"]))
                 self._cmd(cmd.mop(self.prefs["mop"]))
@@ -977,6 +982,8 @@ class MqttBridge:
                 p = next((x for x in self.schedules.plans if x.get("id") == payload), None)
                 rooms = [r for r in (p.get("rooms") or []) if r.get("room") is not None] if p else []
                 if rooms:
+                    if self.pre_clean_resend:
+                        self.pre_clean_resend()
                     first = rooms[0]
                     self._cmd(cmd.fan(first.get("fan") if first.get("fan") in cmd.FAN else self.prefs["fan"]))
                     self._cmd(cmd.water(first.get("water") if first.get("water") in cmd.WATER else self.prefs["water"]))
@@ -1103,12 +1110,19 @@ class MqttBridge:
     def _vacuum_command(self, c: str):
         state = self.robot.state.state
         if c == "start":
-            self._cmd(cmd.resume() if state in ("paused", "returning") else cmd.start())
+            if state in ("paused", "returning"):
+                self._cmd(cmd.resume())
+            else:
+                if self.pre_clean_resend:   # arranque nuevo (no reanudar) -> workaround opcional
+                    self.pre_clean_resend()
+                self._cmd(cmd.start())
         elif c in ("pause", "stop"):
             self._cmd(cmd.cancel_home() if state == "returning" else cmd.pause())
         elif c == "return_to_base":
             self._cmd(cmd.home())
         elif c == "clean_spot":
+            if self.pre_clean_resend:
+                self.pre_clean_resend()
             self._cmd(cmd.start())
         elif c == "locate":
             self._cmd(cmd.locate())
