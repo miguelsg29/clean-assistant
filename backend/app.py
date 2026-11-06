@@ -257,7 +257,8 @@ PREFS_PATH = _data("prefs.json")
 # Es el selector de "idioma de entidades" de la Zona de peligro (entityLangSel), NO el selector
 # de idioma de la propia interfaz web (langSel, puramente client-side) -- el front llama a
 # /api/prefs/lang cuando el usuario lo cambia ahí.
-_ui_prefs = {"map_image_live": False, "map_image_interval": 30, "lang": "es"}
+_ui_prefs = {"map_image_live": False, "map_image_interval": 30,
+             "resend_before_clean": False, "lang": "es"}
 # rango permitido para map_image_interval (ver MqttBridge.map_image_live_s / MAP_IMAGE_LIVE_S):
 # por debajo de 5 s se arriesga a saturar MQTT si el robot informa posición muy seguido; por
 # encima de 30 s (el valor por defecto de siempre) deja de sentirse "en vivo".
@@ -301,6 +302,7 @@ def _load_prefs():
         robot.state.auto_upgrade = robot.ota_enforce
     _ui_prefs["map_image_live"] = bool(p.get("map_image_live", False))
     _ui_prefs["map_image_interval"] = _clamp_map_interval(p.get("map_image_interval", 30))
+    _ui_prefs["resend_before_clean"] = bool(p.get("resend_before_clean", False))
     _ui_prefs["lang"] = p.get("lang") if p.get("lang") in VALID_LANGS else "es"
     cp = p.get("clean_prefs")
     if isinstance(cp, dict):
@@ -317,6 +319,7 @@ def _save_prefs():
                        "ota": getattr(robot, "ota_enforce", 0),
                        "map_image_live": _ui_prefs["map_image_live"],
                        "map_image_interval": _ui_prefs["map_image_interval"],
+                       "resend_before_clean": _ui_prefs["resend_before_clean"],
                        "lang": _ui_prefs["lang"],
                        "clean_prefs": {k: mqtt.prefs.get(k) for k in _CLEAN_PREF_KEYS}}, f)
     except Exception:
@@ -650,6 +653,35 @@ def _send_zone_group(group: str):
     return robot.command(zones.build_command(group, _map_head_id()))
 
 
+def _resend_zones_and_prefs():
+    """Reenvía al robot las zonas (prohibida/sin fregona/limpieza) y la potencia/agua/mopa/modo
+    actuales justo antes de arrancar una limpieza. Workaround opcional (resend_before_clean, OFF
+    por defecto): un arranque "en frío" del robot a veces parece ignorar zonas y ajustes ya
+    guardados hasta que se reenvían de nuevo -- posible fallo de firmware reportado por un
+    usuario, no confirmado por el fabricante."""
+    if not _ui_prefs.get("resend_before_clean"):
+        return
+    try:
+        _send_zone_group("restricted")   # no-go + no-mopa
+        _send_zone_group("cleaning")     # zonas de limpieza (una/dos veces)
+        p = mqtt.prefs
+        if p.get("fan") in cmd.FAN:
+            robot.command(cmd.fan(p["fan"]))
+        if p.get("water") in cmd.WATER:
+            robot.command(cmd.water(p["water"]))
+        if p.get("mop") in cmd.MOP:
+            robot.command(cmd.mop(p["mop"]))
+        if p.get("mode") in cmd.CLEAN_MODES:
+            robot.command(cmd.select_mode(p["mode"]))
+        robot.command(cmd.twice(bool(p.get("twice"))))
+        robot.command(cmd.carpet_turbo(bool(p.get("turbo_carpet"))))
+    except Exception as e:
+        print(f"[resend_before_clean] fallo al reenviar zonas/ajustes: {e}")
+
+
+mqtt.pre_clean_resend = _resend_zones_and_prefs        # reenvío opcional de zonas/ajustes (resend_before_clean)
+
+
 # ------- acción de la interfaz -> objeto `control` del robot -------
 def build(action: str, p: dict):
     if action == "start":        return cmd.start()
@@ -908,6 +940,7 @@ async def _run_due_schedules_legacy():
         _legacy_sched["fired"][p.get("id")] = stamp
         _legacy_sched["last"] = {"ts": time.time(), "name": p.get("name") or "Horario"}
         print(f"[horarios] lanzo '{p.get('name')}' (lo ejecuta Clean Assistant, no el robot)")
+        _resend_zones_and_prefs()
         for i, c in enumerate(controls):
             robot.command(c)
             if i < len(controls) - 1:
@@ -1155,6 +1188,7 @@ def get_info():
             "backend": BACKEND_NAME,   # la interfaz oculta lo que no aplica
             "map_image_live": mqtt.map_image_live,
             "map_image_interval": mqtt.map_image_live_s,
+            "resend_before_clean": _ui_prefs["resend_before_clean"],
             "lang": _ui_prefs["lang"]}
 
 
@@ -1305,6 +1339,8 @@ async def post_command(payload: dict):
         control = build(action, payload)
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
+    if action in ("start", "clean_rooms", "clean_all"):
+        _resend_zones_and_prefs()
     result = robot.command(control)
     if action in ("start", "clean_rooms", "clean_all"):   # limpieza lanzada desde CA -> "manual"
         _clean_trigger["ts"] = time.time()
@@ -1401,6 +1437,16 @@ async def set_map_image_interval(payload: dict):
     _ui_prefs["map_image_interval"] = mqtt.map_image_live_s = _clamp_map_interval(payload.get("value"))
     _save_prefs()
     return {"ok": True, "map_image_interval": mqtt.map_image_live_s}
+
+
+@app.post("/api/prefs/resend_before_clean")
+async def set_resend_before_clean(payload: dict):
+    """Workaround opcional: reenvía las zonas y la potencia/agua/mopa/modo actuales al robot justo
+    antes de arrancar cualquier limpieza (botón de la app, HA, horario...). OFF por defecto --
+    actívalo solo si el robot parece ignorar zonas/ajustes guardados en un arranque "en frío"."""
+    _ui_prefs["resend_before_clean"] = bool(payload.get("value"))
+    _save_prefs()
+    return {"ok": True, "resend_before_clean": _ui_prefs["resend_before_clean"]}
 
 
 @app.post("/api/prefs/lang")
@@ -1852,6 +1898,7 @@ async def schedule_run(payload: dict):
     controls = run_controls(p)
     if not controls:
         return {"ok": False, "error": "el plan no tiene habitaciones"}
+    _resend_zones_and_prefs()
     for i, c in enumerate(controls):
         robot.command(c)
         if i < len(controls) - 1:
