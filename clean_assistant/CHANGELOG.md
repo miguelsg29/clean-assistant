@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.37.0
+- **Nueva opción «Reenviar zonas y ajustes antes de limpiar»** (Ajustes → Robot, desactivada por
+  defecto). Justo antes de cada limpieza nueva (botón de la web, Home Assistant, habitación, plan u
+  horario) reenvía al robot las zonas prohibidas, sin fregona y de limpieza, y la potencia, agua, mopa y
+  modo actuales. Pensada para robots que en un arranque «en frío» ignoran a veces zonas o ajustes ya
+  guardados. Al reanudar una limpieza en pausa no se reenvía nada. Ojo: sustituye las zonas del robot
+  por las de Clean Assistant, así que las creadas desde la app oficial se perderían. Gracias a @m-l (#27).
+
 ## 0.36.1
 - **Home Assistant: nombres sin «Conga» repetido.** Las entidades ya no llevan «Conga» delante
   («Batería», «Mapa imagen»…) y el aspirador toma el nombre del dispositivo. Home Assistant antepone el
