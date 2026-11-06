@@ -1767,25 +1767,44 @@
       });
   }
   // ---- robot en vivo: capa superpuesta con posición animada ----
-  var SCALE=1, RBT=null, RBT_T=null, rbtRAF=0;
+  var SCALE=1, RBT=null, RBT_T=null, RBT_FROM=null, RBT_START=0, RBT_DUR=0, RBT_LAST_T=0, rbtRAF=0;
   function sizeOverlay(){
     var b=document.getElementById('mapCanvas'), o=document.getElementById('robotCanvas');
     if(o.width!==b.width||o.height!==b.height){ o.width=b.width; o.height=b.height; }
   }
+  // El robot informa su posicion real cada ~10-20s (lo marca el propio hardware, no algo que
+  // controlemos); con el salto directo de antes (ease del 18% por frame hacia el ultimo punto) el
+  // punto se quedaba quieto casi todo ese tiempo y luego "saltaba" en una fraccion de segundo, lo
+  // que se ve a tirones. En vez de eso, en cuanto llega un dato real nuevo deslizamos en linea
+  // recta desde donde esta AHORA el punto en pantalla (RBT_FROM) hasta el nuevo dato (RBT_T),
+  // repartiendo el movimiento a lo largo del MISMO intervalo que tardo en llegar este dato desde
+  // el anterior (RBT_DUR) -- así, si el robot informa cada ~10s, el punto tarda esos mismos ~10s
+  // en recorrer la distancia, terminando justo sobre cuando se espera el siguiente dato real, en
+  // vez de saltar de golpe. Con tope [0.4s, 20s] por si el intervalo observado es atipico.
   function setRobotTarget(pose, snap){
-    if(!pose||pose.x==null){ RBT_T=null; return; }
-    RBT_T={x:pose.x,y:pose.y};
-    if(snap||!RBT) RBT={x:pose.x,y:pose.y};
+    if(!pose||pose.x==null){ RBT_T=null; RBT_FROM=null; return; }
+    var now=performance.now();
+    if(snap||!RBT){
+      RBT={x:pose.x,y:pose.y}; RBT_T={x:pose.x,y:pose.y};
+      RBT_FROM=null; RBT_LAST_T=now;
+    } else {
+      RBT_FROM={x:RBT.x,y:RBT.y};              // donde esta ahora en pantalla
+      RBT_T={x:pose.x,y:pose.y};
+      RBT_START=now;
+      RBT_DUR=Math.min(20000,Math.max(400,now-RBT_LAST_T));
+      RBT_LAST_T=now;
+    }
     startRbt();
   }
   function startRbt(){ if(rbtRAF||!MAP||MAP.sample) return; rbtRAF=requestAnimationFrame(tickRbt); }
   function tickRbt(){
     rbtRAF=0;
     var moving=false;
-    if(RBT&&RBT_T){
-      RBT.x+=(RBT_T.x-RBT.x)*0.18; RBT.y+=(RBT_T.y-RBT.y)*0.18;
-      if(Math.abs(RBT_T.x-RBT.x)+Math.abs(RBT_T.y-RBT.y)>0.06) moving=true;
-      else { RBT.x=RBT_T.x; RBT.y=RBT_T.y; }
+    if(RBT&&RBT_T&&RBT_FROM){
+      var frac=RBT_DUR>0 ? Math.min(1,(performance.now()-RBT_START)/RBT_DUR) : 1;
+      RBT.x=RBT_FROM.x+(RBT_T.x-RBT_FROM.x)*frac;
+      RBT.y=RBT_FROM.y+(RBT_T.y-RBT_FROM.y)*frac;
+      if(frac<1) moving=true; else RBT_FROM=null;   // asentado: no vuelve a interpolar hasta el proximo dato real
     }
     drawRobot();
     if(moving||document.body.classList.contains('cleaning')) startRbt();
