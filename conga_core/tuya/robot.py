@@ -50,6 +50,10 @@ MODE_TO_WAY = {0: "auto", 14: "clean_thoroughly", 1: "acrubbing", 5: "espiral", 
 MODE_MOP = 2                 # «Fregado»: solo fregar (DP 41 only_mop)
 CLEAN_MODES = ("Auto", "Limpieza completa", "Fregado", "Bordes", "Espiral", "Espiral cuadrada")
 
+# DPs que cambian solos durante la limpieza (tiempo, área, batería, trama del mapa, vida de
+# consumibles): no se registran
+_QUIET_DPS = {DP_TIME, DP_AREA, DP_BATTERY, DP_FRAME, "17", "19", "21", "23", DP_TOT_AREA, DP_TOT_COUNT, DP_TOT_TIME}
+
 # DP 5 -> estado de CA
 _STATES = {"smart": "cleaning", "zone_clean": "cleaning", "select_room": "cleaning",
            "part_clean": "cleaning", "goto_pos": "cleaning", "game": "cleaning",
@@ -168,6 +172,7 @@ class TuyaRobot:
         self._direct_mode, self._direct_ts, self._direct_moving = False, 0.0, False
         self._stop = threading.Event()
         self._seen_status = set()
+        self._logged_once = False      # el primer volcado (estado completo al conectar) no se registra
 
     # ---------------- interfaz común ----------------
     def start(self):
@@ -370,6 +375,12 @@ class TuyaRobot:
 
     def _on_dps(self, dps: dict):
         self._rx = True
+        # lo que cambia en el robot (sin los contadores que cambian solos): así se ve en el registro
+        # qué manda la app oficial al elegir un modo o una función (DPs aún sin mapear, #8)
+        changed = {k: v for k, v in dps.items() if k not in _QUIET_DPS and self.dps.get(k) != v}
+        if changed and self._logged_once:
+            self.log(f"  <-- robot: {json.dumps(changed, ensure_ascii=False)}")
+        self._logged_once = True
         self.dps.update(dps)
         st = dps.get(DP_STATUS)
         if st and st not in self._seen_status:

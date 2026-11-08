@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.37.1
+- **Tuya (Conga 8290…): el mando manual se ve entero.** Sin mapa, la tarjeta era tan baja que solo se
+  veía la flecha ▼; ahora deja sitio y el mando sale centrado encima de los botones (#8).
+- **Sensores de batería sin errores en Home Assistant.** «Salud de batería», «Consumo de batería» y
+  «Velocidad de carga» quedan como «desconocido» mientras no hay datos suficientes, en vez de llenar el
+  registro de HA con «non-numeric value: 'unknown'».
+- Tuya: el registro muestra lo que cambia en el robot (`<-- robot: …`) para poder mapear modos y
+  funciones que manda la app oficial.
+
 ## 0.37.0
 - **Nueva opción «Reenviar zonas y ajustes antes de limpiar»** (Ajustes → Robot, desactivada por
   defecto). Justo antes de cada limpieza nueva (botón de la web, Home Assistant, habitación, plan u

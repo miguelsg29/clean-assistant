@@ -391,11 +391,11 @@ class MqttBridge:
         for key, name, unit, icon, tpl in (
                 ("bh_cycles", f"Conga {t(lang, 'Ciclos de batería')}", None, "mdi:battery-sync", "{{ value_json.cycles }}"),
                 ("bh_health", f"Conga {t(lang, 'Salud de batería')}", "%", "mdi:battery-heart-variant",
-                 "{{ value_json.health if value_json.health is not none else 'unknown' }}"),
+                 "{{ value_json.health if value_json.health is not none else None }}"),
                 ("bh_drain", f"Conga {t(lang, 'Consumo de batería')}", "%/m²", "mdi:battery-arrow-down",
-                 "{{ value_json.pct_per_m2 if value_json.pct_per_m2 is not none else 'unknown' }}"),
+                 "{{ value_json.pct_per_m2 if value_json.pct_per_m2 is not none else None }}"),
                 ("bh_charge", f"Conga {t(lang, 'Velocidad de carga')}", "%/min", "mdi:battery-charging",
-                 "{{ value_json.charge_rate_low if value_json.charge_rate_low is not none else 'unknown' }}")):
+                 "{{ value_json.charge_rate_low if value_json.charge_rate_low is not none else None }}")):
             cfg = {"name": name, "unique_id": f"{uid}_{key}", "state_topic": bt,
                    "value_template": tpl, "json_attributes_topic": bt, "icon": icon}
             if unit:

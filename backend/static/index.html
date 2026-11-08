@@ -250,6 +250,12 @@
   /* backend tuya (Conga 8290…): sin mapa (no lo manda en local), ni zonas, ni horarios todavía */
   body.tuya .notuya,body.tuya .onlylegacy{display:none!important}
   body:not(.tuya) .onlytuya{display:none!important}
+  /* Tuya no tiene mapa: la tarjeta es baja y recortaba el mando manual (solo se veía ▼, #8). Al
+     abrirlo, la tarjeta deja hueco y el mando va centrado encima de la barra de botones. */
+  body.tuya .mapcard{padding-bottom:84px}
+  body.tuya .mapcard.dpad-open{padding-bottom:250px}
+  body.tuya .mapcard>.hint.onlytuya{margin-top:54px!important}  /* bajo la cabecera «Sin mapa», no debajo de ella */
+  body.tuya .dpad{left:50%;transform:translateX(-50%);bottom:84px}
   .mapnote{position:absolute;left:50%;transform:translateX(-50%);bottom:96px;z-index:5;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;width:max-content;max-width:calc(100% - 32px);padding:8px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--line);box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12.5px}
   .mapnote[hidden]{display:none}
   .mapnote .btn{width:auto;padding:5px 12px;font-size:12px}
@@ -1439,7 +1445,7 @@
     function send(code){ api('direct',{direction:code,angle:0}); }
     function stopAll(){ if(timer){clearInterval(timer);timer=null;} send(MDIR.stop); }
     man.addEventListener('click',function(){
-      var open=dpad.hidden; dpad.hidden=!open; man.setAttribute('aria-pressed',open?'true':'false'); if(!open) stopAll();
+      var open=dpad.hidden; dpad.hidden=!open; man.setAttribute('aria-pressed',open?'true':'false'); var mc=dpad.closest('.mapcard'); if(mc) mc.classList.toggle('dpad-open',open); if(!open) stopAll();
     });
     // ---- flechas: pulsación discreta (mantener = enviar repetido) ----
     dpad.querySelectorAll('.dkey:not(.dstop)').forEach(function(k){
