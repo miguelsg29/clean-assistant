@@ -345,7 +345,7 @@ work too**. Confirmed so far:
 - **Conga 8090 Ultra** — developed and verified end to end
 - **Conga 4690 Ultra** — confirmed by a community user
 - **Conga 9090** — confirmed by a community user
-- **Conga 7090** — confirmed by community users (`CECOTECCRL30V-7003`)
+- **Conga 7090** — confirmed by community users (`CECOTECCRL30V-7003`; 7090 IA: `CECOTECCRL30V-7004`)
 - **Conga 6090** — confirmed by community users
 - **Conga 3890** — confirmed by a community user
 

@@ -15,6 +15,9 @@ def check(c, msg):
 c = cmd.run_plan([11, 12], 1748940943, {11: {"name": "Salón", "type": 0}}, True, 3, 12, 1,
                  "CECOTECCRL30V-7003")
 check(c["control"] == "setRoomCleanPlan", "control")
+for pt in cmd.ROOMS_AS_PLAN:                     # 7003 (7090) y 7004 (7090 IA, #28)
+    check(cmd.run_plan([11], 1, {}, False, 2, 10, 0, pt)["control"] == "setRoomCleanPlan", pt)
+check("CECOTECCRL30V-7004" in cmd.ROOMS_AS_PLAN, "7004")
 o = c["order"]
 check(o["enable"] == 0 and o["mapid"] == 1748940943, "order base")
 check([r["room_id"] for r in o["roomPer"]] == [11, 12], "rooms")

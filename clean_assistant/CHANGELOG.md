@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.2
+- **Conga 7090 IA (`CECOTECCRL30V-7004`): la limpieza por habitación ya arranca.** Igual que el 7090
+  (`7003`), limpia las habitaciones ejecutando un plan (`setRoomCleanPlan`), desde el mapa y desde los
+  botones de Home Assistant, y aparece como «Conga 7090 IA». Gracias a @davidbagar, que lo probó (#28).
+
 ## 0.37.1
 - **Tuya (Conga 8290…): el mando manual se ve entero.** Sin mapa, la tarjeta era tan baja que solo se
   veía la flecha ▼; ahora deja sitio y el mando sale centrado encima de los botones (#8).

@@ -349,7 +349,7 @@ de esa plataforma también funcionan**. Confirmados hasta ahora:
 - **Conga 8090 Ultra** — desarrollada y verificada de punta a punta
 - **Conga 4690 Ultra** — confirmado por un usuario de la comunidad
 - **Conga 9090** — confirmado por un usuario de la comunidad
-- **Conga 7090** — confirmado por usuarios de la comunidad (`CECOTECCRL30V-7003`)
+- **Conga 7090** — confirmado por usuarios de la comunidad (`CECOTECCRL30V-7003`; 7090 IA: `CECOTECCRL30V-7004`)
 - **Conga 6090** — confirmado por usuarios de la comunidad
 - **Conga 3890** — confirmado por un usuario de la comunidad
 
