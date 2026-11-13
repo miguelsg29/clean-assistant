@@ -104,6 +104,12 @@ class FakeTuya:
         ch = dict(dps)
         if dps.get("1") is True:
             ch.update({"5": "smart", "3": False, "6": 0, "7": 0})
+        if "15" in dps:                     # trama 0x59 «empezar» (bordes/espiral), como el 8290 real
+            import base64
+            b = base64.b64decode(dps["15"])
+            if b[6] == 0x59:
+                way = {1: "auto", 3: "acrubbing", 5: "espiral"}.get(b[9], "auto")
+                ch.update({"4": "smart", "105": way, "5": "smart", "1": True, "3": False, "6": 0, "7": 0})
         if dps.get("2") is True:
             ch["5"] = "paused"
         if dps.get("2") is False and self.dps.get("5") == "paused":

@@ -105,6 +105,26 @@ def faults(bitmap) -> list:
     return [name for i, name in enumerate(FAULT_BITS) if v >> i & 1]
 
 
+def build_frame(cmd_byte: int, data: bytes) -> str:
+    """(orden, datos) -> DP 15 en base64 (trama «AA 01 longitud(4) orden datos suma»)."""
+    body = bytes([cmd_byte]) + bytes(data)
+    return base64.b64encode(bytes([0xAA, 0x01]) + len(body).to_bytes(4, "big") + body
+                            + bytes([sum(body) & 0xFF])).decode()
+
+
+# Bordes y Espiral solo se activan con la trama 0x59 «empezar limpieza»: 00 00 modo 01 succión agua
+# 01 00 (modo 01 auto, 03 bordes, 05 espiral; succión 0-3 como DP 9; agua 0-3 como DP 10). Es lo que
+# manda la app de Cecotec (registro con hora de @ftorrealbaa, 13-nov-2026, #8); con DP 105 + DP 1 el
+# robot hace una limpieza normal.
+FRAME_START = 0x59
+MODE_TO_FRAME = {1: 0x03, 5: 0x05}
+
+
+def start_frame(mode: int, fan: int, water: int) -> str:
+    return build_frame(FRAME_START, bytes([0, 0, MODE_TO_FRAME[mode], 1, max(0, min(3, fan)),
+                                           max(0, min(3, water - 10)), 1, 0]))
+
+
 def parse_frame(b64: str):
     """DP 15 (trama «AA 01 longitud(4) orden datos suma») -> (orden, datos) o None."""
     try:
@@ -218,6 +238,9 @@ class TuyaRobot:
             if typ in (0, 14) and val == 1:                  # limpiar toda la casa
                 if st == "paused":
                     return self._set({DP_PAUSE: False})
+                mode = self._mode if typ == 0 else typ
+                if mode in MODE_TO_FRAME:                    # bordes / espiral: trama 0x59
+                    return self._set({DP_FRAME: start_frame(mode, self._fan, self._water)})
                 return self._set(self._start_dps(typ))
             if typ == 7:
                 return {"ok": False, "error": "este robot crea el mapa solo en su primera limpieza"}

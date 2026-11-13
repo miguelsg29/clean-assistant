@@ -48,6 +48,11 @@ assert faults(32768) == ["dustbox_out"] and faults(16777216) == ["land_check"] a
 assert parse_frame("qgEAAAAJWQAAAQEDAAEAXw==") == (0x59, bytes.fromhex("00 00 01 01 03 00 01 00"))
 assert parse_frame(base64.b64encode(bytes.fromhex("aa 01 00 00 00 0a 59 01 01 04 01 01 02 00 01 00 64")).decode())[1][:3] == bytes([1, 1, 4])
 assert parse_frame("qgEAAAAJWQAAAQEDAAEAXg==") is None            # suma incorrecta
+# Bordes / Espiral: la misma trama que manda la app de Cecotec (registro del 13-nov, #8)
+from conga_core.tuya.robot import build_frame, start_frame
+assert build_frame(0x59, bytes.fromhex("00 00 01 01 03 00 01 00")) == "qgEAAAAJWQAAAQEDAAEAXw=="
+assert parse_frame(start_frame(1, 2, 10)) == (0x59, bytes.fromhex("00 00 03 01 02 00 01 00"))
+assert parse_frame(start_frame(5, 2, 10)) == (0x59, bytes.fromhex("00 00 05 01 02 00 01 00"))
 assert robot_state({"5": "smart"}) == "cleaning" and robot_state({"5": "goto_charge"}) == "returning"
 assert robot_state({"5": "charge_done"}) == "docked" and robot_state({"5": "paused", "28": 1 << 20}) == "error"
 assert robot_state({"5": "smart", "28": 1}) == "cleaning"              # batería baja: aviso, no error
@@ -75,7 +80,9 @@ def run(version):
     r.command(cmd.fan("Turbo")); r.command(cmd.water("Bajo")); r.command(cmd.select_mode("Bordes"))
     r.command(cmd.start())
     assert wait(lambda: s.state == "cleaning"), s.state
-    assert wait(lambda: dev.received[-1] == {"9": "strong", "10": "low", "105": "acrubbing", "1": True}), dev.received[-1]
+    # Bordes va con la trama 0x59 (succión 3 strong, agua 1 low), no con DP 105 + DP 1
+    assert wait(lambda: dev.received[-1] == {"15": start_frame(1, 3, 11)}), dev.received[-1]
+    assert wait(lambda: dev.dps.get("105") == "acrubbing")
     assert dev.received[0] == {"9": "strong"} and dev.received[1] == {"10": "low"}
     r.command(cmd.pause()); assert wait(lambda: s.state == "paused")
     assert wait(lambda: dev.received[-1] == {"2": True})

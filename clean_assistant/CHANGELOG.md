@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.3
+- **Tuya (Conga 8290…): los modos Bordes y Espiral funcionan.** El robot solo los activa con la trama
+  «empezar limpieza» (DP 15, orden 0x59) que lleva el modo, la succión y el agua, que es lo que manda la
+  app de Cecotec; antes hacía una limpieza normal. Gracias a @ftorrealbaa por el registro con horas (#8).
+
 ## 0.37.2
 - **Conga 7090 IA (`CECOTECCRL30V-7004`): la limpieza por habitación ya arranca.** Igual que el 7090
   (`7003`), limpia las habitaciones ejecutando un plan (`setRoomCleanPlan`), desde el mapa y desde los
