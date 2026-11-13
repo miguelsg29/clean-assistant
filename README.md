@@ -110,6 +110,8 @@ develop the interface without a Conga.
 - **Consumables**: remaining life of brushes, filter and mop, with a button to reset to
   zero when you replace the part.
 - Robot warnings and errors in the header (e.g. "Water tank low").
+- Optional **resend of zones and settings before every clean**, for robots that sometimes ignore
+  them on a "cold" start (off by default).
 
 ### 🚪 Rooms
 - Name, **room type** (with icon) and **floor type** (wood, tiles, carpet, soft) per
@@ -422,7 +424,7 @@ the robot's own schedules (they're shown and can be imported).
 
 ### Tuya-based Congas (8290…) — `tuya` backend (experimental)
 
-Some newer Congas (the **8290** and others with the Cecotec "ThingClips" app) run on **Tuya**
+Some newer Congas (the **8290**, confirmed by a community user, and others with the Cecotec "ThingClips" app) run on **Tuya**
 instead of 3irobotix. Since **v0.35.0** Clean Assistant talks to them **directly on your
 network** with Tuya's local protocol (**3.3** and **3.4**, port 6668) — no cloud and no DNS to
 redirect. Built from the schema and logs shared by

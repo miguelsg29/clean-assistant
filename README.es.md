@@ -109,6 +109,8 @@ para desarrollar la interfaz sin un Conga.
 - **Consumibles**: vida restante de cepillos, filtro y mopa, con botón para poner a cero
   al cambiar la pieza.
 - Avisos y errores del robot en la cabecera (p. ej. «Depósito de agua bajo»).
+- **Reenvío opcional de zonas y ajustes antes de cada limpieza**, para robots que a veces los
+  ignoran al arrancar «en frío» (desactivado por defecto).
 
 ### 🚪 Habitaciones
 - Nombre, **tipo de estancia** (con icono) y **tipo de suelo** (madera, azulejos,
@@ -426,7 +428,7 @@ editar los horarios propios del robot (se muestran y se pueden importar).
 
 ### Conga sobre Tuya (8290…) — backend `tuya` (experimental)
 
-Algunos Conga nuevos (el **8290** y otros con la app «ThingClips» de Cecotec) funcionan sobre
+Algunos Conga nuevos (el **8290**, confirmado por un usuario de la comunidad, y otros con la app «ThingClips» de Cecotec) funcionan sobre
 **Tuya** en vez de 3irobotix. Desde la **v0.35.0** Clean Assistant habla con ellos
 **directamente en tu red** con el protocolo local de Tuya (**3.3** y **3.4**, puerto 6668), sin
 nube ni DNS que redirigir. Hecho a partir del esquema y los registros que compartió
