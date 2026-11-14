@@ -51,6 +51,10 @@ assert r._oneoff is None
 # no arranca: se retira a los 5 min
 r.command(cmd.clean_rooms([18])); r._oneoff["ts"] -= 301; r.state.state = "docked"; r.tick()
 assert sent[-1]["control"] == "deleteOrder6090"
+# 3890 Ultra (CECOTECCRL20S-2001, #30): igual que el 3890
+ru = mk("CECOTECCRL20S-2001"); ru.command(cmd.clean_rooms([18]))
+assert sent[-1]["control"] == "setOrder6090" and ru._oneoff, sent[-1]
+assert sent[-1]["order"]["roomPer"][0].get("cleanmode", 3) == 3, sent[-1]
 # 8090: setRoomClean intacto
 r8 = mk("CECOTECCRL350-1001"); r8.command(cmd.clean_rooms([3]))
 assert sent[-1]["control"] == "setRoomClean" and r8._oneoff is None

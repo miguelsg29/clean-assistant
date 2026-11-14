@@ -281,11 +281,11 @@ def _order_id(plan) -> int:
 
 # modo de limpieza de cada habitación en un horario (cleanmode/sweep_mode). En el 8090 "Auto" es 0;
 # en el 3890 la app oficial manda 3 para "Auto" y con 0 el robot espera la mopa (fault 522, #14)
-ORDER_CLEANMODE = {"CECOTECCRL20S-1001": 3}
+ORDER_CLEANMODE = {"CECOTECCRL20S-1001": 3, "CECOTECCRL20S-2001": 3}   # 2001: 3890 Ultra (#30)
 # modelos cuyo horario se manda con la forma EXACTA de su app oficial. En el 3890, aun con agua y
 # mopa en Off, el horario de CA hacía saltar el 522 («falta la mopa», #14): llevaba campos que su
 # app no manda, entre ellos shake_shift (intensidad de la mopa)
-ORDER_APP_SHAPE = ("CECOTECCRL20S-1001",)
+ORDER_APP_SHAPE = ("CECOTECCRL20S-1001", "CECOTECCRL20S-2001")
 
 
 def build_order(plan, map_head_id, rooms_meta=None, enable=None, project_type=None):
@@ -336,7 +336,7 @@ def delete_order(orderid): return {"control": "deleteOrder6090", "orderid": int(
 # modelos SIN orden directa de limpiar habitación: su app oficial lo hace con un horario que empieza
 # YA (setOrder6090 con la hora/día actuales y orderid = epoch). Informe de @mactron254 (#12) sobre la
 # app del 3890: setRoomClean/3047 existe pero es código muerto (#14).
-ROOMS_AS_ORDER = ("CECOTECCRL20S-1001",)
+ROOMS_AS_ORDER = ("CECOTECCRL20S-1001", "CECOTECCRL20S-2001")
 
 
 def immediate_order(room_ids, map_head_id, rooms_meta=None, project_type=None, now=None):

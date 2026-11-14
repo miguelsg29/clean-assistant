@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.37.4
+- **Conga 3890 Ultra (`CECOTECCRL20S-2001`): la limpieza por habitación ya arranca.** Igual que el 3890
+  (`1001`), limpia una habitación creando un horario puntual que se borra al terminar, y aparece en Home
+  Assistant como «Conga 3890 Ultra». Gracias a @gmontojo (#30).
+
 ## 0.37.3
 - **Tuya (Conga 8290…): los modos Bordes y Espiral funcionan.** El robot solo los activa con la trama
   «empezar limpieza» (DP 15, orden 0x59) que lleva el modo, la succión y el agua, que es lo que manda la
