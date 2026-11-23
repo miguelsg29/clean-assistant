@@ -357,7 +357,8 @@ def immediate_order(room_ids, map_head_id, rooms_meta=None, project_type=None, n
 # modelos en los que setRoomClean funciona «a veces»: su app limpia habitaciones ejecutando un plan
 # (setRoomCleanPlan, CMD 224 «ejecutar plan de habitaciones»), que va fino. Captura de @zjuanma con
 # el 7090 (#15) + informe de @mactron254 (#12).
-ROOMS_AS_PLAN = ("CECOTECCRL30V-7003", "CECOTECCRL30V-7004")   # 7004: Conga 7090 IA (#28, @davidbagar)
+ROOMS_AS_PLAN = ("CECOTECCRL30V-7003", "CECOTECCRL30V-7004",   # 7004: Conga 7090 IA (#28, @davidbagar)
+                 "CECOTECCRL30S-1001")   # 6090: desde el firmware S3.5.32 setRoomClean vuelve a la base (#31)
 
 
 def run_plan(room_ids, map_head_id, rooms_meta=None, twice=False, fan=2, water=10, mop=0,

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.37.5
+- **Conga 6090 (`CECOTECCRL30S-1001`): la limpieza por habitación ya arranca.** Con el firmware S3.5.32,
+  la orden de limpiar habitaciones hacía que el robot volviera a la base (o daba el fallo 521 con doble
+  pasada). Ahora limpia las habitaciones ejecutando un plan (`setRoomCleanPlan`), como su app oficial.
+  Gracias a @Miguel17mr (#31).
+
 ## 0.37.4
 - **Conga 3890 Ultra (`CECOTECCRL20S-2001`): la limpieza por habitación ya arranca.** Igual que el 3890
   (`1001`), limpia una habitación creando un horario puntual que se borra al terminar, y aparece en Home
