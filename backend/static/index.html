@@ -1777,7 +1777,7 @@
       });
   }
   // ---- robot en vivo: capa superpuesta con posición animada ----
-  var SCALE=1, RBT=null, RBT_T=null, RBT_FROM=null, RBT_START=0, RBT_DUR=0, RBT_LAST_T=0, rbtRAF=0;
+  var SCALE=1, RBT=null, RBT_T=null, RBT_FROM=null, RBT_START=0, RBT_DUR=0, RBT_LAST_T=0, RBT_GAP=0, rbtRAF=0;
   function sizeOverlay(){
     var b=document.getElementById('mapCanvas'), o=document.getElementById('robotCanvas');
     if(o.width!==b.width||o.height!==b.height){ o.width=b.width; o.height=b.height; }
@@ -1794,6 +1794,8 @@
   function setRobotTarget(pose, snap){
     if(!pose||pose.x==null){ RBT_T=null; RBT_FROM=null; return; }
     var now=performance.now();
+    // el refresco del mapa repite la misma pose: no reiniciar el deslizamiento (aceleraba de golpe)
+    if(!snap&&RBT&&RBT_T&&RBT_T.x===pose.x&&RBT_T.y===pose.y) return;
     if(snap||!RBT){
       RBT={x:pose.x,y:pose.y}; RBT_T={x:pose.x,y:pose.y};
       RBT_FROM=null; RBT_LAST_T=now;
@@ -1801,7 +1803,11 @@
       RBT_FROM={x:RBT.x,y:RBT.y};              // donde esta ahora en pantalla
       RBT_T={x:pose.x,y:pose.y};
       RBT_START=now;
-      RBT_DUR=Math.min(20000,Math.max(400,now-RBT_LAST_T));
+      // duración = intervalo real entre poses; tras un parón (más de 20 s sin poses) se usa el último
+      // intervalo normal (o 1,5 s si aún no hay): si no, el primer movimiento se arrastraba 20 s
+      var gap=now-RBT_LAST_T;
+      if(gap<=20000) RBT_GAP=gap;
+      RBT_DUR=Math.max(400,gap<=20000?gap:(RBT_GAP||1500));
       RBT_LAST_T=now;
     }
     startRbt();

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.37.6
+- **Mapa en vivo de la web: el robot se desliza en vez de saltar.** El robot informa su posición cada
+  10–20 s; antes el punto se quedaba quieto y saltaba, ahora recorre el camino durante ese mismo
+  intervalo. Gracias a @m-l (#26). Ajustes encima: el refresco del mapa ya no reinicia el
+  deslizamiento (el punto aceleraba de golpe) y el primer movimiento tras un parón ya no tarda 20 s.
+
 ## 0.37.5
 - **Conga 6090 (`CECOTECCRL30S-1001`): la limpieza por habitación ya arranca.** Con el firmware S3.5.32,
   la orden de limpiar habitaciones hacía que el robot volviera a la base (o daba el fallo 521 con doble
