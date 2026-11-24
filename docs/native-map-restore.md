@@ -1,14 +1,15 @@
 # Recuperar los planos de una Conga 4090
 
-En **Ajustes → Mapas de la casa → Copia nativa del mapa del robot** puedes copiar los archivos de navegación al servidor mientras el plano está bien. Si el robot los pierde, el panel permite devolverle esa copia. Una exportaci?n JSON del dibujo no recupera la navegaci?n. Para recuperar la navegación necesitas haber creado **una copia nativa antes de la pérdida**.
+En **Ajustes → Mapas de la casa → Copia nativa del mapa del robot** puedes copiar los archivos de navegación al servidor mientras el plano está bien. Si el robot los pierde, el panel permite devolverle esa copia. Una exportación JSON del dibujo no recupera la navegación. Para recuperar la navegación necesitas haber creado **una copia nativa antes de la pérdida**.
 
 ## Configurar el acceso
 
 Esta función experimental admite la 4090 con backend `legacy`, producto interno `CECOTECCRL300` y versión de sistema `S3.3.8`. Exige una cuenta SSH ya autorizada en tu robot, con acceso de lectura y escritura a los archivos de mapas. El servidor comprueba la clave de host y la identidad de la unidad. La contraseña del router y la sesión de la aplicación Android sirven para otros servicios.
 
-1. En la carpeta de configuración **del complemento** de Home Assistant, crea el directorio `native-ssh`. Dentro del complemento estará en `/config/native-ssh`.
-2. Coloca en ese directorio la clave privada correspondiente a la clave pública autorizada en la Conga y el archivo `known_hosts` con la clave de host del robot, cuya huella hayas verificado por un canal de confianza. Usa permisos privados para el directorio y la clave (en Linux, `0700` y `0600`, respectivamente).
-3. Crea `native-ssh/config`. Sustituye la IP de ejemplo y el usuario por los de tu unidad. El alias debe llamarse `conga-map`.
+1. Localiza el **slug completo del complemento instalado** en Home Assistant, por ejemplo mediante `ha addons list`. Incluye el prefijo del repositorio: instalaciones desde un fork y desde el repositorio original pueden tener slugs diferentes aunque ambas terminen en `_clean_assistant`. No copies el prefijo de otra instalación. Desde el host de Home Assistant, su carpeta de configuración es `/addon_configs/<slug_completo_real>/`; crea allí `native-ssh`. No es la carpeta general `/config` de Home Assistant. El montaje `addon_config` expone esa carpeta dentro del complemento como `/config`, por lo que el directorio interno es `/config/native-ssh`.
+2. Deja exactamente estos cuatro archivos de configuración SSH en `native-ssh`: `config`, `id_conga` (clave privada), `id_conga.pub` (su clave pública, ya autorizada en el robot) y `known_hosts`. La clave pública se conserva como referencia; el transporte utiliza la privada. El usuario del proceso debe poder leerlos. En Linux, usa `0700` para el directorio y `0600` para `config`, `id_conga` y `known_hosts`; `id_conga.pub` puede ser `0644`. No publiques estos archivos ni los añadas al repositorio.
+3. Obtén y verifica la huella de la clave de host por un canal de confianza antes de incluirla en `known_hosts`. `ssh-keyscan` puede recopilar una clave candidata, pero no autentica por sí solo al robot: compara su huella con una obtenida de manera independiente. Conserva `StrictHostKeyChecking yes`; no uses `StrictHostKeyChecking no` ni `UserKnownHostsFile /dev/null`.
+4. Crea `native-ssh/config`. Sustituye la IP reservada para documentación y el usuario del ejemplo por los de tu unidad. El alias debe llamarse `conga-map`.
 
 ```sshconfig
 Host conga-map
@@ -21,9 +22,26 @@ Host conga-map
     StrictHostKeyChecking yes
 ```
 
-4. En la configuración del complemento, selecciona `BACKEND: legacy`, activa `NATIVE_MAPS_ENABLED`, reinicia el complemento y abre su interfaz desde Home Assistant. La Conga debe haber comunicado su identidad, su versión y su estado en la conexión actual. Algunos servidores SSH antiguos requieren algoritmos específicos. Comprueba la compatibilidad del cliente con tu conexión autorizada antes de crear la primera copia.
+5. En la configuración del complemento, selecciona `BACKEND: legacy`, activa el booleano `NATIVE_MAPS_ENABLED`, reinicia el complemento y abre su interfaz mediante Ingress de Home Assistant. El arranque fija automáticamente `NATIVE_MAP_SSH_CONFIG=/config/native-ssh/config`. No añadas `NATIVE_MAP_SSH_CONFIG` como opción del complemento: su esquema expone el booleano. La Conga debe haber comunicado su identidad, su versión y su estado en la conexión actual.
 
-En una instalación independiente, configura `CONGA_MODE=real`, `CONGA_BACKEND=legacy`, un `DATA_DIR` privado y persistente, y `NATIVE_MAP_SSH_CONFIG` con la ruta del archivo de configuración SSH. Para estas operaciones abre la interfaz a través de una conexión local a `localhost` en el entorno donde se ejecuta el servidor. Inicia Uvicorn con `--no-proxy-headers`, como en las imágenes incluidas.
+### Instalación independiente
+
+Aquí se configura una variable de entorno con una **ruta absoluta dentro del entorno donde se ejecuta el backend**; el booleano del complemento no interviene. Por ejemplo:
+
+```sh
+export CONGA_MODE=real
+export CONGA_BACKEND=legacy
+export DATA_DIR=/var/lib/clean-assistant
+export NATIVE_MAP_SSH_CONFIG=/etc/clean-assistant/native-ssh/config
+```
+
+Usa un `DATA_DIR` privado y persistente. Conserva los mismos cuatro archivos y permisos; adapta `IdentityFile` y `UserKnownHostsFile` del bloque anterior a `/etc/clean-assistant/native-ssh/id_conga` y `/etc/clean-assistant/native-ssh/known_hosts`. En Docker, monta el directorio SSH privado en esa ruta dentro del contenedor, preferiblemente de solo lectura, y pasa la variable al contenedor. Una ruta que solo exista en el host no basta. Abre la interfaz a través de una conexión local a `localhost` en el entorno donde se ejecuta el servidor, mediante un túnel SSH si es remoto. Inicia Uvicorn con `--no-proxy-headers`, como en las imágenes incluidas.
+
+### Diagnosticar la configuración sin escribir en el robot
+
+Abre **Actualizar estado** en el panel nativo. La consulta `GET api/maps/native/status`, relativa a la URL del backend bajo Ingress, devuelve `configured`, `available`, `backup_available` y los motivos de bloqueo. Puedes verla en la pestaña Red del navegador dentro de la sesión de Ingress; no sustituyas su prefijo por una URL pública `/api/...`. En una instalación independiente usa, por ejemplo, `GET http://localhost:8000/api/maps/native/status` desde una conexión local. Un acceso LAN directo recibe 403 por diseño.
+
+`configured: true` solo confirma que existe el archivo de configuración; esta consulta no abre SSH ni prueba las claves. `available` comprueba conexión, identidad comunicada y estado de carga; `backup_available` exige además un mapa completo de la sesión actual. Para comprobar el transporte autorizado, crea una copia con el robot en su base: esa operación lee los archivos del robot y guarda la copia en el servidor, sin reemplazar archivos del robot. Un error SSH puede indicar permisos, clave de host, autorización o algoritmos incompatibles; el API oculta stderr y los datos privados. Revisa esos puntos desde el servidor sin desactivar la verificación de host.
 
 ## Guardar y recuperar
 
@@ -41,15 +59,15 @@ La implementación se ha probado con archivos y sesiones simulados. La comprobac
 
 ## Estado experimental y bloqueo conocido
 
-Una captura de los archivos nativos mediante SSH se ha completado en una Conga 4090 real. Esa captura se realiz? fuera del complemento: su archivo ZIP no es una copia creada por esta interfaz. La interfaz guarda JSON privados con bytes base64, hashes e identidad; no importa ZIP ni acepta esa captura externa como copia restaurable.
+Una captura de solo lectura de los archivos nativos mediante SSH se ha completado en una Conga 4090 real. Esa captura se realizó fuera del complemento: su archivo ZIP no es una copia creada por esta interfaz. La interfaz guarda JSON privados con bytes base64, hashes e identidad; no importa ZIP ni acepta esa captura externa como copia restaurable. Esa prueba no valida el flujo completo de copia desde la interfaz.
 
-La restauraci?n f?sica no se ha probado. La unidad de f?brica comprobada dispone de BusyBox y `md5sum`, pero no de `sha256sum` ni `openssl`. Esta implementaci?n exige `sha256sum` remoto y bloquea la restauraci?n antes de preparar o reemplazar archivos si falta, con el error `Robot lacks sha256sum; native restore is blocked before staging or replacing files`. No hay alternativa autom?tica con MD5. Por ello, esta propuesta debe permanecer en borrador hasta validar una soluci?n segura y la restauraci?n f?sica.
+La restauración física no se ha probado. La unidad de fábrica comprobada dispone de BusyBox y `md5sum`, pero no de `sha256sum` ni `openssl`. Esta implementación exige `sha256sum` remoto y bloquea la restauración antes de preparar o reemplazar archivos si falta, con el error `Robot lacks sha256sum; native restore is blocked before staging or replacing files`. No hay alternativa automática con MD5. Por ello, esta propuesta debe permanecer en borrador hasta validar una solución segura y la restauración física.
 
-El cliente SSH de esa unidad requiere compatibilidad expl?cita por host. Si tu unidad lo necesita, a?ade ?nicamente dentro del bloque `Host conga-map` de su configuraci?n privada:
+El servidor SSH de esa unidad requiere compatibilidad explícita por host. Si los diagnósticos de tu conexión autorizada indican que lo necesita, añade únicamente dentro del bloque `Host conga-map` de su configuración privada:
 
 ```sshconfig
     HostKeyAlgorithms +ssh-rsa
     MACs +hmac-sha1
 ```
 
-Mant?n la verificaci?n estricta de la clave de host y no habilites estos algoritmos globalmente. Las pruebas automatizadas usan datos sint?ticos y no contactan con ning?n robot.
+Si además la autenticación con la clave RSA autorizada falla porque el servidor solo acepta firmas RSA/SHA-1, añade `PubkeyAcceptedAlgorithms +ssh-rsa` en ese mismo bloque, únicamente si es necesario. Esta opción controla la firma de autenticación del usuario; `HostKeyAlgorithms` controla la clave del servidor. No cambies los algoritmos globales del cliente ni uses un bloque `Host *` para estas excepciones. Mantén la verificación estricta de la clave de host. Las pruebas automatizadas usan datos sintéticos y no contactan con ningún robot.

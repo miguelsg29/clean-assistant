@@ -57,4 +57,3 @@ def valid_map(data: object) -> bool:
     except (ValueError, binascii.Error):
         return False
     return len(cells) == width * height and any(cells)
-

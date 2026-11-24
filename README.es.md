@@ -477,4 +477,4 @@ RobArt ni Tuya**. «Conga», «Cecotec», «Rowenta» y «X-plorer» son marcas 
 propietarios. Úsalo bajo tu propia responsabilidad.
 
 
-Copias nativas experimentales de Conga 4090: [configuraci?n y l?mites](docs/native-map-restore.md). Restauraci?n sin probar f?sicamente y bloqueada en robots originales sin sha256sum.
+Copias nativas experimentales de Conga 4090: [configuración y límites](docs/native-map-restore.md). Restauración sin probar físicamente y bloqueada en robots originales sin sha256sum.
