@@ -12,7 +12,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # openssl: genera los certificados TLS autofirmados si no existen
-RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+RUN apt-get update && apt-get install -y --no-install-recommends openssl openssh-client \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
@@ -28,4 +28,4 @@ WORKDIR /data
 
 EXPOSE 8000 9090 4010 4030 4050
 CMD ["python", "-m", "uvicorn", "backend.app:app", "--app-dir", "/app", \
-     "--host", "0.0.0.0", "--port", "8000"]
+     "--host", "0.0.0.0", "--port", "8000", "--no-proxy-headers"]

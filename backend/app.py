@@ -26,6 +26,7 @@ from conga_core.config import load_env, save_identity
 from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore, suggested_plans, plan_from_order, run_controls
+from backend.native_maps import NativeMaps, register_native_maps
 from backend.maps import MapStore
 from backend.history import HistoryStore
 from backend.battery import BatteryHealth
@@ -1168,6 +1169,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Clean Assistant", version="0.37.6", lifespan=lifespan)
+
+
+native_maps = NativeMaps(DATA_DIR, lambda: robot, lambda: LEGACY,
+                         lambda: (env("NATIVE_MAP_SSH_CONFIG", "") or "").strip())
+register_native_maps(app, native_maps)
 
 
 @app.get("/api/state")

@@ -51,6 +51,9 @@ export DEFAULT_MOP=$(jq -r '.DEFAULT_MOP // "Estándar"' $CONFIG)
 # Datos persistentes en /data (mapa, zonas, horarios, vista, enlace e identidad).
 # Con esto la identidad capturada se recuerda y NO se vuelve a la nube en cada arranque.
 export DATA_DIR=/data
+if jq -e '.NATIVE_MAPS_ENABLED == true' "$CONFIG" >/dev/null; then
+    export NATIVE_MAP_SSH_CONFIG=/config/native-ssh/config
+fi
 
 # Certificados TLS persistentes en /data (se generan una vez)
 export CERT_PATH=/data/cert.pem
@@ -64,4 +67,4 @@ fi
 # El mapa, zonas, horarios y vista se guardan en /data (persistente entre reinicios)
 cd /data
 echo "[INFO] Clean Assistant: web por ingress (:8099), robot en :9090"
-exec python3 -m uvicorn backend.app:app --app-dir /app --host 0.0.0.0 --port 8099
+exec python3 -m uvicorn backend.app:app --app-dir /app --host 0.0.0.0 --port 8099 --no-proxy-headers
