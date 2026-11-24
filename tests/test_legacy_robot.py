@@ -128,6 +128,8 @@ from conga_core import commands as cmd
 def sent_after(control):
     robot.command(control)
     return recv_pkt(c)
+check("start without map fails closed", robot.command(cmd.start()).get("ok") is False)
+robot.state.state = "paused"  # A resume preserves the existing plan without preparing a new one.
 p = sent_after(cmd.start()); f = pb.decode(p.payload)
 check("start -> AUTO_CLEAN ctrl=1 type=2", p.opname == "DEVICE_AUTO_CLEAN_REQ" and f[1] == [1] and f[2] == [2])
 check("ids intercambiados (wire userId = device)", p.user_id == dev_id)

@@ -9,7 +9,7 @@ from conga_core.config import RobotConfig
 r = LR.LegacyRobot(RobotConfig()); r.log = lambda *a, **k: None
 sent = []
 r._send = lambda op, f: (sent.append((op, f)), {"result": 0})[1]
-r._send_recv = lambda op, f, rsp, *a, **k: sent.append((op, f))
+r._send_recv = lambda op, f, rsp, *a, **k: (sent.append((op, f)), True)[1]
 r._in_background = lambda fn, *a: (fn(*a), {"result": 0})[1]
 r._lmap = {"head": {"map_head_id": 77}, "plans": [{"id": 2, "name": "P"}], "walls": {},
            "rooms": [{"id": 10, "name": "Cocina"}, {"id": 11, "name": "Salón"}]}

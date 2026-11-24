@@ -146,6 +146,8 @@ class MqttBridge:
         self._sensors_last = None
         self._battery_last = None
         self.lang_provider = None       # callback -> código de idioma ('es','en',...), ver backend/i18n.py
+        self.on_clean_error = None
+        self.on_clean_started = None
         self.pre_clean_resend = None    # callback opcional (resend_before_clean): reenvía zonas y
                                          # fan/water/mop/mode al robot justo antes de un arranque
                                          # "en frío" -- ver _resend_zones_and_prefs en app.py
@@ -923,9 +925,22 @@ class MqttBridge:
     def _cmd(self, control):
         """Envía un objeto control al robot (misma vía que la web)."""
         try:
-            self.robot.command(control)
+            if (hasattr(self.robot, "_lmap") and control.get("control") == "set_preference"
+                    and control.get("ctrltype") == 15):
+                return {"result": 0}  # This generation has no vibration-mop setting.
+            result = self.robot.command(control)
+            if isinstance(result, dict) and (result.get("ok") is False or result.get("result", 0) not in (0, None)):
+                raise RuntimeError(result.get("error") or "Comando rechazado")
+            if self.on_clean_started and (
+                    (control.get("control") == "set_mode" and control.get("type") == 0 and control.get("value") == 1)
+                    or (control.get("control") == "setRoomClean" and control.get("ctrlValue") == 1)):
+                self.on_clean_started()
+            return result
         except Exception as e:
+            if self.on_clean_error:
+                self.on_clean_error(e)
             self.log(f"  [MQTT] error enviando al robot: {e}")
+            raise
 
     def _sweep_stale_config(self, topic):
         """Recibe un config de descubrimiento retenido (homeassistant/{comp}/{obj}/config) y, si
@@ -1107,6 +1122,8 @@ class MqttBridge:
             if topic == self.t_cmd and payload:
                 self._vacuum_command(payload)
         except Exception as e:
+            if self.on_clean_error:
+                self.on_clean_error(e)
             self.log(f"  [MQTT] error procesando {topic}='{payload}': {e}")
 
     def _vacuum_command(self, c: str):
