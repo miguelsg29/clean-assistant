@@ -66,6 +66,34 @@ class NativeMapTests(unittest.TestCase):
         with self.assertRaises(NativeMapError):
             self.io._identity()
 
+    def test_read_registration_identity_requires_verified_robot(self):
+        self.io._run = Mock(side_effect=AssertionError("must not connect"))
+        with self.assertRaises(NativeMapError):
+            self.io.read_registration_identity()
+        self.io._run.assert_not_called()
+
+    def test_read_registration_identity_filters_and_validates_fields(self):
+        self.io._identity = Mock()
+        self.io._run = Mock(return_value=b"software_version=S3.3.8.23.42R\ndevice_sn=123456789\n")
+        self.assertEqual(self.io.read_registration_identity(),
+                         {"sn": "123456789", "software": "S3.3.8.23.42R"})
+        self.io._identity.assert_called_once()
+        script = self.io._run.call_args.args[0]
+        self.assertIn("/mnt/UDISK/config/device_config.ini", script)
+        self.assertIn("test ! -L", script)
+        self.assertIn("16384", script)
+        self.assertIn("device_sn|software_version", script)
+
+        for response in (b"device_sn=123\n", b"device_sn=123\nsoftware_version=\n",
+                         b"device_sn=123\ndevice_sn=456\nsoftware_version=S3\n",
+                         b"device_sn=123\nsoftware_version=S3\nsecret=oops\n",
+                         b"device_sn=12 3\nsoftware_version=S3\n",
+                         b"device_sn=123\nsoftware_version=\xff\n", b"x" * 16385):
+            with self.subTest(response=response[:50]):
+                self.io._run.return_value = response
+                with self.assertRaises(NativeMapError):
+                    self.io.read_registration_identity()
+
     def test_stable_twice_and_inventory_change(self):
         self.io._identity = Mock()
         self.io._inventory = Mock(return_value=self.names)

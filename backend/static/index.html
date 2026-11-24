@@ -2818,7 +2818,12 @@
         'Place the robot on its charging base and wait until docked':'Coloca el robot en su base de carga y espera a que esté acoplado.',
         'Wait for a fresh robot status after reconnecting':'Espera a recibir el estado actualizado del robot tras reconectarlo.',
         'Wait for a complete live robot map before creating a native backup':'Espera a recibir el mapa completo del robot antes de crear una copia.',
-        'Robot registration identity is incomplete; reconnect the robot':'La identidad del robot está incompleta; reconéctalo.',
+        'SSH identity does not match the live robot registration':'El número de serie o el firmware leído por SSH difiere del que comunica la Conga. Comprueba el destino del perfil SSH.',
+        'Robot connection or SSH configuration changed during refresh; retry':'La conexión del robot o el perfil SSH cambió durante la consulta. Vuelve a pulsar Actualizar estado.',
+        'SSH robot identity changed; refresh native map status':'La identidad leída por SSH ha cambiado. Pulsa Actualizar estado para volver a verificarla.',
+        'Missing robot registration identity':'Falta el número de serie o la versión del firmware en el archivo de configuración del robot.',
+        'Invalid robot registration identity':'El archivo del robot contiene datos de identidad ambiguos o inválidos.',
+        'Robot registration identity is incomplete; refresh native map status to verify it over SSH':'Pulsa «Actualizar estado» para leer por SSH el número de serie y la versión del firmware.',
         'Native maps require stock Conga 4090 product CECOTECCRL300 / S3.3.8':'La copia nativa requiere un Conga 4090 compatible con firmware original S3.3.8.'
       };
       return messages[reason]||reason;
@@ -2828,10 +2833,12 @@
       if(!r.ok) throw new Error(typeof data.detail==='string'?nativeReason(data.detail):t('No se pudo completar la operación de copia nativa.'));
       return data;
     }
-    async function refresh(){
+    async function refresh(checkIdentity=false){
       if(loading)return; loading=true; available=false; canCreate=false; controls();
       try{
-        var data=await request('api/maps/native/status');
+        var data=checkIdentity
+          ? await request('api/maps/native/refresh',{method:'POST',headers:{'X-Native-Map-Action':'1'}})
+          : await request('api/maps/native/status');
         available=!!data.available; canCreate=!!data.backup_available;
         setup.textContent=available?t('Copia nativa disponible.'):t(data.configured?'Copia nativa no disponible: {reason}':'Configuración de copia nativa pendiente: {reason}',{reason:nativeReason(data.reason||'')});
         if(available&&!canCreate&&data.backup_reason) setup.textContent+=' '+nativeReason(data.backup_reason);
@@ -2852,7 +2859,7 @@
       controls();
     }
     panel.addEventListener('toggle',function(){if(panel.open&&!busy) refresh();});
-    refreshButton.addEventListener('click',function(){if(!busy) refresh();});
+    refreshButton.addEventListener('click',function(){if(!busy) refresh(true);});
     select.addEventListener('change',controls);
     create.addEventListener('click',async function(){
       if(busy||!available||!canCreate)return; busy=true; controls(); status.textContent=t('Creando copia nativa…');

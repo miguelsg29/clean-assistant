@@ -21,12 +21,16 @@ class FakeIO:
         self.files = {"scheme_data.info42": b"native-map", "customer_map_list_path.plan": b"plans"}
         self.writes = 0
         self.device = {"mac": "00:11:22:33:44:55", "sysProduct": "CECOTECCRL300", "sysVersion": "S3.3.8"}
+        self.registration = {"sn": "robot-1", "software": "S3.3.8.23.42R"}
 
     def verify_identity(self, expected_mac, expected_ip=None):
         return self.device.copy()
 
     def read_pair(self, mid):
         return self.files.copy()
+
+    def read_registration_identity(self):
+        return self.registration.copy()
 
     def restore_pair(self, mid, files, before_write):
         before_write()
@@ -151,6 +155,88 @@ class NativeMapsTests(unittest.TestCase):
         self.robot.map["cells_b64"] = base64.b64encode(bytes([13, 13, 13, 255])).decode()
         self.assertEqual(self.service.verification()["status"], "different")
 
+    def test_refresh_with_complete_registration_keeps_status_passive(self):
+        with patch.object(self.io, "read_registration_identity") as read:
+            self.assertTrue(self.service.refresh()["backup_available"])
+            read.assert_not_called()
+
+    def test_refresh_recovers_missing_identity_and_backup_preserves_it(self):
+        self.robot.native_live_software = None
+        with patch.object(self.io, "verify_identity", wraps=self.io.verify_identity) as verify:
+            self.assertFalse(self.service.status()["backup_available"])
+            verify.assert_not_called()
+            self.assertTrue(self.service.refresh()["backup_available"])
+            verify.assert_called_once_with("00:11:22:33:44:55", expected_ip="192.0.2.1")
+        self.assertIsNone(self.robot.native_live_software)
+        saved = self.service.backup()
+        self.assertEqual(self.service._load(saved["id"])["identity"], self.io.registration)
+        self.assertEqual(self.service.restore(saved["id"], True)["status"], "disk_verified_pending_reload")
+
+    def test_refresh_allows_idle_but_backup_still_requires_dock(self):
+        self.robot.native_live_sn = self.robot.native_live_software = None
+        self.robot.state.state = "idle"
+        self.robot.state.charging = False
+        self.assertFalse(self.service.refresh()["backup_available"])
+        with self.assertRaises(HTTPException):
+            self.service.backup()
+        self.robot.state.state = "docked"
+        self.robot.state.charging = True
+        self.assertTrue(self.service.status()["backup_available"])
+
+    def test_refresh_rejects_identity_conflicts_and_does_not_publish(self):
+        self.robot.native_live_software = None
+        self.io.registration["sn"] = "another-robot"
+        with self.assertRaises(HTTPException):
+            self.service.refresh()
+        self.assertFalse(self.service.status()["backup_available"])
+        self.assertEqual(self.service.listing()["backups"], [])
+
+    def test_refreshed_identity_is_bound_to_session_peer_and_configuration(self):
+        self.robot.native_live_sn = self.robot.native_live_software = None
+        for name, changed in (("native_session_id", "session-2"),
+                              ("native_peer_ip", "192.0.2.20")):
+            self.service.refresh()
+            previous = getattr(self.robot, name)
+            setattr(self.robot, name, changed)
+            self.assertFalse(self.service.status()["backup_available"])
+            setattr(self.robot, name, previous)
+        self.service.refresh()
+        self.config.write_text("changed-test-configuration")
+        self.assertFalse(self.service.status()["backup_available"])
+
+    def test_refresh_rejects_reconnect_while_ssh_is_reading(self):
+        self.robot.native_live_software = None
+        def reconnect():
+            self.robot.native_session_id = self.robot.native_state_session_id = "new-session"
+            return self.io.registration.copy()
+        with patch.object(self.io, "read_registration_identity", side_effect=reconnect):
+            with self.assertRaises(HTTPException):
+                self.service.refresh()
+        self.assertFalse(self.service.status()["backup_available"])
+
+    def test_refresh_rejects_offline_and_concurrent_operations_before_ssh(self):
+        with patch.object(self.io, "verify_identity", wraps=self.io.verify_identity) as verify:
+            self.robot.state.online = False
+            with self.assertRaises(HTTPException):
+                self.service.refresh()
+            self.robot.state.online = True
+            self.service.lock.acquire()
+            try:
+                with self.assertRaises(HTTPException):
+                    self.service.refresh()
+            finally:
+                self.service.lock.release()
+            verify.assert_not_called()
+
+    def test_backup_rechecks_ssh_identity_after_refresh(self):
+        self.robot.native_live_software = None
+        self.service.refresh()
+        self.io.registration["software"] = "changed-firmware"
+        with self.assertRaises(HTTPException):
+            self.service.backup()
+        self.assertEqual(self.service.listing()["backups"], [])
+        self.assertFalse(self.service.status()["backup_available"])
+
     def test_round_trip_through_real_shell_on_a_synthetic_robot_filesystem(self):
         git_bash = Path("C:/Program Files/Git/bin/bash.exe")
         shell = str(git_bash) if git_bash.is_file() else shutil.which("sh")
@@ -210,9 +296,18 @@ class NativeMapsTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as failure:
                 endpoints["/api/maps/native/backup"](req)
             self.assertEqual(failure.exception.status_code, 403)
+            with self.assertRaises(HTTPException) as failure:
+                endpoints["/api/maps/native/refresh"](req)
+            self.assertEqual(failure.exception.status_code, 403)
         saved = endpoints["/api/maps/native/backup"](request(headers=[(b"x-native-map-action", b"1"),
                                                                       (b"sec-fetch-site", b"same-origin")]))
         self.assertEqual(saved["map_id"], 42)
+        self.robot.native_live_software = None
+        refreshed = endpoints["/api/maps/native/refresh"](request(headers=[(b"x-native-map-action", b"1"),
+                                                                         (b"sec-fetch-site", b"same-origin")]))
+        self.assertTrue(refreshed["backup_available"])
+        self.assertNotIn("identity", refreshed)
+        self.assertEqual(self.io.writes, 0)
         with self.assertRaises(HTTPException):
             endpoints["/api/maps/native/backups"](request("192.0.2.9"))
         for authority in (b"rebinding.example:8080", b"localhost@evil.example", b"localhost/path"):

@@ -31,6 +31,15 @@ class NativeMaps:
         self.lock = threading.Lock()
         self.pending_path = Path(data_dir) / "native-map-restore.json"
         self.index_path = self.root / "index.json"
+        self._ssh_identity = None
+
+    def _identity_context(self):
+        robot = self.robot_getter()
+        config = Path(self.config_getter()).resolve(strict=True)
+        stat = config.stat()
+        return (id(robot), getattr(robot, "native_session_id", None),
+                getattr(robot, "native_peer_ip", None), str(config),
+                stat.st_mtime_ns, stat.st_size, stat.st_ino)
 
     @staticmethod
     def _geometry(data):
@@ -74,10 +83,15 @@ class NativeMaps:
         identity = {"sn": getattr(robot, "native_live_sn", None),
                     "software": getattr(robot, "native_live_software", None)}
         if not all(identity.values()):
-            raise HTTPException(409, "Robot registration identity is incomplete; reconnect the robot")
+            cached = self._ssh_identity
+            if cached and cached["context"] == self._identity_context():
+                if any(value and value != cached["identity"][key] for key, value in identity.items()):
+                    raise HTTPException(409, "SSH identity does not match the live robot registration")
+                return cached["identity"].copy()
+            raise HTTPException(409, "Robot registration identity is incomplete; refresh native map status to verify it over SSH")
         return identity
 
-    def _preflight(self, require_map=False):
+    def _preflight(self, require_map=False, require_identity=True, require_docked=True):
         if not self.legacy_getter():
             raise HTTPException(409, "Native maps require a real legacy robot")
         config = self.config_getter()
@@ -87,12 +101,12 @@ class NativeMaps:
         state = robot.state
         if not state.online:
             raise HTTPException(409, "Connect the robot before using native maps")
-        if state.state != "docked" or not state.charging:
+        if require_docked and (state.state != "docked" or not state.charging):
             raise HTTPException(409, "Place the robot on its charging base and wait until docked")
         session = getattr(robot, "native_session_id", None)
         if not session or getattr(robot, "native_state_session_id", None) != session:
             raise HTTPException(409, "Wait for a fresh robot status after reconnecting")
-        identity = self._identity()
+        identity = self._identity() if require_identity else None
         if require_map:
             mid = state.map_head_id
             live = getattr(robot, "map", None)
@@ -113,7 +127,40 @@ class NativeMaps:
         device = transport.verify_identity(cap.get("mac") or None, expected_ip=peer)
         if device.get("sysProduct") != "CECOTECCRL300" or device.get("sysVersion") != "S3.3.8":
             raise HTTPException(409, "Native maps require stock Conga 4090 product CECOTECCRL300 / S3.3.8")
+        if self._ssh_identity and (not getattr(robot, "native_live_sn", None)
+                                  or not getattr(robot, "native_live_software", None)):
+            if transport.read_registration_identity() != self._identity():
+                self._ssh_identity = None
+                raise HTTPException(409, "SSH robot identity changed; refresh native map status")
         return transport, device
+
+    def refresh(self):
+        """Read missing registration data from the already verified SSH endpoint."""
+        if not self.lock.acquire(blocking=False):
+            raise HTTPException(409, "Another native map operation is running")
+        try:
+            self._ssh_identity = None
+            self._preflight(require_identity=False, require_docked=False)
+            robot = self.robot_getter()
+            if robot.native_live_sn and robot.native_live_software:
+                return self.status()
+            context = self._identity_context()
+            if not context[2]:
+                raise HTTPException(409, "Cannot identify one live robot network address")
+            transport, _ = self._io()
+            identity = transport.read_registration_identity()
+            self._preflight(require_identity=False, require_docked=False)
+            if context != self._identity_context():
+                raise HTTPException(409, "Robot connection or SSH configuration changed during refresh; retry")
+            robot = self.robot_getter()
+            live = {"sn": getattr(robot, "native_live_sn", None),
+                    "software": getattr(robot, "native_live_software", None)}
+            if any(value and value != identity[key] for key, value in live.items()):
+                raise HTTPException(409, "SSH identity does not match the live robot registration")
+            self._ssh_identity = {"context": context, "identity": identity.copy()}
+            return self.status()
+        finally:
+            self.lock.release()
 
     @staticmethod
     def _summary(item):
@@ -320,6 +367,11 @@ def register_native_maps(app, service):
     def native_backup(request: Request):
         same_origin(request)
         return execute(service.backup)
+
+    @app.post("/api/maps/native/refresh")
+    def native_refresh(request: Request):
+        same_origin(request)
+        return execute(service.refresh)
 
     @app.post("/api/maps/native/backups/{backup_id}/restore")
     def native_restore(backup_id: str, request: Request, body: dict):

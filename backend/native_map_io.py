@@ -127,6 +127,41 @@ class NativeMapIO:
             raise NativeMapError("Verify the physical robot MAC before native access")
         self.verify_identity(self._expected_mac)
 
+    def read_registration_identity(self):
+        """Read the registration fields from the verified robot's configuration."""
+        path = "/mnt/UDISK/config/device_config.ini"
+        with self._lock:
+            self._identity()
+            script = (
+                "set -eu\n"
+                "for p in /mnt /mnt/UDISK /mnt/UDISK/config; do\n"
+                'test -d "$p" && test ! -L "$p" || exit 1\n'
+                "done\n"
+                f"test -f {path} && test ! -L {path} || exit 1\n"
+                f"size=$(wc -c < {path})\n"
+                'test "$size" -le 16384 || exit 1\n'
+                f"awk -F= '$1 ~ /^[[:space:]]*(device_sn|software_version)[[:space:]]*$/ {{print}}' {path}"
+            )
+            raw = self._run(script)
+        if len(raw) > 16384:
+            raise NativeMapError("Invalid robot registration identity")
+        try:
+            lines = raw.decode("ascii").splitlines()
+        except UnicodeError as exc:
+            raise NativeMapError("Invalid robot registration identity") from exc
+        fields = {}
+        names = {"device_sn": "sn", "software_version": "software"}
+        for line in lines:
+            key, separator, value = line.partition("=")
+            key, value = key.strip(), value.strip()
+            if (not separator or key not in names or names[key] in fields or
+                    not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,127}", value)):
+                raise NativeMapError("Invalid robot registration identity")
+            fields[names[key]] = value
+        if set(fields) != {"sn", "software"}:
+            raise NativeMapError("Missing robot registration identity")
+        return fields
+
     def _inventory(self, map_id, allow_missing=False):
         patterns = " ".join(f"{self.ROOT}/{n}" for n in
                             ("scheme_data.info[0-9]*", "customer_map_list_path.plan") + self.COMPANIONS)
