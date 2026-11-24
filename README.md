@@ -470,3 +470,6 @@ Thank you to everyone who has supported Clean Assistant:
 use — **not affiliated with, endorsed by, or authorized by Cecotec, 3irobotix, Rowenta /
 Groupe SEB, RobArt or Tuya**. "Conga", "Cecotec", "Rowenta" and "X-plorer" are trademarks of their
 respective owners. Use at your own risk.
+
+
+Experimental native Conga 4090 backups: [setup and limitations](docs/native-map-restore.md). Restore is untested on hardware and blocked on stock robots without sha256sum.

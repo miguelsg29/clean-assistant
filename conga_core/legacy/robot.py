@@ -16,6 +16,7 @@ import socket
 import struct
 import threading
 import time
+from uuid import uuid4
 
 import json
 
@@ -155,6 +156,11 @@ class LegacyRobot:
         self.on_orders = None
         self.on_provision = None
         self.captured = {}             # identidad del robot (sn, mac, versiones…) del registro
+        self.native_session_id = None
+        self.native_state_session_id = None
+        self.native_map_session_id = None
+        self.native_live_sn = None
+        self.native_live_software = None
         self.link = "local"            # la gen. legacy no tiene pasarela a la nube (aún)
         self.ota_enforce = 0
         self.log = logger
@@ -582,6 +588,14 @@ class LegacyRobot:
         with self._lock:
             if sock in self._conns:
                 return
+            if not self._conns:
+                self.native_session_id = uuid4().hex
+                self.native_state_session_id = None
+                self.native_map_session_id = None
+                self.native_live_sn = None
+                self.native_live_software = None
+                self._lmap = {}
+                self._last_cells = None
             self._conns.append(sock)
             n = len(self._conns)
         # @agnoc lanza el handshake al tener las 2 conexiones (cmd + map); por si un
@@ -601,11 +615,27 @@ class LegacyRobot:
                 self._conns.remove(sock)
             self._kind.pop(sock, None)
             empty = not self._conns
+            if empty:
+                self.native_session_id = None
+                self.native_map_session_id = None
+                self.native_state_session_id = None
+                self.native_live_sn = None
+                self.native_live_software = None
         if empty and self.state.online:
             self.state.online = False
             self._handshaken = False
             self._manual = False
             self._notify()
+
+    @property
+    def native_peer_ip(self):
+        """Use the actual connected peer; DHCP names and editable UI options are insufficient."""
+        with self._lock:
+            try:
+                peers = {sock.getpeername()[0] for sock in self._conns}
+            except OSError:
+                return None
+        return peers.pop() if len(peers) == 1 else None
 
     def _start_handshake(self):
         with self._lock:
@@ -683,9 +713,11 @@ class LegacyRobot:
                         else {1: 1, 2: "Device not registered", 3: pkt.opcode})
             return
         if op == "CLIENT_ONLINE_REQ":
-            self.captured.setdefault("sn", pb.as_str(pb.first(f, 1, b"")))
+            serial = pb.as_str(pb.first(f, 1, b""))
             self._reply(sock, pkt, "CLIENT_ONLINE_RSP", {1: 0})
             self._attach(sock)
+            if serial:
+                self.captured["sn"] = self.native_live_sn = serial
             return
         self._attach(sock)
         if op.endswith("_RSP"):
@@ -712,7 +744,8 @@ class LegacyRobot:
                 self.state.battery = battery_pct(lvl)
                 self._notify()
         elif op == "DEVICE_VERSION_INFO_UPDATE_REQ":
-            self.captured["software"] = pb.as_str(pb.first(f, 1, b""))
+            self.native_live_software = pb.as_str(pb.first(f, 1, b""))
+            self.captured["software"] = self.native_live_software
             self.captured["hardware"] = pb.as_str(pb.first(f, 2, b""))
             self._reply(sock, pkt, "DEVICE_VERSION_INFO_UPDATE_RSP", {1: 0})
         elif op == "PUSH_DEVICE_AGENT_SETTING_REQ":     # ajustes del robot (voz, silencio…)
@@ -794,6 +827,8 @@ class LegacyRobot:
                  f"ctrl {g(7)}")
         self._reply(sock, pkt, "DEVICE_REGISTER_RSP", {1: 0, 3: {1: self._device_id}})
         self._attach(sock)
+        self.native_live_sn = self.captured.get("sn")
+        self.native_live_software = self.captured.get("software")
 
     def _apply_agent_setting(self, f: dict):
         """PUSH_DEVICE_AGENT_SETTING_REQ: voz (campo 2) y horario silencioso (campo 7)."""
@@ -834,15 +869,23 @@ class LegacyRobot:
             s.repeat_clean = g(9)
         if g(1):
             s.map_head_id = g(1)
+        self.native_state_session_id = self.native_session_id if mode is not None else None
         self._notify()
 
     # ---------------- mapa ----------------
     def _on_map(self, payload: bytes):
+        self.native_map_session_id = None
         try:
             d = mapdecode.decode_map(payload)
         except Exception as e:
             self.log(f"  [legacy] mapa no decodificable ({len(payload)} B): {e}")
             return
+        # Sections retained from another map must never enter a new room plan or wall resend.
+        new_mid = (d.get("head") or {}).get("map_head_id")
+        old_mid = (self._lmap.get("head") or {}).get("map_head_id")
+        if new_mid is not None and new_mid != old_mid:
+            for key in ("grid", "rooms", "charger", "robot", "walls", "plans"):
+                self._lmap.pop(key, None)
         # no todos los pushes traen todas las secciones (mask): se conserva la última de cada una
         for k in ("head", "grid", "rooms", "charger", "robot", "walls", "maps", "plans"):
             if d.get(k) is not None:
@@ -857,9 +900,12 @@ class LegacyRobot:
             self.state.map_name = name
         try:
             self.map = cmap.build_map(self._legacy_info(name), head["size_x"], head["size_y"])
+            self.native_map_session_id = self.native_session_id
         except ValueError as e:
+            self.native_map_session_id = None
             self.log(f"  [legacy] mapa vacío o incompleto: {e}")
             return
+        self.map["map_head_id"] = mid
         self.map_empty = False
         self.pose = self.map.get("robot")
         self._accumulate_trail()

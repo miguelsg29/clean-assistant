@@ -23,6 +23,9 @@ homeassistant_api: true
 # La interfaz web se abre desde la barra lateral de Home Assistant (ingress).
 ingress: true
 ingress_port: 8099
+map:
+  - type: addon_config
+    read_only: true
 panel_icon: "mdi:robot-vacuum"
 # El robot se conecta a estos puertos (redirige por DNS los dominios de Cecotec a HA):
 #   9090 = control; 8001 = OTA (independencia de la nube); 8002/8006 = subida de historial.
@@ -42,6 +45,7 @@ services:
   - mqtt:want
 options:
   BACKEND: "new"
+  NATIVE_MAPS_ENABLED: false
   ROBOT_IP: ""
   TUYA_DEVICE_ID: ""
   TUYA_LOCAL_KEY: ""
@@ -63,6 +67,7 @@ options:
   DEFAULT_MODE: "Auto"
 schema:
   BACKEND: list(new|legacy|robeye|tuya)
+  NATIVE_MAPS_ENABLED: bool
   ROBOT_IP: str?
   TUYA_DEVICE_ID: str?
   TUYA_LOCAL_KEY: password?

@@ -550,6 +550,20 @@
 
         <div class="phead notuya">Mapas de la casa</div>
         <p class="hint nolegacy" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
+        <details class="notuya" id="nativeBackup">
+          <summary>Copia nativa del mapa del robot</summary>
+          <p class="hint">Crea una copia de los archivos nativos del robot. Es distinta del historial JSON, que no puede restaurar el mapa del robot.</p>
+          <p class="hint" id="nativeSetup" role="status"></p>
+          <div class="btnrow"><button class="btn ghost" id="nativeRefresh">Actualizar estado</button></div>
+          <p class="hint">La copia nativa requiere configurar SSH en el servidor mediante NATIVE_MAP_SSH_CONFIG; consulta la documentación de instalación. En Home Assistant debe activarse NATIVE_MAPS_ENABLED.</p>
+          <div class="btnrow"><button class="btn ghost" id="nativeCreate" disabled>Crear copia nativa</button></div>
+          <label for="nativeVersion">Copia nativa guardada</label>
+          <select id="nativeVersion" class="tinput" disabled></select>
+          <div class="btnrow"><button class="btn ghost" id="nativeRestore" disabled>Restaurar copia nativa</button></div>
+          <p class="hint" id="nativeStatus" role="status" aria-live="polite"></p>
+          <p class="hint">Tras restaurar, reinicia el robot normalmente y comprueba el mapa y sus habitaciones antes de limpiar. El reinicio nunca es automático.</p>
+        </details>
+
         <div id="mapsList" class="notuya"></div>
         <div class="btnrow legacyhide"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button><button class="btn ghost norobeye" id="wipeMapsBtn" style="color:var(--critical)">Borrar todos</button></div>
         <div id="newMapForm" class="legacyhide" style="display:none">
@@ -1080,6 +1094,32 @@
   window.CA_STR=STR;
   function norm(s){ return String(s==null?'':s).replace(/\s+/g,' ').trim(); }
   function interp(s,p){ if(!p)return s; return s.replace(/\{(\w+)\}/g,function(m,k){return p[k]!=null?p[k]:m;}); }
+  Object.assign(STR,{
+  "Copia nativa del mapa del robot":{en:"Native robot map backup",pt:"Cópia nativa do mapa do robô",fr:"Sauvegarde native de la carte du robot",de:"Native Sicherung der Roboterkarte",it:"Backup nativo della mappa del robot",nl:"Native back-up van de robotkaart",ca:"Còpia nativa del mapa del robot",pl:"Natywna kopia mapy robota"},
+  "Actualizar estado":{en:"Refresh status",pt:"Atualizar estado",fr:"Actualiser l’état",de:"Status aktualisieren",it:"Aggiorna stato",nl:"Status vernieuwen",ca:"Actualitza l’estat",pl:"Odśwież stan"},
+  "La copia nativa requiere configurar SSH en el servidor mediante NATIVE_MAP_SSH_CONFIG; consulta la documentación de instalación. En Home Assistant debe activarse NATIVE_MAPS_ENABLED.":{en:"Native backups require SSH configuration on the server using NATIVE_MAP_SSH_CONFIG; see the installation documentation. In Home Assistant, enable NATIVE_MAPS_ENABLED.",pt:"A cópia nativa requer a configuração de SSH no servidor através de NATIVE_MAP_SSH_CONFIG; consulta a documentação de instalação. No Home Assistant, ativa NATIVE_MAPS_ENABLED.",fr:"La sauvegarde native nécessite la configuration SSH du serveur via NATIVE_MAP_SSH_CONFIG ; consultez la documentation d’installation. Dans Home Assistant, activez NATIVE_MAPS_ENABLED.",de:"Für native Sicherungen muss SSH auf dem Server über NATIVE_MAP_SSH_CONFIG eingerichtet sein; siehe Installationsanleitung. Aktiviere in Home Assistant NATIVE_MAPS_ENABLED.",it:"Il backup nativo richiede la configurazione SSH sul server tramite NATIVE_MAP_SSH_CONFIG; consulta la documentazione di installazione. In Home Assistant attiva NATIVE_MAPS_ENABLED.",nl:"Voor native back-ups is SSH-configuratie op de server via NATIVE_MAP_SSH_CONFIG nodig; zie de installatiedocumentatie. Schakel in Home Assistant NATIVE_MAPS_ENABLED in.",ca:"La còpia nativa requereix configurar SSH al servidor mitjançant NATIVE_MAP_SSH_CONFIG; consulta la documentació d’instal·lació. A Home Assistant cal activar NATIVE_MAPS_ENABLED.",pl:"Kopia natywna wymaga konfiguracji SSH na serwerze za pomocą NATIVE_MAP_SSH_CONFIG; zobacz dokumentację instalacji. W Home Assistant włącz NATIVE_MAPS_ENABLED."},
+  "Consulta y descarga los planos guardados en este servidor. Estos archivos JSON no pueden restaurar el mapa del robot.":{en:"View and download maps saved on this server. These JSON files cannot restore the robot's map.",pt:"Consulta e descarrega os mapas guardados neste servidor. Estes ficheiros JSON não podem restaurar o mapa do robô.",fr:"Consultez et téléchargez les plans enregistrés sur ce serveur. Ces fichiers JSON ne peuvent pas restaurer la carte du robot.",de:"Gespeicherte Karten ansehen und herunterladen. Diese JSON-Dateien können die Roboterkarte nicht wiederherstellen.",it:"Consulta e scarica le mappe salvate sul server. Questi file JSON non possono ripristinare la mappa del robot.",nl:"Bekijk en download kaarten op deze server. Deze JSON-bestanden kunnen de robotkaart niet herstellen.",ca:"Consulta i descarrega els plànols desats en aquest servidor. Aquests fitxers JSON no poden restaurar el mapa del robot.",pl:"Przeglądaj i pobieraj mapy zapisane na serwerze. Pliki JSON nie przywracają mapy robota."},
+  "Crea una copia de los archivos nativos del robot. Es distinta del historial JSON, que no puede restaurar el mapa del robot.":{en:"Back up the robot's native files. This differs from JSON history, which cannot restore the robot's map.",pt:"Cria uma cópia dos ficheiros nativos do robô. É diferente do histórico JSON, que não pode restaurar o mapa do robô.",fr:"Sauvegardez les fichiers natifs du robot. Cette sauvegarde diffère de l’historique JSON, qui ne peut pas restaurer sa carte.",de:"Sichere die nativen Dateien des Roboters. Der JSON-Verlauf kann die Roboterkarte nicht wiederherstellen.",it:"Crea un backup dei file nativi del robot. La cronologia JSON non può ripristinare la sua mappa.",nl:"Maak een back-up van de native robotbestanden. De JSON-geschiedenis kan de robotkaart niet herstellen.",ca:"Crea una còpia dels fitxers natius del robot. És diferent de l’historial JSON, que no pot restaurar el mapa del robot.",pl:"Utwórz kopię natywnych plików robota. Historia JSON nie pozwala przywrócić jego mapy."},
+  "Crear copia nativa":{en:"Create native backup",pt:"Criar cópia nativa",fr:"Créer une sauvegarde native",de:"Native Sicherung erstellen",it:"Crea backup nativo",nl:"Native back-up maken",ca:"Crea una còpia nativa",pl:"Utwórz kopię natywną"},
+  "Copia nativa guardada":{en:"Saved native backup",pt:"Cópia nativa guardada",fr:"Sauvegarde native enregistrée",de:"Gespeicherte native Sicherung",it:"Backup nativo salvato",nl:"Opgeslagen native back-up",ca:"Còpia nativa desada",pl:"Zapisana kopia natywna"},
+  "Restaurar copia nativa":{en:"Restore native backup",pt:"Restaurar cópia nativa",fr:"Restaurer la sauvegarde native",de:"Native Sicherung wiederherstellen",it:"Ripristina backup nativo",nl:"Native back-up herstellen",ca:"Restaura la còpia nativa",pl:"Przywróć kopię natywną"},
+  "Tras restaurar, reinicia el robot normalmente y comprueba el mapa y sus habitaciones antes de limpiar. El reinicio nunca es automático.":{en:"After restoring, restart the robot normally and check the map and its rooms before cleaning. Restart is never automatic.",pt:"Após restaurar, reinicia o robô normalmente e verifica o mapa e as divisões antes de limpar. O reinício nunca é automático.",fr:"Après la restauration, redémarrez normalement le robot et vérifiez la carte et ses pièces avant le nettoyage. Le redémarrage n’est jamais automatique.",de:"Starte den Roboter nach der Wiederherstellung normal neu und prüfe Karte und Räume vor der Reinigung. Der Neustart erfolgt nie automatisch.",it:"Dopo il ripristino, riavvia normalmente il robot e controlla mappa e stanze prima della pulizia. Il riavvio non è mai automatico.",nl:"Herstart de robot na herstel normaal en controleer de kaart en kamers vóór het schoonmaken. Herstarten gebeurt nooit automatisch.",ca:"Després de restaurar, reinicia el robot normalment i comprova el mapa i les habitacions abans de netejar. El reinici mai no és automàtic.",pl:"Po przywróceniu uruchom robota ponownie i sprawdź mapę oraz pomieszczenia przed sprzątaniem. Ponowne uruchomienie nie jest automatyczne."},
+  "Configuración de copia nativa pendiente: {reason}":{en:"Native backup setup is incomplete: {reason}",pt:"Configuração da cópia nativa incompleta: {reason}",fr:"Configuration de la sauvegarde native incomplète : {reason}",de:"Einrichtung der nativen Sicherung unvollständig: {reason}",it:"Configurazione del backup nativo incompleta: {reason}",nl:"Configuratie van native back-up is onvolledig: {reason}",ca:"Configuració de la còpia nativa pendent: {reason}",pl:"Konfiguracja kopii natywnej jest niekompletna: {reason}"},
+  "Copia nativa no disponible: {reason}":{en:"Native backup unavailable: {reason}",pt:"Cópia nativa indisponível: {reason}",fr:"Sauvegarde native indisponible : {reason}",de:"Native Sicherung nicht verfügbar: {reason}",it:"Backup nativo non disponibile: {reason}",nl:"Native back-up niet beschikbaar: {reason}",ca:"Còpia nativa no disponible: {reason}",pl:"Kopia natywna niedostępna: {reason}"},
+  "Copia nativa disponible.":{en:"Native backup available.",pt:"Cópia nativa disponível.",fr:"Sauvegarde native disponible.",de:"Native Sicherung verfügbar.",it:"Backup nativo disponibile.",nl:"Native back-up beschikbaar.",ca:"Còpia nativa disponible.",pl:"Kopia natywna dostępna."},
+  "No hay copias nativas guardadas.":{en:"No native backups saved.",pt:"Não há cópias nativas guardadas.",fr:"Aucune sauvegarde native enregistrée.",de:"Keine nativen Sicherungen gespeichert.",it:"Nessun backup nativo salvato.",nl:"Geen native back-ups opgeslagen.",ca:"No hi ha còpies natives desades.",pl:"Brak zapisanych kopii natywnych."},
+  "No se pudo consultar la copia nativa.":{en:"Could not check native backups.",pt:"Não foi possível consultar as cópias nativas.",fr:"Impossible de consulter les sauvegardes natives.",de:"Native Sicherungen konnten nicht abgefragt werden.",it:"Impossibile consultare i backup nativi.",nl:"Native back-ups konden niet worden opgehaald.",ca:"No s’han pogut consultar les còpies natives.",pl:"Nie udało się sprawdzić kopii natywnych."},
+  "Creando copia nativa…":{en:"Creating native backup…",pt:"A criar cópia nativa…",fr:"Création de la sauvegarde native…",de:"Native Sicherung wird erstellt…",it:"Creazione backup nativo…",nl:"Native back-up maken…",ca:"S’està creant la còpia nativa…",pl:"Tworzenie kopii natywnej…"},
+  "Copia nativa creada.":{en:"Native backup created.",pt:"Cópia nativa criada.",fr:"Sauvegarde native créée.",de:"Native Sicherung erstellt.",it:"Backup nativo creato.",nl:"Native back-up gemaakt.",ca:"Còpia nativa creada.",pl:"Utworzono kopię natywną."},
+  "Restaurando copia nativa…":{en:"Restoring native backup…",pt:"A restaurar cópia nativa…",fr:"Restauration de la sauvegarde native…",de:"Native Sicherung wird wiederhergestellt…",it:"Ripristino backup nativo…",nl:"Native back-up herstellen…",ca:"S’està restaurant la còpia nativa…",pl:"Przywracanie kopii natywnej…"},
+  "Copia escrita y verificada en disco; pendiente de cargar en el robot. Reinicia el robot normalmente y comprueba el mapa y sus habitaciones antes de limpiar. El reinicio no es automático.":{en:"Backup written and verified on disk; robot reload is pending. Restart the robot normally and check the map and its rooms before cleaning. Restart is not automatic.",pt:"Cópia escrita e verificada no disco; falta carregá-la no robô. Reinicia o robô normalmente e verifica o mapa e as divisões antes de limpar. O reinício não é automático.",fr:"Sauvegarde écrite et vérifiée sur le disque ; son chargement par le robot reste en attente. Redémarrez normalement le robot et vérifiez la carte et ses pièces avant le nettoyage. Le redémarrage n’est pas automatique.",de:"Sicherung auf dem Datenträger geschrieben und geprüft; das Laden durch den Roboter steht noch aus. Starte den Roboter normal neu und prüfe Karte und Räume vor der Reinigung. Der Neustart erfolgt nicht automatisch.",it:"Backup scritto e verificato su disco; il caricamento nel robot è in attesa. Riavvia normalmente il robot e controlla mappa e stanze prima della pulizia. Il riavvio non è automatico.",nl:"Back-up op schijf geschreven en gecontroleerd; laden door de robot is nog nodig. Herstart de robot normaal en controleer de kaart en kamers vóór het schoonmaken. Herstarten gebeurt niet automatisch.",ca:"Còpia escrita i verificada al disc; pendent de carregar al robot. Reinicia el robot normalment i comprova el mapa i les habitacions abans de netejar. El reinici no és automàtic.",pl:"Kopia zapisana i zweryfikowana na dysku; oczekuje na wczytanie przez robota. Uruchom robota ponownie i sprawdź mapę oraz pomieszczenia przed sprzątaniem. Ponowne uruchomienie nie jest automatyczne."},
+  "No se pudo completar la operación de copia nativa.":{en:"Could not complete the native backup operation.",pt:"Não foi possível concluir a operação de cópia nativa.",fr:"Impossible de terminer l’opération de sauvegarde native.",de:"Der Vorgang der nativen Sicherung konnte nicht abgeschlossen werden.",it:"Impossibile completare l’operazione di backup nativo.",nl:"De bewerking voor de native back-up is mislukt.",ca:"No s’ha pogut completar l’operació de còpia nativa.",pl:"Nie udało się ukończyć operacji kopii natywnej."},
+  "Pendiente de verificar tras reiniciar el robot.":{en:"Waiting for verification after the robot restarts.",pt:"Aguardando verificação após reiniciar o robô.",fr:"Vérification en attente après le redémarrage du robot.",de:"Überprüfung nach Neustart des Roboters ausstehend.",it:"Verifica in attesa del riavvio del robot.",nl:"Verificatie wacht op herstart van de robot.",ca:"Pendent de verificar després de reiniciar el robot.",pl:"Oczekiwanie na weryfikację po ponownym uruchomieniu robota."},
+  "Mapa restaurado verificado tras el reinicio.":{en:"Restored map verified after restart.",pt:"Mapa restaurado verificado após reiniciar.",fr:"Carte restaurée vérifiée après redémarrage.",de:"Wiederhergestellte Karte nach Neustart überprüft.",it:"Mappa ripristinata verificata dopo il riavvio.",nl:"Herstelde kaart na herstart geverifieerd.",ca:"Mapa restaurat verificat després del reinici.",pl:"Przywrócona mapa zweryfikowana po ponownym uruchomieniu."},
+  "El mapa cargado es diferente de la copia restaurada. Comprueba el robot antes de limpiar.":{en:"The loaded map differs from the restored backup. Check the robot before cleaning.",pt:"O mapa carregado difere da cópia restaurada. Verifica o robô antes de limpar.",fr:"La carte chargée diffère de la sauvegarde restaurée. Vérifiez le robot avant le nettoyage.",de:"Die geladene Karte weicht von der Sicherung ab. Prüfe den Roboter vor der Reinigung.",it:"La mappa caricata differisce dal backup ripristinato. Controlla il robot prima della pulizia.",nl:"De geladen kaart verschilt van de herstelde back-up. Controleer de robot vóór het schoonmaken.",ca:"El mapa carregat és diferent de la còpia restaurada. Comprova el robot abans de netejar.",pl:"Wczytana mapa różni się od przywróconej kopii. Sprawdź robota przed sprzątaniem."},
+  "¿Restaurar la copia nativa seleccionada? Se reemplazarán los archivos nativos del mapa y los planes guardados incluidos en la copia. Si existen archivos actuales, se conservarán antes de reemplazarlos. Después tendrás que reiniciar el robot normalmente y comprobar el mapa. ¿Continuar?":{en:"Restore the selected native backup? The native map files and saved plans included in the backup will be replaced. Existing files, if present, will be preserved before replacement. You will then need to restart the robot normally and check the map. Continue?",pt:"Restaurar a cópia nativa selecionada? Os ficheiros nativos do mapa e os planos guardados incluídos na cópia serão substituídos. Os ficheiros atuais serão preservados antes da substituição, se existirem. Depois, reinicia o robô normalmente e verifica o mapa. Continuar?",fr:"Restaurer la sauvegarde native sélectionnée ? Les fichiers natifs de la carte et les plans enregistrés inclus seront remplacés. Les fichiers actuels, s’ils existent, seront conservés avant remplacement. Redémarrez ensuite normalement le robot et vérifiez la carte. Continuer ?",de:"Ausgewählte native Sicherung wiederherstellen? Die enthaltenen nativen Kartendateien und gespeicherten Pläne werden ersetzt. Vorhandene Dateien werden zuvor gesichert. Starte danach den Roboter normal neu und prüfe die Karte. Fortfahren?",it:"Ripristinare il backup nativo selezionato? I file nativi della mappa e i piani salvati inclusi saranno sostituiti. I file attuali, se presenti, saranno conservati prima della sostituzione. Riavvia poi normalmente il robot e controlla la mappa. Continuare?",nl:"De geselecteerde native back-up herstellen? De native kaartbestanden en opgeslagen plannen in de back-up worden vervangen. Bestaande bestanden worden eerst bewaard. Herstart daarna de robot normaal en controleer de kaart. Doorgaan?",ca:"Restaurar la còpia nativa seleccionada? Se substituiran els fitxers natius del mapa i els plans desats inclosos a la còpia. Si hi ha fitxers actuals, es conservaran abans de substituir-los. Després hauràs de reiniciar el robot normalment i comprovar el mapa. Vols continuar?",pl:"Przywrócić wybraną kopię natywną? Natywne pliki mapy i zapisane plany zawarte w kopii zostaną zastąpione. Obecne pliki, jeśli istnieją, zostaną wcześniej zachowane. Następnie uruchom robota ponownie i sprawdź mapę. Kontynuować?"},
+
+  });
   function t(s,p){
     if(L==='es') return interp(s,p);
     var e=STR[norm(s)];
@@ -2761,6 +2801,85 @@
     ws.onclose=function(){st.online=false;render();setTimeout(connect,2000);};
     ws.onerror=function(){try{ws.close();}catch(e){}};
   }
+  (function initNativeBackup(){
+    var panel=document.getElementById('nativeBackup'), setup=document.getElementById('nativeSetup');
+    var status=document.getElementById('nativeStatus'), create=document.getElementById('nativeCreate');
+    var select=document.getElementById('nativeVersion'), restore=document.getElementById('nativeRestore'), refreshButton=document.getElementById('nativeRefresh');
+    var busy=false, loading=false, available=false, canCreate=false;
+    function controls(){ refreshButton.disabled=busy||loading; create.disabled=busy||loading||!available||!canCreate; select.disabled=busy||loading||!available||!select.length; restore.disabled=busy||loading||!available||!select.value; }
+    function nativeReason(reason){
+      if(window.CA_LANG!=='es')return reason;
+      var messages={
+        'Native maps require Home Assistant ingress or a loopback connection (SSH forwarding)':'Accede mediante el panel de Home Assistant o una conexión local con túnel SSH.',
+        'Native operation failed; check server SSH configuration and private backup integrity':'Falló la operación nativa. Comprueba la configuración SSH del servidor y la integridad de la copia privada.',
+        'Configure NATIVE_MAP_SSH_CONFIG with a private SSH configuration file':'Configura NATIVE_MAP_SSH_CONFIG con un archivo privado de configuración SSH.',
+        'Native maps require a real legacy robot':'La copia nativa requiere un robot compatible conectado, no un simulador.',
+        'Connect the robot before using native maps':'Conecta el robot antes de usar copias nativas.',
+        'Place the robot on its charging base and wait until docked':'Coloca el robot en su base de carga y espera a que esté acoplado.',
+        'Wait for a fresh robot status after reconnecting':'Espera a recibir el estado actualizado del robot tras reconectarlo.',
+        'Wait for a complete live robot map before creating a native backup':'Espera a recibir el mapa completo del robot antes de crear una copia.',
+        'SSH identity does not match the live robot registration':'El número de serie o el firmware leído por SSH difiere del que comunica la Conga. Comprueba el destino del perfil SSH.',
+        'Robot connection or SSH configuration changed during refresh; retry':'La conexión del robot o el perfil SSH cambió durante la consulta. Vuelve a pulsar Actualizar estado.',
+        'SSH robot identity changed; refresh native map status':'La identidad leída por SSH ha cambiado. Pulsa Actualizar estado para volver a verificarla.',
+        'Missing robot registration identity':'Falta el número de serie o la versión del firmware en el archivo de configuración del robot.',
+        'Invalid robot registration identity':'El archivo del robot contiene datos de identidad ambiguos o inválidos.',
+        'Robot registration identity is incomplete; refresh native map status to verify it over SSH':'Pulsa «Actualizar estado» para leer por SSH el número de serie y la versión del firmware.',
+        'Native maps require stock Conga 4090 product CECOTECCRL300 / S3.3.8':'La copia nativa requiere un Conga 4090 compatible con firmware original S3.3.8.'
+      };
+      return messages[reason]||reason;
+    }
+    async function request(url, options){
+      var r=await fetch(BASE+url,options), data=await r.json();
+      if(!r.ok) throw new Error(typeof data.detail==='string'?nativeReason(data.detail):t('No se pudo completar la operación de copia nativa.'));
+      return data;
+    }
+    async function refresh(checkIdentity=false){
+      if(loading)return; loading=true; available=false; canCreate=false; controls();
+      try{
+        var data=checkIdentity
+          ? await request('api/maps/native/refresh',{method:'POST',headers:{'X-Native-Map-Action':'1'}})
+          : await request('api/maps/native/status');
+        available=!!data.available; canCreate=!!data.backup_available;
+        setup.textContent=available?t('Copia nativa disponible.'):t(data.configured?'Copia nativa no disponible: {reason}':'Configuración de copia nativa pendiente: {reason}',{reason:nativeReason(data.reason||'')});
+        if(available&&!canCreate&&data.backup_reason) setup.textContent+=' '+nativeReason(data.backup_reason);
+        var previous=select.value; select.replaceChildren();
+        (data.backups||[]).forEach(function(item){
+          var date=new Date(item.created_at), label=(isNaN(date.getTime())?item.created_at:date.toLocaleString(window.CA_LANG))+' · #'+item.map_id;
+          select.add(new Option(label,item.id,false,item.id===previous));
+        });
+        if(available) status.textContent=select.length?'':t('No hay copias nativas guardadas.');
+        if(data.restore_verification){
+          var verification=data.restore_verification.status;
+          if(verification==='pending_reload') status.textContent=t('Pendiente de verificar tras reiniciar el robot.');
+          else if(verification==='verified') status.textContent=t('Mapa restaurado verificado tras el reinicio.');
+          else if(verification==='different') status.textContent=t('El mapa cargado es diferente de la copia restaurada. Comprueba el robot antes de limpiar.');
+        }
+      }catch(e){ setup.textContent=t('No se pudo consultar la copia nativa.')+' '+e.message; }
+      loading=false;
+      controls();
+    }
+    panel.addEventListener('toggle',function(){if(panel.open&&!busy) refresh();});
+    refreshButton.addEventListener('click',function(){if(!busy) refresh(true);});
+    select.addEventListener('change',controls);
+    create.addEventListener('click',async function(){
+      if(busy||!available||!canCreate)return; busy=true; controls(); status.textContent=t('Creando copia nativa…');
+      try{
+        await request('api/maps/native/backup',{method:'POST',headers:{'Content-Type':'application/json','X-Native-Map-Action':'1'},body:'{}'});
+        await refresh(); status.textContent=t('Copia nativa creada.');
+      }catch(e){status.textContent=e.message;}
+      finally{busy=false; controls();}
+    });
+    restore.addEventListener('click',async function(){
+      if(busy||!available||!select.value)return; busy=true; controls();
+      try{
+        if(!await uiConfirm(t('¿Restaurar la copia nativa seleccionada? Se reemplazarán los archivos nativos del mapa y los planes guardados incluidos en la copia. Si existen archivos actuales, se conservarán antes de reemplazarlos. Después tendrás que reiniciar el robot normalmente y comprobar el mapa. ¿Continuar?')))return;
+        status.textContent=t('Restaurando copia nativa…');
+        await request('api/maps/native/backups/'+encodeURIComponent(select.value)+'/restore',{method:'POST',headers:{'Content-Type':'application/json','X-Native-Map-Action':'1'},body:JSON.stringify({confirm:true})});
+        status.textContent=t('Copia escrita y verificada en disco; pendiente de cargar en el robot. Reinicia el robot normalmente y comprueba el mapa y sus habitaciones antes de limpiar. El reinicio no es automático.');
+      }catch(e){status.textContent=e.message;}
+      finally{busy=false; controls();}
+    });
+  })();
   fetch(BASE+'api/state').then(function(r){return r.json();}).then(function(s){st=s;render();});
   // modelo real + versión reales en cabecera y pie (antes hardcodeados; issue #1)
   fetch(BASE+'api/info').then(function(r){return r.json();}).then(function(info){
