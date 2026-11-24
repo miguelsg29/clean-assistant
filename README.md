@@ -110,8 +110,9 @@ develop the interface without a Conga.
 - **Consumables**: remaining life of brushes, filter and mop, with a button to reset to
   zero when you replace the part.
 - Robot warnings and errors in the header (e.g. "Water tank low").
-- Optional **resend of zones and settings before every clean**, for robots that sometimes ignore
-  them on a "cold" start (off by default).
+- Independent options to **resend settings** and **resend restrictions before every clean**
+  (both off by default). Existing settings opt-ins do not enable restriction resends. Restrictions
+  merge saved no-go/no-mop zones with the active robot map; unavailable map data cancels the clean.
 
 ### 🚪 Rooms
 - Name, **room type** (with icon) and **floor type** (wood, tiles, carpet, soft) per
