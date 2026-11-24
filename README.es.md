@@ -2,6 +2,8 @@
 
 # Clean Assistant
 
+En **Ajustes ? Mapas de la casa ? Historial de planos** puedes ver y descargar versiones anteriores, aunque el robot pierda el mapa activo. Se conservan hasta diez versiones por mapa para un m?ximo de veinte mapas. El JSON contiene el plano decodificado para consultarlo fuera del robot. Para navegar, el robot sigue necesitando su mapa nativo.
+
 Aplicación **local y sin nube** para gestionar el robot aspirador **Cecotec Conga
 8090 Ultra** — y otros modelos Conga de la misma plataforma **3irobotix** (**4690 / 6090 /
 7090 / 9090 / 3890** confirmados por usuarios), los Conga sobre Tuya como el **8290**

@@ -17,7 +17,8 @@ import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from conga_core import commands as cmd
@@ -27,6 +28,7 @@ from backend.mock import MockRobot
 from backend.zones import ZoneStore
 from backend.schedules import ScheduleStore, suggested_plans, plan_from_order, run_controls
 from backend.maps import MapStore
+from backend.map_history import MapHistory, atomic_json, valid_map
 from backend.history import HistoryStore
 from backend.battery import BatteryHealth
 from backend.sensors import SensorCare
@@ -336,23 +338,44 @@ _load_prefs()
 # caché del último mapa: se muestra al arrancar (aunque el robot esté en la base) y se
 # refresca cuando el robot envía uno nuevo (al empezar a limpiar y durante la limpieza).
 MAP_CACHE = _data("map_cache.json")
+map_history = MapHistory(_data("map_history.json"))
+_last_saved_map_id = None
 
 
 def _save_map():
+    global _last_saved_map_id
     m = getattr(robot, "map", None)
-    if not m:
+    if getattr(robot, "map_empty", False) or not valid_map(m):
         return
     try:
-        with open(MAP_CACHE, "w", encoding="utf-8") as f:
-            json.dump(m, f)
-    except Exception:
-        pass
+        map_id = getattr(robot.state, "map_head_id", None)
+        if m.get("map_head_id") not in (None, map_id):
+            return
+        changed = map_history.record(map_id, m)
+        if not changed and map_id and _last_saved_map_id == map_id and os.path.exists(MAP_CACHE):
+            return
+        cached = dict(m)
+        if type(map_id) is int and map_id > 0:
+            cached["map_head_id"] = map_id
+        atomic_json(MAP_CACHE, cached)
+        _last_saved_map_id = map_id
+    except (OSError, ValueError, TypeError) as exc:
+        print(f"[map history] could not persist map: {exc}")
 
 
 def _load_map():
     try:
         with open(MAP_CACHE, encoding="utf-8") as f:
-            return json.load(f)
+            m = json.load(f)
+        if not valid_map(m):
+            return None
+        # Only migrate caches carrying an explicit ID; older anonymous caches
+        # remain displayable without guessing which robot map they belong to.
+        try:
+            map_history.record(m.get("map_head_id"), m)
+        except (OSError, ValueError, TypeError) as exc:
+            print(f"[map history] could not retain cached map: {exc}")
+        return m
     except Exception:
         return None
 
@@ -1077,7 +1100,7 @@ async def lifespan(app: FastAPI):
     if MODE == "real" and getattr(robot, "map", None) is None:
         cached = _load_map()
         if cached:
-            robot.map = cached
+            robot.map = dict(cached, _cached=True)
     def on_provision():
         # primer arranque: captura la identidad del robot de la nube y pasa a local
         save_identity(robot.captured)
@@ -1580,6 +1603,42 @@ async def _reconcile_robot_zones():
 @app.get("/api/maps")
 def get_maps():
     return _maps_payload()
+
+
+@app.get("/api/maps/history")
+def get_map_history():
+    """Local decoded-map copies, including maps no longer present on the robot."""
+    return map_history.listing()
+
+
+@app.get("/api/maps/history/{map_id}/{version}")
+def get_map_version(map_id: int, version: str):
+    snapshot = map_history.get(map_id, version)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="Map version not found")
+    return snapshot
+
+
+@app.get("/api/maps/history/{map_id}/{version}/export")
+def export_map_version(map_id: int, version: str):
+    snapshot = get_map_version(map_id, version)
+    return JSONResponse(snapshot, headers={
+        "Content-Disposition": f'attachment; filename="map-{map_id}-{snapshot["version"]}.json"'
+    })
+
+
+@app.get("/api/maps/history/{map_id}/{version}/preview.png")
+def preview_map_version(map_id: int, version: str):
+    from conga_core.mapimage import render_png
+
+    snapshot = get_map_version(map_id, version)
+    if not valid_map(snapshot["map"]):
+        raise HTTPException(status_code=422, detail="Invalid stored map")
+    try:
+        image, _ = render_png(snapshot["map"], view=view_settings, live=False)
+    except (ValueError, TypeError, KeyError, IndexError) as exc:
+        raise HTTPException(status_code=422, detail="Cannot render stored map") from exc
+    return Response(image, media_type="image/png")
 
 
 def _order_key(o):
