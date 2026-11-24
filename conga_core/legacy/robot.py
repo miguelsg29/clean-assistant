@@ -170,7 +170,7 @@ class LegacyRobot:
         self._unhandled = set()        # opcodes ya avisados (para no llenar el log)
         self._lmap = {}                # última sección conocida de cada parte del mapa legacy
         self._last_cells = None        # rejilla del último mapa emitido (para detectar cambios)
-        self._last_zones = None
+        self._last_map_metadata = None
         self._trail_last = None
         self._trail_map = None
         self._diag = {"quiet": 0, "info": 0, "orders": 0}
@@ -843,6 +843,12 @@ class LegacyRobot:
         except Exception as e:
             self.log(f"  [legacy] mapa no decodificable ({len(payload)} B): {e}")
             return
+        # Sections retained from another map must never enter a new room plan or wall resend.
+        new_mid = (d.get("head") or {}).get("map_head_id")
+        old_mid = (self._lmap.get("head") or {}).get("map_head_id")
+        if new_mid is not None and new_mid != old_mid:
+            for key in ("grid", "rooms", "charger", "robot", "walls", "plans"):
+                self._lmap.pop(key, None)
         # no todos los pushes traen todas las secciones (mask): se conserva la última de cada una
         for k in ("head", "grid", "rooms", "charger", "robot", "walls", "maps", "plans"):
             if d.get(k) is not None:
@@ -860,12 +866,15 @@ class LegacyRobot:
         except ValueError as e:
             self.log(f"  [legacy] mapa vacío o incompleto: {e}")
             return
+        self.map["map_head_id"] = mid
         self.map_empty = False
         self.pose = self.map.get("robot")
         self._accumulate_trail()
-        zsig = json.dumps(self.map.get("stored_zones", []), sort_keys=True)
-        if self.map["cells_b64"] != self._last_cells or zsig != self._last_zones:
-            self._last_cells, self._last_zones = self.map["cells_b64"], zsig
+        # Renaming a room or selecting a different map can leave the pixels unchanged.
+        metadata = json.dumps([mid, name, self.map.get("rooms"), self.map.get("stored_zones"),
+                               self.map.get("world"), self.map.get("bbox")], sort_keys=True)
+        if self.map["cells_b64"] != self._last_cells or metadata != self._last_map_metadata:
+            self._last_cells, self._last_map_metadata = self.map["cells_b64"], metadata
             self._fire(self.on_map)
         else:
             self._fire(self.on_pose)

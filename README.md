@@ -2,6 +2,8 @@
 
 # Clean Assistant
 
+Open **Settings → House maps → Map history** to preview or download an earlier floor plan, even after the robot loses its active map. The server keeps up to ten versions per map and twenty maps in total. The JSON export contains the decoded floor plan for use outside the robot. Navigation still requires the robot’s native map.
+
 A **local, no-cloud** app to manage the **Cecotec Conga 8090 Ultra** — and other Conga
 models on the same **3irobotix** platform (**4690 / 6090 / 7090 / 9090 / 3890** confirmed by
 users), Tuya-based Congas such as the **8290** (experimental), and now other brands too: the

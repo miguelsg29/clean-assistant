@@ -551,6 +551,15 @@
         <div class="phead notuya">Mapas de la casa</div>
         <p class="hint nolegacy" style="opacity:.65;font-size:11.5px;margin:0 0 8px">Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.</p>
         <div id="mapsList" class="notuya"></div>
+        <details class="notuya" id="mapArchive">
+          <summary>Historial de planos</summary>
+          <p class="hint">Consulta y descarga los planos guardados en este servidor. El robot necesita su propio mapa para navegar.</p>
+          <label for="archiveVersion">Versión guardada</label>
+          <select id="archiveVersion" class="tinput" disabled></select>
+          <p class="hint" id="archiveStatus" role="status"></p>
+          <img id="archivePreview" alt="Plano archivado" hidden style="max-width:100%;max-height:18rem"/>
+          <p><a id="archiveDownload" hidden download>Descargar JSON</a></p>
+        </details>
         <div class="btnrow legacyhide"><button class="btn ghost" id="newMapBtn">+ Crear mapa nuevo</button><button class="btn ghost norobeye" id="wipeMapsBtn" style="color:var(--critical)">Borrar todos</button></div>
         <div id="newMapForm" class="legacyhide" style="display:none">
           <div class="field"><label>Nombre del mapa</label><input type="text" id="nmName" class="tinput" placeholder="Planta baja"/></div>
@@ -933,6 +942,14 @@
   "Exportar":{en:"Export",pt:"Exportar",fr:"Exporter",pl:"Eksportuj",de:"Exportieren",it:"Esporta",nl:"Exporteren",ca:"Exportar"},
   "Importar…":{en:"Import…",pt:"Importar…",fr:"Importer…",pl:"Importuj…",de:"Importieren…",it:"Importa…",nl:"Importeren…",ca:"Importar…"},
   "Exportar datos del robot":{en:"Export robot data",pt:"Exportar dados do robô",fr:"Exporter les données du robot",pl:"Eksportuj dane robota",de:"Roboterdaten exportieren",it:"Esporta dati del robot",nl:"Robotgegevens exporteren",ca:"Exportar dades del robot"},
+  "Historial de planos":{en:"Map history",pt:"Histórico de mapas",fr:"Historique des plans",de:"Kartenverlauf",it:"Cronologia mappe",nl:"Kaartgeschiedenis",ca:"Historial de plànols",pl:"Historia map"},
+  "Consulta y descarga los planos guardados en este servidor. El robot necesita su propio mapa para navegar.":{en:"View and download maps saved on this server. The robot uses its own map to navigate.",pt:"Consulta e descarrega os mapas guardados neste servidor. O robô usa o seu próprio mapa para navegar.",fr:"Consultez et téléchargez les plans enregistrés sur ce serveur. Le robot utilise sa propre carte pour naviguer.",de:"Hier kannst du gespeicherte Karten ansehen und herunterladen. Der Roboter navigiert mit seiner eigenen Karte.",it:"Consulta e scarica le mappe salvate su questo server. Il robot usa la propria mappa per orientarsi.",nl:"Bekijk en download de kaarten op deze server. De robot navigeert met zijn eigen kaart.",ca:"Consulta i descarrega els plànols desats en aquest servidor. El robot navega amb el seu propi mapa.",pl:"Przeglądaj i pobieraj mapy zapisane na tym serwerze. Robot używa do nawigacji własnej mapy."},
+  "Versión guardada":{en:"Saved version",pt:"Versão guardada",fr:"Version enregistrée",de:"Gespeicherte Version",it:"Versione salvata",nl:"Opgeslagen versie",ca:"Versió desada",pl:"Zapisana wersja"},
+  "Descargar JSON":{en:"Download JSON",pt:"Descarregar JSON",fr:"Télécharger le JSON",de:"JSON herunterladen",it:"Scarica JSON",nl:"JSON downloaden",ca:"Descarrega el JSON",pl:"Pobierz JSON"},
+  "Aún no hay planos archivados.":{en:"No archived maps yet.",pt:"Ainda não há mapas arquivados.",fr:"Aucun plan archivé pour le moment.",de:"Noch keine archivierten Karten.",it:"Nessuna mappa archiviata.",nl:"Nog geen gearchiveerde kaarten.",ca:"Encara no hi ha plànols arxivats.",pl:"Brak zarchiwizowanych map."},
+  "No se pudo cargar el historial.":{en:"Could not load map history.",pt:"Não foi possível carregar o histórico.",fr:"Impossible de charger l’historique.",de:"Kartenverlauf konnte nicht geladen werden.",it:"Impossibile caricare la cronologia.",nl:"Kan de kaartgeschiedenis niet laden.",ca:"No s’ha pogut carregar l’historial.",pl:"Nie udało się wczytać historii."},
+  "No se pudo cargar el plano.":{en:"Could not load the map.",pt:"Não foi possível carregar o mapa.",fr:"Impossible de charger le plan.",de:"Karte konnte nicht geladen werden.",it:"Impossibile caricare la mappa.",nl:"Kan de kaart niet laden.",ca:"No s’ha pogut carregar el plànol.",pl:"Nie udało się wczytać mapy."},
+  "Plano archivado":{en:"Archived map",pt:"Mapa arquivado",fr:"Plan archivé",de:"Archivierte Karte",it:"Mappa archiviata",nl:"Gearchiveerde kaart",ca:"Plànol arxivat",pl:"Zarchiwizowana mapa"},
   "Mapas de la casa":{en:"House maps",pt:"Mapas da casa",fr:"Cartes de la maison",pl:"Mapy domu",de:"Hauskarten",it:"Mappe della casa",nl:"Huiskaarten",ca:"Mapes de la casa"},
   "Clean Assistant recuerda los mapas que va viendo. Pulsa uno para activarlo en el robot. (Al cambiar de mapa, las zonas y horarios son por mapa.) Puedes borrar cualquier mapa; si borras el último, el robot se queda sin mapa y podrás crear uno nuevo desde cero.":{en:"Clean Assistant remembers the maps it sees. Tap one to activate it on the robot. (When you switch maps, zones and schedules are per map.) You can delete any map; if you delete the last one, the robot is left with no map and you can create a new one from scratch.",pt:"O Clean Assistant lembra-se dos mapas que vai vendo. Prime um para o ativar no robô. (Ao mudar de mapa, as zonas e horários são por mapa.) Podes eliminar qualquer mapa; se eliminares o último, o robô fica sem mapa e poderás criar um novo do zero.",fr:"Clean Assistant mémorise les cartes qu’il voit. Touchez-en une pour l’activer sur le robot. (En changeant de carte, les zones et horaires sont par carte.) Vous pouvez supprimer n’importe quelle carte ; si vous supprimez la dernière, le robot se retrouve sans carte et vous pourrez en créer une de zéro.",pl:"Clean Assistant zapamiętuje mapy, które widzi. Naciśnij jedną, aby aktywować ją w robocie. (Po zmianie mapy strefy i harmonogramy są przypisane do mapy.) Możesz usunąć dowolną mapę; jeśli usuniesz ostatnią, robot zostanie bez mapy i będzie można utworzyć nową od zera.",de:"Clean Assistant merkt sich die Karten, die es sieht. Tippe auf eine, um sie im Roboter zu aktivieren. (Beim Wechseln der Karte gelten Zonen und Zeitpläne pro Karte.) Du kannst jede Karte löschen; löschst du die letzte, bleibt der Roboter ohne Karte und du kannst eine neue von Grund auf erstellen.",it:"Clean Assistant ricorda le mappe che vede. Toccane una per attivarla nel robot. (Cambiando mappa, zone e programmazioni sono per mappa.) Puoi eliminare qualsiasi mappa; se elimini l'ultima, il robot resta senza mappa e potrai crearne una nuova da zero.",nl:"Clean Assistant onthoudt de kaarten die het ziet. Tik op één om deze in de robot te activeren. (Bij het wisselen van kaart zijn zones en schema's per kaart.) Je kunt elke kaart verwijderen; verwijder je de laatste, dan blijft de robot zonder kaart en kun je een nieuwe vanaf nul maken.",ca:"Clean Assistant recorda els mapes que va veient. Prem-ne un per activar-lo al robot. (En canviar de mapa, les zones i els horaris són per mapa.) Pots esborrar qualsevol mapa; si esborres l'últim, el robot es queda sense mapa i en podràs crear un de nou des de zero."},
   "+ Crear mapa nuevo":{en:"+ Create new map",pt:"+ Criar novo mapa",fr:"+ Créer une nouvelle carte",pl:"+ Utwórz nową mapę",de:"+ Neue Karte erstellen",it:"+ Crea nuova mappa",nl:"+ Nieuwe kaart maken",ca:"+ Crear mapa nou"},
@@ -2573,6 +2590,49 @@
     });
   }
   function loadMaps(){ fetch(BASE+'api/maps').then(function(r){return r.json();}).then(function(d){HOUSE_MAPS=d;renderMaps();}).catch(function(){}); }
+  var archive=document.getElementById('mapArchive');
+  var versions=document.getElementById('archiveVersion');
+  var preview=document.getElementById('archivePreview');
+  var download=document.getElementById('archiveDownload');
+  var archiveStatus=document.getElementById('archiveStatus');
+  function showArchiveVersion(){
+    var url=versions.value;
+    preview.hidden=true;
+    download.hidden=!url;
+    if(url){
+      preview.src=url+'/preview.png';
+      download.href=url+'/export';
+    }else{
+      preview.removeAttribute('src');
+      download.removeAttribute('href');
+    }
+    archiveStatus.textContent='';
+  }
+  preview.addEventListener('load',function(){preview.hidden=false;});
+  preview.addEventListener('error',function(){
+    if(versions.value) archiveStatus.textContent=t('No se pudo cargar el plano.');
+  });
+  versions.addEventListener('change',showArchiveVersion);
+  archive.addEventListener('toggle',async function(){
+    if(!archive.open) return;
+    versions.disabled=true;
+    var previous=versions.value;
+    versions.replaceChildren();
+    showArchiveVersion();
+    try{
+      var response=await fetch(BASE+'api/maps/history');
+      if(!response.ok) throw new Error();
+      var history=await response.json();
+      history.versions.forEach(function(item){
+        var url=BASE+'api/maps/history/'+encodeURIComponent(item.map_id)+'/'+encodeURIComponent(item.version);
+        var label=(item.name || t('Mapa'))+' · '+new Date(item.saved_at).toLocaleString(window.CA_LANG)+' · #'+item.map_id;
+        versions.add(new Option(label,url,false,url===previous));
+      });
+      versions.disabled=!versions.length;
+      showArchiveVersion();
+      if(!versions.length) archiveStatus.textContent=t('Aún no hay planos archivados.');
+    }catch(error){archiveStatus.textContent=t('No se pudo cargar el historial.');}
+  });
   _modalInit();
   loadMaps();
   setTimeout(maybeWizard, 3000);   // tras dar tiempo a que lleguen los mapas del robot (WS)
