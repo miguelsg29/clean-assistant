@@ -162,6 +162,7 @@ class LegacyRobot:
         self.ports = ports or {"cmd": 4010, "map": 4030, "rtc": 4050}
         self._lock = threading.Lock()
         self._wlock = threading.Lock()
+        self._sequence_lock = threading.RLock()
         self._conns = []               # sockets del robot registrado, en orden de llegada
         self._device_id = None         # id que le asignamos en DEVICE_REGISTER_RSP
         self._user_id = random.randint(1, 2**31 - 1)
@@ -175,7 +176,7 @@ class LegacyRobot:
         self._trail_map = None
         self._diag = {"quiet": 0, "info": 0, "orders": 0}
         self._listeners = []
-        self._waiters = {}             # opname de respuesta -> [Event] (para _send_recv)
+        self._waiters = {}             # (response opcode, request sequence) -> Event
         self._kind = {}                # socket -> "cmd" | "map" (puerto por el que entró)
         self._mode = 0                 # modo elegido en la interfaz (commands.CLEAN_MODES): 0 = auto
         self._last_lock = 0.0          # último DEVICE_CONTROL_LOCK_REQ enviado
@@ -260,13 +261,13 @@ class LegacyRobot:
             return self._send("USER_SET_DEVICE_CLEANPREFERENCE_REQ", {4: bool(control["value"])})
         elif c == "setRoomClean":
             ids = [int(r) for r in control.get("roomsID") or []]
-            return self._in_background(self._clean_rooms, ids, bool(control.get("clean_type")))
+            return self._sequence(self._clean_rooms, ids, bool(control.get("clean_type")))
         elif c == "set_area":
             if control.get("area_type") == 3:              # limpiar estas zonas ahora
-                return self._in_background(self._clean_zones, _zone_points(control))
+                return self._sequence(self._clean_zones, _zone_points(control))
             return {"result": 0}       # zonas guardadas: la gen. legacy no las guarda en el robot
         elif c == "set_virwall":
-            return self._in_background(self._set_walls, control)
+            return self._sequence(self._set_walls, control)
         elif c == "set_voice":
             vol = max(0, min(10, int(control.get("volume", 10))))
             on = bool(control.get("voiceMode"))
@@ -333,8 +334,21 @@ class LegacyRobot:
             connected = bool(self._conns)
         if not connected:
             return {"ok": False, "error": "robot no conectado"}
-        threading.Thread(target=fn, args=args, daemon=True).start()
+        threading.Thread(target=self._sequence, args=(fn, *args), daemon=True).start()
         return {"result": 0}
+
+    def _sequence(self, fn, *args):
+        """Return the actual outcome after completing mandatory confirmations."""
+        with self._sequence_lock:
+            try:
+                return fn(*args) or {"result": 0}
+            except Exception as e:
+                self.log(f"  [legacy] secuencia cancelada: {e}")
+                return {"ok": False, "error": str(e)}
+
+    def _confirmed(self, op, fields, rsp):
+        if not self._send_recv(op, fields, rsp):
+            raise RuntimeError(f"Sin confirmación positiva: {rsp}; limpieza cancelada")
 
     def _walls_raw(self) -> list:
         """Paredes virtuales del robot tal cual las manda: [(id, [(x, y)…])] en metros."""
@@ -353,36 +367,46 @@ class LegacyRobot:
         L, head = self._lmap, self._lmap.get("head")
         if not head or not L.get("rooms"):
             self.log("  [legacy] limpiar habitaciones: aún no hay mapa con habitaciones")
-            return
+            raise RuntimeError("Mapa o zonas no disponibles; limpieza cancelada")
+        if not ids or not set(ids).issubset({r["id"] for r in L["rooms"]}):
+            raise RuntimeError("Habitaciones no disponibles en el mapa activo")
         mid = head["map_head_id"]
-        self._send("USER_SET_DEVICE_CLEANPREFERENCE_REQ", {2: twice})
-        self._send_recv("DEVICE_MAPID_SET_PLAN_PARAMS_REQ",
+        result = self._send("USER_SET_DEVICE_CLEANPREFERENCE_REQ", {2: twice})
+        if result.get("ok") is False:
+            return result
+        self._confirmed("DEVICE_MAPID_SET_PLAN_PARAMS_REQ",
                         self._plan_rooms_req(mid, lambda rid: rid in ids),
                         "DEVICE_MAPID_SET_PLAN_PARAMS_RSP")
-        self._send_recv("DEVICE_MAPID_SELECT_MAP_PLAN_REQ", {1: mid, 2: ROOM_PLAN_ID, 3: 1},
+        self._confirmed("DEVICE_MAPID_SELECT_MAP_PLAN_REQ", {1: mid, 2: ROOM_PLAN_ID, 3: 1},
                         "DEVICE_MAPID_SELECT_MAP_PLAN_RSP")
-        self._send_recv("DEVICE_MAPID_GET_GLOBAL_INFO_REQ", {1: 0x78FF},
-                        "DEVICE_MAPID_GET_GLOBAL_INFO_RSP")
-        self._auto_clean(CTRL_START)
+        self._request_map()  # Binary map refresh, not a result-bearing acknowledgement.
+        return self._auto_clean(CTRL_START)
 
     def _clean_all(self):
         """Limpieza completa. El automático (0x106D) limpia el plan de habitaciones seleccionado, y
         tras limpiar habitaciones ese plan solo tiene esas activadas: el robot repetía la última
         (captura de @mactron254, #12). Se reactivan todas antes de arrancar."""
         L, head = self._lmap, self._lmap.get("head")
+        if not head or not L.get("rooms"):
+            raise RuntimeError("Active map rooms unavailable; cleaning cancelled")
         if head and L.get("rooms"):
             mid = head["map_head_id"]
-            self._send_recv("DEVICE_MAPID_SET_PLAN_PARAMS_REQ",
+            self._confirmed("DEVICE_MAPID_SET_PLAN_PARAMS_REQ",
                             self._plan_rooms_req(mid, lambda rid: True),
                             "DEVICE_MAPID_SET_PLAN_PARAMS_RSP")
-            self._send_recv("DEVICE_MAPID_SELECT_MAP_PLAN_REQ", {1: mid, 2: ROOM_PLAN_ID, 3: 1},
+            self._confirmed("DEVICE_MAPID_SELECT_MAP_PLAN_REQ", {1: mid, 2: ROOM_PLAN_ID, 3: 1},
                             "DEVICE_MAPID_SELECT_MAP_PLAN_RSP")
-        self._auto_clean(CTRL_START)
+        return self._auto_clean(CTRL_START)
 
     def _plan_rooms_req(self, mid: int, enable, names: dict | None = None) -> dict:
         """DEVICE_MAPID_SET_PLAN_PARAMS_REQ del plan de habitaciones (mismo mensaje que manda
         Congatudo, validado byte a byte). enable(room_id) -> bool; names: {id: nombre nuevo}."""
         L = self._lmap
+        active = getattr(self.state, "map_head_id", None)
+        if (L.get("head") or {}).get("map_head_id") != mid or (active and active != mid):
+            raise RuntimeError("Map changed; plan cancelled")
+        if "walls" not in L:
+            raise RuntimeError("Las paredes del mapa activo no estan confirmadas; plan cancelado")
         plan = next((p for p in L.get("plans") or [] if p["id"] == ROOM_PLAN_ID), {})
         names = names or {}
         return {
@@ -439,29 +463,32 @@ class LegacyRobot:
         """Como cleanAreas de @agnoc: pasar a modo zona, mandar las zonas y arrancar."""
         head = self._lmap.get("head")
         if not head or not zones:
-            return
+            raise RuntimeError("Mapa o zonas no disponibles; limpieza cancelada")
         mid = head["map_head_id"]
         if self.state.work_mode not in _ZONE_MODES:          # setMode(ZONE)
-            self._send_recv("DEVICE_AREA_CLEAN_REQ", {1: CTRL_STOP}, "DEVICE_AREA_CLEAN_RSP")
-            self._send_recv("DEVICE_MAPID_GET_GLOBAL_INFO_REQ", {1: 0x78FF | 0x100},
-                            "DEVICE_MAPID_GET_GLOBAL_INFO_RSP")
-            self._wait_for(lambda: self.state.work_mode in _ZONE_MODES, 5.0)
+            self._confirmed("DEVICE_AREA_CLEAN_REQ", {1: CTRL_STOP}, "DEVICE_AREA_CLEAN_RSP")
+            self._send("DEVICE_MAPID_GET_GLOBAL_INFO_REQ", {1: 0x78FF | 0x100})
+            if not self._wait_for(lambda: self.state.work_mode in _ZONE_MODES, 5.0):
+                raise RuntimeError("El robot no confirmó el modo zona; limpieza cancelada")
         areas = [(random.randint(1, 65535), pts) for pts in zones]
-        self._send_recv("DEVICE_MAPID_SET_AREA_CLEAN_INFO_REQ", self._area_info(mid, 0, areas),
+        self._confirmed("DEVICE_MAPID_SET_AREA_CLEAN_INFO_REQ", self._area_info(mid, 0, areas),
                         "DEVICE_MAPID_SET_AREA_CLEAN_INFO_RSP")
-        self._send("DEVICE_AREA_CLEAN_REQ", {1: CTRL_START})
+        return self._send("DEVICE_AREA_CLEAN_REQ", {1: CTRL_START})
 
     def _set_walls(self, control: dict):
         """Como setRestrictedZones de @agnoc: las nuevas + las del robot SIN coordenadas
         (así se borran las antiguas). La gen. legacy no tiene zonas 'sin fregona' (301)."""
         head = self._lmap.get("head")
         if not head:
-            return
+            raise RuntimeError("Mapa o zonas no disponibles; limpieza cancelada")
+        active = getattr(self.state, "map_head_id", None)
+        if (control.get("map_head_id") != head["map_head_id"]
+                or (active and active != head["map_head_id"])):
+            raise RuntimeError("El mapa de las restricciones no coincide con el mapa activo")
         new = []
         for z in control.get("virwallList") or []:
             if int(z.get("Type", 200)) != 200:
-                self.log("  [legacy] las zonas 'sin fregona' no existen en la generación legacy: se omite")
-                continue
+                raise RuntimeError("Las zonas sin fregona no están soportadas en legacy")
             pts = [(float(p["PointX"]), float(p["PointY"])) for p in z.get("PointList", [])]
             if len(pts) == 2:
                 pts = pts * 2                      # pared: el robot la guarda como A,B,A,B
@@ -470,30 +497,44 @@ class LegacyRobot:
         if not new:
             new = [(random.randint(1, 65535), [])]
         areas = new + [(aid, []) for aid, _ in self._walls_raw()]
-        self._send_recv("DEVICE_MAPID_SET_AREA_RESTRICTED_INFO_REQ",
+        self._confirmed("DEVICE_MAPID_SET_AREA_RESTRICTED_INFO_REQ",
                         self._area_info(head["map_head_id"], 0, areas),
                         "DEVICE_MAPID_SET_AREA_RESTRICTED_INFO_RSP")
+        self._lmap["walls"] = {"areas": [{"id": aid, "points": pts} for aid, pts in new if pts]}
         self._request_map()
+        return {"result": 0}
 
     def _send_recv(self, opname: str, fields: dict, rsp: str, timeout: float = 8.0) -> bool:
-        """Envía y espera la respuesta `rsp` (como sendRecv de @agnoc)."""
-        ev = threading.Event()
-        with self._lock:
-            self._waiters.setdefault(rsp, []).append(ev)
-        if self._send(opname, fields).get("ok") is False:
-            return False
-        if ev.wait(timeout):
-            return True
-        with self._lock:
-            if ev in self._waiters.get(rsp, []):
-                self._waiters[rsp].remove(ev)
-        self.log(f"  [legacy] sin respuesta {rsp} en {timeout:.0f}s (sigo)")
-        return False
+        """Match one result-bearing response to the outgoing packet sequence.
 
-    def _wake(self, rsp: str):
+        packet.respond preserves request.sequence (the connection.emitter.ts semantics
+        documented in packet.py). A late reply cannot release a later request.
+        Binary map responses have no result field and must not authorize a clean.
+        """
+        if rsp in BINARY_OPS:
+            raise ValueError("Binary map data is not a command acknowledgement")
+        ev = threading.Event()
+        ev.success = False
+        sequence = random.getrandbits(64)
+        key = (rsp, sequence)
         with self._lock:
-            evs = self._waiters.pop(rsp, [])
-        for ev in evs:
+            while key in self._waiters:
+                sequence = random.getrandbits(64)
+                key = (rsp, sequence)
+            self._waiters[key] = ev
+        try:
+            if self._send(opname, fields, sequence=sequence).get("ok") is False:
+                return False
+            return bool(ev.wait(timeout) and ev.success)
+        finally:
+            with self._lock:
+                self._waiters.pop(key, None)
+
+    def _wake(self, rsp: str, fields=None, sequence=None):
+        with self._lock:
+            ev = self._waiters.get((rsp, sequence))
+        if ev is not None:
+            ev.success = pb.first(fields or {}, 1, None) == 0
             ev.set()
 
     @staticmethod
@@ -501,12 +542,13 @@ class LegacyRobot:
         end = time.time() + timeout
         while time.time() < end and not cond():
             time.sleep(0.2)
+        return bool(cond())
 
     # ---------------- envío ----------------
     def _auto_clean(self, ctrl: int) -> dict:
         return self._send("DEVICE_AUTO_CLEAN_REQ", {1: ctrl, 2: CLEAN_TYPE_AUTO})
 
-    def _send(self, opname: str, fields: dict) -> dict:
+    def _send(self, opname: str, fields: dict, *, sequence=None) -> dict:
         """Trama iniciada por nosotros, por la conexión de COMANDOS (4010), como hace Congatudo en
         la captura real. Si aún no existe, por la primera que haya. (@agnoc usa siempre la primera
         registrada, pero 4010 y 4030 llegan en paralelo y podría ganar la del mapa.)"""
@@ -516,7 +558,7 @@ class LegacyRobot:
             dev = self._device_id
         if not sock or dev is None:
             return {"ok": False, "error": "robot no conectado"}
-        pkt = send(opname, pb.encode(fields), device_id=dev, user_id=self._user_id)
+        pkt = send(opname, pb.encode(fields), device_id=dev, user_id=self._user_id, sequence=sequence)
         try:
             self._write(sock, pkt)
             self.log(f"  --> robot: {opname}")
@@ -633,7 +675,7 @@ class LegacyRobot:
             op = None
         if op is None:
             if ctrl == CTRL_START and starting and self.state.state not in ("paused", "cleaning"):
-                return self._in_background(self._clean_all)
+                return self._sequence(self._clean_all)
             return self._auto_clean(ctrl)
         return self._send(op, {1: ctrl})
 
@@ -689,7 +731,7 @@ class LegacyRobot:
             return
         self._attach(sock)
         if op.endswith("_RSP"):
-            self._wake(op)                 # respuesta a un _send_recv en curso
+            self._wake(op, f, pkt.sequence)                 # respuesta a un _send_recv en curso
 
         if op == "CLIENT_HEARTBEAT_REQ":
             self._reply(sock, pkt, "CLIENT_HEARTBEAT_RSP")
@@ -843,6 +885,12 @@ class LegacyRobot:
         except Exception as e:
             self.log(f"  [legacy] mapa no decodificable ({len(payload)} B): {e}")
             return
+        # Sections retained from another map must never enter a new room plan or wall resend.
+        new_mid = (d.get("head") or {}).get("map_head_id")
+        old_mid = (self._lmap.get("head") or {}).get("map_head_id")
+        if new_mid is not None and new_mid != old_mid:
+            for key in ("grid", "rooms", "charger", "robot", "walls", "plans"):
+                self._lmap.pop(key, None)
         # no todos los pushes traen todas las secciones (mask): se conserva la última de cada una
         for k in ("head", "grid", "rooms", "charger", "robot", "walls", "maps", "plans"):
             if d.get(k) is not None:

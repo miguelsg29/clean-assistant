@@ -638,10 +638,18 @@ mqtt.prefs.update(_loaded_clean_prefs)                # restaura fan/water/mop/m
                                                        # quedan los DEFAULT_* / "Auto" de siempre)
 
 
+_last_clean_error = {"value": None}
+
+
+def _record_clean_error(error):
+    _last_clean_error["value"] = {"ts": time.time(), "error": str(error)}
+
+
 def _state_dict():
     """robot.state + la sombra de "próxima limpieza" (mqtt.prefs), para que la web pueda
     pintar el Modo/Succión/Agua/Mopa realmente activos en vez de asumir los de fábrica."""
     d = robot.state.to_dict()
+    d["last_clean_error"] = _last_clean_error["value"]
     d["prefs"] = {k: mqtt.prefs.get(k) for k in _CLEAN_PREF_KEYS}
     return d
 # mqtt.ha_notify_provider se asigna más abajo, junto a _on_mqtt_connectivity_change (necesita
@@ -650,7 +658,23 @@ def _state_dict():
 
 def _send_zone_group(group: str):
     """Reenvía al robot la lista COMPLETA del grupo (set_virwall o set_area)."""
-    return robot.command(zones.build_command(group, _map_head_id()))
+    return _checked_command(zones.build_command(group, _map_head_id()))
+
+
+class PreCleanError(RuntimeError):
+    pass
+
+
+def _checked_command(control):
+    if LEGACY and control.get("control") == "set_preference" and control.get("ctrltype") == 15:
+        return {"result": 0}  # Legacy has no vibration-mop setting; retain existing schedule behavior.
+    result = robot.command(control)
+    if isinstance(result, dict) and (result.get("ok") is False or result.get("result", 0) not in (0, None)):
+        raise RuntimeError(result.get("error") or f"Comando rechazado: {control.get('control')}")
+    if ((control.get("control") == "set_mode" and control.get("type") == 0 and control.get("value") == 1)
+            or (control.get("control") == "setRoomClean" and control.get("ctrlValue") == 1)):
+        _last_clean_error["value"] = None
+    return result
 
 
 def _resend_zones_and_prefs():
@@ -666,19 +690,22 @@ def _resend_zones_and_prefs():
         _send_zone_group("cleaning")     # zonas de limpieza (una/dos veces)
         p = mqtt.prefs
         if p.get("fan") in cmd.FAN:
-            robot.command(cmd.fan(p["fan"]))
+            _checked_command(cmd.fan(p["fan"]))
         if p.get("water") in cmd.WATER:
-            robot.command(cmd.water(p["water"]))
+            _checked_command(cmd.water(p["water"]))
         if p.get("mop") in cmd.MOP:
-            robot.command(cmd.mop(p["mop"]))
+            _checked_command(cmd.mop(p["mop"]))
         if p.get("mode") in cmd.CLEAN_MODES:
-            robot.command(cmd.select_mode(p["mode"]))
-        robot.command(cmd.twice(bool(p.get("twice"))))
-        robot.command(cmd.carpet_turbo(bool(p.get("turbo_carpet"))))
+            _checked_command(cmd.select_mode(p["mode"]))
+        _checked_command(cmd.twice(bool(p.get("twice"))))
+        _checked_command(cmd.carpet_turbo(bool(p.get("turbo_carpet"))))
     except Exception as e:
-        print(f"[resend_before_clean] fallo al reenviar zonas/ajustes: {e}")
+        _record_clean_error(e)
+        raise PreCleanError(f"Could not prepare cleaning: {e}") from e
 
 
+mqtt.on_clean_started = lambda: _last_clean_error.update(value=None)
+mqtt.on_clean_error = _record_clean_error
 mqtt.pre_clean_resend = _resend_zones_and_prefs        # reenvío opcional de zonas/ajustes (resend_before_clean)
 
 
@@ -940,11 +967,16 @@ async def _run_due_schedules_legacy():
         _legacy_sched["fired"][p.get("id")] = stamp
         _legacy_sched["last"] = {"ts": time.time(), "name": p.get("name") or "Horario"}
         print(f"[horarios] lanzo '{p.get('name')}' (lo ejecuta Clean Assistant, no el robot)")
-        _resend_zones_and_prefs()
-        for i, c in enumerate(controls):
-            robot.command(c)
-            if i < len(controls) - 1:
-                await asyncio.sleep(0.3)      # potencia/agua antes de limpiar (como schedule_run)
+        try:
+            await asyncio.to_thread(_resend_zones_and_prefs)
+            for i, c in enumerate(controls):
+                await asyncio.to_thread(_checked_command, c)
+                if i < len(controls) - 1:
+                    await asyncio.sleep(0.3)
+        except Exception as e:
+            _record_clean_error(e)
+            _legacy_sched["last"]["error"] = str(e)
+            print(f"[horarios] limpieza cancelada: {e}")
         return                                # uno por minuto: el robot ya está ocupado
 
 
@@ -1339,9 +1371,16 @@ async def post_command(payload: dict):
         control = build(action, payload)
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
-    if action in ("start", "clean_rooms", "clean_all"):
-        _resend_zones_and_prefs()
-    result = robot.command(control)
+    try:
+        if action in ("start", "clean_rooms", "clean_all"):
+            await asyncio.to_thread(_resend_zones_and_prefs)
+    except PreCleanError as e:
+        return {"ok": False, "code": "pre_clean_failed", "error": str(e)}
+    try:
+        result = await asyncio.to_thread(_checked_command, control)
+    except Exception as e:
+        _record_clean_error(e)
+        return {"ok": False, "code": "command_failed", "error": str(e)}
     if action in ("start", "clean_rooms", "clean_all"):   # limpieza lanzada desde CA -> "manual"
         _clean_trigger["ts"] = time.time()
         _clean_trigger["rooms"] = payload.get("rooms", [])
@@ -1481,7 +1520,7 @@ async def zone_add(payload: dict):
                       mapid=_active_map())          # la zona pertenece al mapa activo
     except (KeyError, ValueError) as e:
         return {"ok": False, "error": str(e)}
-    _send_zone_group(zones.group_of(z["kind"]))
+    await asyncio.to_thread(_send_zone_group, zones.group_of(z["kind"]))
     await broadcast_zones()
     return {"ok": True, "zone": z, "zones": _zones_payload()}
 
@@ -1492,7 +1531,7 @@ async def zone_delete(payload: dict):
     z = next((x for x in zones.zones if x["id"] == int(zid)), None)
     zones.delete(zid)
     if z:
-        _send_zone_group(zones.group_of(z["kind"]))
+        await asyncio.to_thread(_send_zone_group, zones.group_of(z["kind"]))
     await broadcast_zones()
     return {"ok": True, "zones": _zones_payload()}
 
@@ -1501,7 +1540,7 @@ async def zone_delete(payload: dict):
 async def zone_rename(payload: dict):
     z = zones.rename(payload["id"], payload.get("name", ""))
     if z:
-        _send_zone_group(zones.group_of(z["kind"]))   # el nombre viaja en el comando
+        await asyncio.to_thread(_send_zone_group, zones.group_of(z["kind"]))   # el nombre viaja en el comando
     await broadcast_zones()
     return {"ok": True, "zones": _zones_payload()}
 
@@ -1511,7 +1550,7 @@ async def zone_update(payload: dict):
     """Mueve una zona: nuevos puntos (metros) -> reenvía el grupo al robot."""
     z = zones.update_points(payload["id"], payload.get("points") or [])
     if z:
-        _send_zone_group(zones.group_of(z["kind"]))
+        await asyncio.to_thread(_send_zone_group, zones.group_of(z["kind"]))
     await broadcast_zones()
     return {"ok": True, "zones": _zones_payload()}
 
@@ -1570,10 +1609,10 @@ async def _reconcile_robot_zones():
         robot_restricted = any(z.get("kind") in ("nogo", "nomop")
                                for z in m.get("stored_zones", []))
         if ca_restricted and not robot_restricted:
-            _send_zone_group("restricted")
+            await asyncio.to_thread(_send_zone_group, "restricted")
             print("[zonas] paredes virtuales re-enviadas (el robot las había perdido)")
         if ca_cleaning:
-            _send_zone_group("cleaning")
+            await asyncio.to_thread(_send_zone_group, "cleaning")
 
 
 # ---- mapas de la casa: listar / cambiar / renombrar (Clean Assistant los va recordando) ----
@@ -1898,11 +1937,18 @@ async def schedule_run(payload: dict):
     controls = run_controls(p)
     if not controls:
         return {"ok": False, "error": "el plan no tiene habitaciones"}
-    _resend_zones_and_prefs()
-    for i, c in enumerate(controls):
-        robot.command(c)
-        if i < len(controls) - 1:
-            await asyncio.sleep(0.3)          # deja que potencia/agua/mopa lleguen antes de limpiar
+    try:
+        await asyncio.to_thread(_resend_zones_and_prefs)
+    except PreCleanError as e:
+        return {"ok": False, "code": "pre_clean_failed", "error": str(e)}
+    try:
+        for i, c in enumerate(controls):
+            await asyncio.to_thread(_checked_command, c)
+            if i < len(controls) - 1:
+                await asyncio.sleep(0.3)
+    except Exception as e:
+        _record_clean_error(e)
+        return {"ok": False, "code": "command_failed", "error": str(e)}
     ids = [r["room"] for r in p.get("rooms", []) if r.get("room") is not None]
     _clean_trigger["ts"] = time.time()        # limpieza lanzada desde CA -> "manual"
     _clean_trigger["rooms"] = ids
@@ -1943,7 +1989,7 @@ async def delete_robot_order(payload: dict):
 # ---- zonas guardadas en el robot (paredes virtuales del mapa): editar / borrar ----
 def _robot_virwall_zones() -> list:
     m = getattr(robot, "map", None) or {}
-    return [z for z in m.get("stored_zones", []) if z.get("kind") in ("nogo", "nomop")]
+    return [dict(z) for z in m.get("stored_zones", []) if z.get("kind") in ("nogo", "nomop")]
 
 
 def _push_robot_zones(zlist):
@@ -1952,7 +1998,7 @@ def _push_robot_zones(zlist):
               "type": z.get("type") or cmd.VIRWALL_NOGO,
               "name": z.get("name", ""), "id": i + 1}
              for i, z in enumerate(zlist) if z.get("points_m")]
-    robot.command(cmd.set_virwall(zones, _map_head_id()))
+    return _checked_command(cmd.set_virwall(zones, _map_head_id()))
 
 
 async def _reflect_robot_zones(zlist):
@@ -1972,7 +2018,7 @@ async def robot_zone_delete(payload: dict):
     if not (0 <= idx < len(zs)):
         return {"ok": False, "error": "índice fuera de rango"}
     remaining = [z for i, z in enumerate(zs) if i != idx]
-    _push_robot_zones(remaining)
+    await asyncio.to_thread(_push_robot_zones, remaining)
     await _reflect_robot_zones(remaining)
     return {"ok": True}
 
@@ -1987,7 +2033,7 @@ async def robot_zone_update(payload: dict):
         zs[idx]["name"] = str(payload["name"])
     if payload.get("points_m"):
         zs[idx]["points_m"] = [list(p) for p in payload["points_m"]]
-    _push_robot_zones(zs)
+    await asyncio.to_thread(_push_robot_zones, zs)
     await _reflect_robot_zones(zs)
     return {"ok": True}
 
@@ -2050,8 +2096,8 @@ async def config_import(payload: dict):
     active = _active_map()                 # sube al robot lo del mapa activo (zonas + horarios)
     if active is not None:
         try:
-            _send_zone_group("restricted")
-            _send_zone_group("cleaning")
+            await asyncio.to_thread(_send_zone_group, "restricted")
+            await asyncio.to_thread(_send_zone_group, "cleaning")
             for p in schedules.for_map(active):
                 robot.command(schedules.order_command(p, active, _rooms_meta()))
             # restaura nombres/tipo/suelo de habitación en el robot si las del backup coinciden
