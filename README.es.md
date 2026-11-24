@@ -109,8 +109,9 @@ para desarrollar la interfaz sin un Conga.
 - **Consumibles**: vida restante de cepillos, filtro y mopa, con botón para poner a cero
   al cambiar la pieza.
 - Avisos y errores del robot en la cabecera (p. ej. «Depósito de agua bajo»).
-- **Reenvío opcional de zonas y ajustes antes de cada limpieza**, para robots que a veces los
-  ignoran al arrancar «en frío» (desactivado por defecto).
+- Opciones independientes para **reenviar ajustes** y **reenviar restricciones antes de limpiar**
+  (desactivadas por defecto). Activar ajustes no activa restricciones. Se combinan las zonas
+  guardadas con las restricciones del mapa activo del robot; sin datos del mapa se cancela la limpieza.
 
 ### 🚪 Habitaciones
 - Nombre, **tipo de estancia** (con icono) y **tipo de suelo** (madera, azulejos,
