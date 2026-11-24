@@ -874,15 +874,16 @@ class LegacyRobot:
 
     # ---------------- mapa ----------------
     def _on_map(self, payload: bytes):
+        self.native_map_session_id = None
         try:
             d = mapdecode.decode_map(payload)
         except Exception as e:
             self.log(f"  [legacy] mapa no decodificable ({len(payload)} B): {e}")
             return
+        # Sections retained from another map must never enter a new room plan or wall resend.
         new_mid = (d.get("head") or {}).get("map_head_id")
         old_mid = (self._lmap.get("head") or {}).get("map_head_id")
         if new_mid is not None and new_mid != old_mid:
-            self.native_map_session_id = None
             for key in ("grid", "rooms", "charger", "robot", "walls", "plans"):
                 self._lmap.pop(key, None)
         # no todos los pushes traen todas las secciones (mask): se conserva la última de cada una
@@ -899,12 +900,12 @@ class LegacyRobot:
             self.state.map_name = name
         try:
             self.map = cmap.build_map(self._legacy_info(name), head["size_x"], head["size_y"])
+            self.native_map_session_id = self.native_session_id
         except ValueError as e:
             self.native_map_session_id = None
             self.log(f"  [legacy] mapa vacío o incompleto: {e}")
             return
         self.map["map_head_id"] = mid
-        self.native_map_session_id = self.native_session_id
         self.map_empty = False
         self.pose = self.map.get("robot")
         self._accumulate_trail()
