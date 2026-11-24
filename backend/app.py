@@ -689,19 +689,15 @@ def _resend_zones_and_prefs():
         _send_zone_group("restricted")   # no-go + no-mopa
         _send_zone_group("cleaning")     # zonas de limpieza (una/dos veces)
         p = mqtt.prefs
-        if p.get("fan") in cmd.FAN:
-            _checked_command(cmd.fan(p["fan"]))
-        if p.get("water") in cmd.WATER:
-            _checked_command(cmd.water(p["water"]))
-        if p.get("mop") in cmd.MOP:
-            _checked_command(cmd.mop(p["mop"]))
-        if p.get("mode") in cmd.CLEAN_MODES:
-            _checked_command(cmd.select_mode(p["mode"]))
+        for key, choices, factory in (("fan", cmd.FAN, cmd.fan), ("water", cmd.WATER, cmd.water),
+                                      ("mop", cmd.MOP, cmd.mop), ("mode", cmd.CLEAN_MODES, cmd.select_mode)):
+            if p.get(key) in choices:
+                _checked_command(factory(p[key]))
         _checked_command(cmd.twice(bool(p.get("twice"))))
         _checked_command(cmd.carpet_turbo(bool(p.get("turbo_carpet"))))
     except Exception as e:
         _record_clean_error(e)
-        raise PreCleanError(f"Could not prepare cleaning: {e}") from e
+        raise PreCleanError(f"No se pudo preparar la limpieza: {e}") from e
 
 
 mqtt.on_clean_started = lambda: _last_clean_error.update(value=None)
